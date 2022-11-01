@@ -3,6 +3,21 @@ uuid = "ace4fa40-4b0d-4fab-a937-802c9281da09"
 authors = ["Mel Wey <45990429+melwey@users.noreply.github.com> and contributors"]
 version = "0.1.0"
 
+[deps]
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+EarthDataLab = "359177bc-a543-11e8-11b7-bb015dba3358"
+FastTransforms = "057dd010-8810-581a-b7be-e3fc3b93f78c"
+OnlineStats = "a15396b6-48d5-5d58-9928-6d29437db91e"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+SlurmClusterManager = "c82cd089-7bf7-41d7-976b-6b5d413cbe0a"
+SphericalConvolutions = "7186af5b-8736-480f-81ff-8eb527665490"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+WeightedOnlineStats = "bbac0a1f-7c9d-5672-960b-c6ca726e5d5d"
+YAXArrays = "c21b50f5-aa40-41ea-b809-c0f5e47bfa5c"
+Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
+
 [compat]
 julia = "1"
 
