@@ -5,6 +5,8 @@ using YAXArrays, EarthDataLab, Statistics, Zarr
 using Distributed, SlurmClusterManager
 # spatial filter
 using SphericalConvolutions
+# label connected components
+using ImageMorphology
 # stats
 using OnlineStats, WeightedOnlineStats
 using DataFrames
@@ -35,5 +37,6 @@ source: https://github.com/JuliaLang/julia/blob/76952a88ea650ae8c6b6b1d010ef695e
 include("preprocessing.jl")
 include("detection.jl")
 include("stats.jl")
+include("plots.jl")
 #include("sanity_check.jl")
 # end
