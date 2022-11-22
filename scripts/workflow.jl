@@ -2,7 +2,9 @@
 
 # point to ERA5 daily data
 # zarr group
-zg = zopen("https://s3.bgc-jena.mpg.de:9000/xaida/ERA5Data.zarr",consolidated=true)
+# zg = zopen("https://s3.bgc-jena.mpg.de:9000/xaida/ERA5Data.zarr",consolidated=true)
+zg = zopen("https://s3.bgc-jena.mpg.de:9000/xaida/v2/ERA5Data.zarr",consolidated=true, fill_as_missing = false)
+
 # YAXArray Dataset
 ds = open_dataset(zg)
 # YAXArray
@@ -10,6 +12,7 @@ era5 = Cube(ds)
 # run preprocessing
 ## calc PET
 ## compute PEI = P - E
+# run compute_pei.jl
 pei = Cube(open_dataset(zopen("https://s3.bgc-jena.mpg.de:9000/xaida/SPEICube.zarr", consolidated = true)))
 
 # subsetcube
@@ -26,34 +29,12 @@ sub_pei = subsetcube(pei,
     # lat=(51,50),
     #time=(Date("2000-01-01"),Date("2001-12-31")),
     )
-# ranked
-# input
-x = sub_tmax[lon=10,lat=51][:];
-m = (markershape = :circle,
-    markersize = 2,
-    markeralpha = 0.6,
-    #markercolor = :green,
-    #markerstrokewidth = 0,
-    #markerstrokealpha = 0.2,
-    #markerstrokecolor = :black,
-    markerstrokestyle = :none
-    )
-p = plot(sub_tmax.time,x, seriestype = :scatter, color = :grey, markershape = :circle, markersize = 2, markeralpha = 0.6, markerstrokewidth = 0,
-    xlabel = "Days", ylabel = "Tmax", label = "Events",
-    legend = :bottomright)
-savefig(p,"../tmax_series.png")
-q = quantile(x, 0.99)
-ind = x .>= q;
-sum(ind)
-plot!(p,sub_tmax.time[[1,end]], [q,q], color= Colors.colorant"#28828F", lw=3, label = "Threshold")
-savefig(p,"../tmax_tres.png")
-plot!(p,sub_tmax.time[ind], x[ind], seriestype = :scatter, 
-    color = Colors.colorant"#366570", markersize = 3, markeralpha = 0.6, markerstrokewidth = 0,
-    label = "Extremes")
-savefig(p,"../tmax_extremes.png")
 
+# ranked: normalize data between 0 and 1, with extremes of interest in the lower range
 
+# daily maximum temperature extremes of interest are in the upper range, so we multiply values by -1 before we normalize them
 ranked_t = rescale(sub_tmax,"/Users/mweynants/BGI/temp/tmax_ranked.zarr", multiplier = -1)
+# PEI values of interest are in the lower range (P-E << 0), so we don't transform them before we normalize them
 ranked_pei = rescale(sub_pei,"/Users/mweynants/BGI/temp/pei_ranked.zarr")
 
 # # with different data sources?
@@ -62,6 +43,8 @@ ranked_pei = rescale(sub_pei,"/Users/mweynants/BGI/temp/pei_ranked.zarr")
 # mds = merge_datasets((ds,ds2))
 # ranked1 = rescale(Cube(mds),"/Users/mweynants/BGI/temp/ranked1.zarr")
 
+
+# smoothed: apply spatial filter on ranked data
 ## DO NOT RUN ON LOCAL MACHINE
 # smoothed = smooth(ranked, "/Users/mweynants/BGI/temp/tmax_smoothed.zarr")
 ##
@@ -93,7 +76,7 @@ simpleplot(extr1, 40, 2001, 4)
 Plots.plot(reshape(extr[:,:,:], (92,24)),legend = :outertopright)
 Plots.plot(reshape(extr1[:,:,:], (92,24)),legend = :outertopright)
 
-# other metheof for compute_extremes, with tuple as input and multipliyng temp by -1
+# other metheod for compute_extremes, with tuple as input 
 tmp = compute_extremes(inputs,0.01, "/Users/mweynants/BGI/temp/tmp.zarr"; tresne = 0.1)
 tmp1 = compute_extremes(inputs,0.01, "/Users/mweynants/BGI/temp/tmp1.zarr")
 simpleplot(tmp, 182, 2019, 4)
@@ -104,6 +87,7 @@ eec = Cube(open_dataset(zopen("https://s3.bgc-jena.mpg.de:9000/xaida/EventCube_0
 ## connected components
 eec_bin = subsetcube(eec, time = 2019:2019, region="Germany").data[:,:,:] .> 0;
 Plots.heatmap(eec_bin[182,:,:]'[end:-1:1,:], c = cgrad(:thermal, categorical = true), title = "Boolean layer")
+# use ImageMorphology.label_components to label the connected blobs of events
 r = label_components(eec_bin);
  # should be 70 labels
 findmax(r)
