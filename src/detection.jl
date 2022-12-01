@@ -30,9 +30,9 @@ Transforms input into values between 0 and 1
     function rank_transform!(xout, xin; multiplier = nothing)
         # modify the xin columns for which sign need to be changed
         if !isnothing(multiplier)
-            @show xin[1:10]
-            xin .* multiplier
-            @show xin[1:10]
+            #@show xin[1:10]
+            xin .*= multiplier
+            #@show xin[1:10]
         end
         N=length(xout)
         for (i,si) in enumerate(sortperm(xin))
@@ -56,7 +56,8 @@ Transforms input into values between 0 and 1
         inputcube;
         indims=indims,
         outdims=outdims,
-        max_cache=1e9
+        max_cache=1e9,
+        multiplier=multiplier
         )
 end
 
@@ -85,14 +86,15 @@ function smooth(
     max_cache::Float64 = 5e8
 )
     function applylowpass(xout,xin;lbord = 20, width=2)
-        @show xin
-        im2 = [xin[j,i] for i in size(xin,2):-1:1,j in 1:(size(xin,1)-1)]
-        @show im2
+        # @show xin
+        im2 = [xin[j,i] for i in size(xin,2):-1:2,j in 1:(size(xin,1)-1)]
+        # @show im2
         imfiltered = SphericalConvolutions.lowpass(Float64.(im2),lbord = lbord,width=width)
-        @show imfiltered
-        xout[1:end-1,end:-1:1] = permutedims(imfiltered)
+        # @show imfiltered
+        xout[1:end-1,end:-1:2] = permutedims(imfiltered)
         xout[end,:] = xout[end-1,:]
-        @show xout
+        xout[:,1] = xout[:,end]
+        # @show xout
         xout
     end
 
@@ -109,7 +111,7 @@ function smooth(
         inputcube,
         indims=indims,
         outdims=outdims,
-        max_cache=5e8)
+        max_cache=max_cache)
 end
 
 
