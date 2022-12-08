@@ -105,13 +105,18 @@ function smooth(
         path=outputpath,
         backend=backend,
         overwrite=overwrite)
+    
+    # limit number of threads to 1 per worker. (lowpass doesn't work with multiple threads)
+    ntr = Dict(w=>1 for w in workers())
+
 
     mapCube(
         applylowpass,
         inputcube,
         indims=indims,
         outdims=outdims,
-        max_cache=max_cache)
+        max_cache=max_cache,
+        nthreads=ntr)
 end
 
 
@@ -145,7 +150,7 @@ function compute_extremes(
     max_cache::Float64 = 1e9
 )   
     indims = ntuple(_->InDims("Time"),length(input))
-    @show indims
+    #@show indims
     outdims = OutDims("Time",
     outtype=UInt8,
     chunksize = :input, 
@@ -178,7 +183,7 @@ function compute_extremes(
     max_cache::Float64 = 1e9
 )   
     indims = InDims("Time","Variable",)
-    @show indims
+    #@show indims
     outdims = OutDims("Time",
         outtype=UInt8,
         chunksize = :input, 

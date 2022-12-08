@@ -8,7 +8,7 @@ zg = zopen("https://s3.bgc-jena.mpg.de:9000/xaida/v2/ERA5Data.zarr",consolidated
 # YAXArray Dataset
 ds = open_dataset(zg)
 # YAXArray
-era5 = Cube(ds)
+era = Cube(ds)
 # run preprocessing
 ## calc PET
 ## compute PEI = P - E
@@ -16,12 +16,12 @@ era5 = Cube(ds)
 pei = Cube(open_dataset(zopen("https://s3.bgc-jena.mpg.de:9000/xaida/SPEICube.zarr", consolidated = true)))
 
 # subsetcube
-sub_tmax = subsetcube(era5,
+sub_tmax = subsetcube(era,
     variable = ["t2mmax"],
-    region = "Germany",
-    # lon=(10,11.5),
-    # lat=(51,50),
-    #time=(Date("2000-01-01"),Date("2001-12-31")),
+    # region = "Germany",
+    lon=(10,11.5),
+    lat=(51,50),
+    time=(Date("2000-01-01"),Date("2001-12-31")),
     )
 sub_pei = subsetcube(pei,
     region = "Germany",
@@ -66,7 +66,8 @@ ranked_dc = Cube(ranked_ds)
 extr = compute_extremes(ranked_dc, 0.01, "/Users/mweynants/BGI/temp/extr.zarr")
 extr1 = compute_extremes(ranked_dc, 0.01, "/Users/mweynants/BGI/temp/extr1.zarr"; tresne = 0.1)
 
-extr = Cube("/Users/mweynants/BGI/temp/extr.zarr")
+extr = Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventCube_ranked_pot0.01_ne0.1.zarr")
+# extr = Cube("/Users/mweynants/BGI/temp/extr.zarr")
 
 # simpleplot(dc::YAXArray, d::Int, year::Int, nlayer::Int; variable = nothing)
 simpleplot(extr, 45, 2001, 4)
@@ -106,5 +107,11 @@ p2 = Plots.heatmap(r'[end:-1:1,:], c = cgrad(:gist_earth, categorical = true), t
 savefig(p2,"../connected_comp.png")
 
 
+ranked_pei = Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/pei_ranks.zarr")
+c1 = ranked_pei[time=(Date(2020,6,15),Date(2020,6,17)), variable = "pei_30"]
+tmp = smooth(c1, "smooth_pei.zarr")
 
+tmp1 = tmp[:,:,:]
+p = heatmap(tmp1[:,:,1]'[end:-1:1,:])
+p = heatmap(tmp1[:,:,2]'[end:-1:1,:])
 
