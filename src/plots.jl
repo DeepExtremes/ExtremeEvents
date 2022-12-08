@@ -7,11 +7,20 @@ using Dates
         d::Int, 
         year::Int, 
         nlayer::Int;
-        variable::Union{nothing, AbstractString}
+        variable::Union{nothing, AbstractString} = nothing,
+        colours::Union{nothing, PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient} = nothing, 
+        replacement::Union{nothing, Pair{::Any, ::Any} = nothing
         )
     Plots a heatmap of cube `dc` on day `d` of Year `year`.
 """
-function simpleplot(dc::YAXArray, d::Int, year::Int, nlayers::Int; variable = nothing)
+function simpleplot(dc::YAXArray, 
+    d::Int, 
+    year::Int, 
+    nlayers::Int; 
+    variable::Union{Nothing, AbstractString} = nothing,
+    colours::Union{Nothing, PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient} = nothing, 
+    replacement::Any = Pair(nothing,nothing)
+    )
     if isnothing(getAxis("Variable", dc))
             sdc = subsetcube(dc, time = year:year)
     else
@@ -21,13 +30,21 @@ function simpleplot(dc::YAXArray, d::Int, year::Int, nlayers::Int; variable = no
             sdc = subsetcube(dc, time = year:year, variable = variable)
         end
     end
-    # v = repeat([RGB(1,1,1)],2^nlayers + 1)
-    # v[end] = RGB(.7,.7,.7)
-    
-    #     RGBA(1,0,0,1), # 0x01 # 1 !!
-
+    if isnothing(colours)
+        colours = palette(:darkterrain, 16)
+    else
+        if typeof(colours) in [PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient]
+            ErrorException("colours should be of type ColorGradient")
+        end
+    end
     # transpose and count backwards to get the map correctly
-    Plots.heatmap(sdc.data[d,:,:]'[end:-1:1,:], c = cgrad(:thermal, categorical = true), zlims = [0,2^nlayers], title = Date("$year") + Day(d))
+    plotdata = copy(sdc.data[d,:,:]'[end:-1:1,:]);
+    # replace 0 
+    if !isa(replacement, Pair{Nothing, Nothing})
+        replace!(plotdata, replacement);
+    end
+    # Plots.heatmap(sdc.data[d,:,:]'[end:-1:1,:], c = cgrad(:thermal, categorical = true), zlims = [0,2^nlayers], title = Date("$year") + Day(d))
+    Plots.heatmap(plotdata, c = colours, zlims = [0,2^nlayers], title = Date("$year") + Day(d))
 end
 
 # cols = Tuple((Light1 = "#28828F",
