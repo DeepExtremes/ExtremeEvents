@@ -102,7 +102,7 @@ function computestat(st::Pair,row)
     if !ismissing(row[variable])
         # skip NaN
         if isa(row[variable], Number) 
-            if !isnan(row[variable])
+            if isnan(row[variable])
                 return
             end
         end

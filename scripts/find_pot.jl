@@ -7,12 +7,19 @@ using YAXArrays, EarthDataLab
 using DataFrames
 import CSV
 using Plots
+using PlotlyJS
 using Statistics
+using ImageMorphology
+using ImageFiltering
 
 inpath_t = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_smoothed.zarr"
 inpath_pei = "/Net/Groups/BGI/scratch/fgans/DeepExtremes/smoothed_pei_ranks.zarr"
-r_t = open_dataset(inpath_t)
-r_pei = open_dataset(inpath_pei)
+s_t = open_dataset(inpath_t)
+s_t40 = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_smoothed_40.zarr")
+s_pei = open_dataset(inpath_pei)
+s_pei40 = open_dataset("/Net/Groups/BGI/scratch/fgans/DeepExtremes/smoothed_pei_ranks_40.zarr")
+r_t = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_ranked.zarr")
+r_pei = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/pei_ranks.zarr")
 inputs = (r_t.layer,
         r_pei.pei_30, 
         r_pei.pei_90,
@@ -54,23 +61,130 @@ obs = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventPart2.csv", 
 obs = dropmissing!(obs)
 obs.Start .= replace.(obs.Start, r"\." => "-")
 obs.End .= replace.(obs.End, r"\." => "-")
-for obs_event = 1:(size(obs)[1])
+obs_event = 5# for obs_event = 1:(size(obs)[1])
     period =( Date(obs[obs_event,:Start]), Date(obs[obs_event,:End]))
     #### !!! need to fix longitude to match 0-360 !!!
     lat = (obs[obs_event,:North], obs[obs_event,:South])
     lon = (obs[obs_event,:West], obs[obs_event,:East])
     # subset smoothed indicators
-    subt = subsetcube(r_t, time=period, latitude=lat, longitude=lon)
-    subpei = subsetcube(r_pei, time=period, latitude=lat, longitude=lon)
-    # histogram
-    t =  reshape( subt.layer[:,:,:], :);
-    d30 = reshape(subpei.pei_30[:,:,:], :);
-    h1 = Plots.histogram(t, title="Smoothed t2mmax in bbox Longitude" * string(lon) * " Latitude " * string(lat) * " Time " * string(period))
-    h2 = Plots.histogram(d30)
+    subst = subsetcube(s_t, time=period, latitude=lat, longitude=lon)
+    subst40 = subsetcube(s_t40, time=period, latitude=lat, longitude=lon)
+    subspei = subsetcube(s_pei, time=period, latitude=lat, longitude=lon)
+    subspei40 = subsetcube(s_pei40, time=period, latitude=lat, longitude=lon)
+    # histogram smoothed
+    st =  reshape( subst.layer[:,:,:], :);
+    st40 =  reshape( subst40.layer[:,:,:], :);
+    sd30 = reshape(subspei.pei_30[:,:,:], :);
+    s40d30 = reshape(subspei40.pei_30[:,:,:], :);
+    sd90 = reshape(subspei.pei_90[:,:,:], :);
+    s40d90 = reshape(subspei40.pei_90[:,:,:], :);
+    sd180 = reshape(subspei.pei_180[:,:,:], :);
+    h1 = Plots.histogram(st, xlabel = "Smoothed t2mmax", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
+    h2 = Plots.histogram(sd30, xlabel = "Smoothed PEI_30", title="bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))    
+    h3 = Plots.histogram(sd90, xlabel = "Smoothed PEI_90", title="bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
+    h4 = Plots.histogram(sd180, xlabel = "Smoothed PEI_180", title="bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
+    # subset ranked indicators
+    subrt = subsetcube(r_t, time=period, latitude=lat, longitude=lon)
+    subrpei = subsetcube(r_pei, time=period, latitude=lat, longitude=lon)
+    # histogram smoothed
+    rt =  reshape( subrt.layer[:,:,:], :);
+    rd30 = reshape(subrpei.pei_30[:,:,:], :);
+    rd90 = reshape(subrpei.pei_90[:,:,:], :);
+    rd180 = reshape(subrpei.pei_180[:,:,:], :);
+    h1 = Plots.histogram(rt, xlabel = "Ranked t2mmax", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
+    h2 = Plots.histogram(rd30, xlabel = "Ranked PEI_30", title="bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))    
+    h3 = Plots.histogram(rd90, xlabel = "Ranked PEI_90", title="bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
+    h4 = Plots.histogram(rd180, xlabel = "Ranked PEI_180", title="bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
+    # compare distribution of ranked and smoothed
+    # s1 = PlotlyJS.plot(PlotlyJS.histogram2d(x=rt,y=st), Layout(xaxis_title = "Ranked t2mmax", yaxis_title = "Smoothed t2mmax", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2])))
+    s1 = Plots.histogram2d(rt,st)
+    # s1f = PlotlyJS.plot(PlotlyJS.histogram2d(x=rt,y=st40), Layout(xaxis_title = "Ranked t2mmax", yaxis_title = "Smoothed t2mmax lbord 40", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2])))
+    # s1c = PlotlyJS.plot(PlotlyJS.histogram2d(x=st,y=st40), Layout(xaxis_title = "Smoothed t2mmax lbord 20", yaxis_title = "Smoothed t2mmax lbord 40", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2])))
+    #savefig(s1,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/hist2d_rt_st.png")
+    h2d20 = Plots.histogram2d(rd30,sd30, nbins = 100, xlabel = "Ranked PEI_30", ylabel = "Smoothed PEI_30", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
+    h2d40 = Plots.histogram2d(rd30,s40d30, nbins = 100, xlabel = "Ranked PEI_30", ylabel = "Smoothed PEI_30 (lbord = 40)", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
+    savefig(h2d20,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/hist2d_rd30_s20d30.png")
+    savefig(h2d40,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/hist2d_rd30_s40d30.png")
+# end
 
+# Smoothing is too strong
+# we loose the skewness of histogram during extremes. And too many values that were > 0.1 in ranked are <0.01 in smoothed.
+# would then be better to work on ranked, but set more conditions to labelling
+# e.g. element could only be labelled if > 50% neighbouring pixels are 1
+# that would mean creating another spatial filter
+# opening?
+tmpt =  [0 0 1 1 0 0 0;
+        1 1 0 0 1 0 0;
+        0 1 1 1 1 0 1;
+        0 0 0 1 1 1 1;
+        0 0 0 0 1 0 1;]
+tmp0 = reshape(subrt.layer[:,:,:],(:, 1, size(subrt.time)[1])) .<= 0.01
+rtmp0 = reduce(+, tmp0, dims=1)
+Plots.bar(subrt.time[:],reshape(rtmp0, (:)))
+tmp = subrt.layer[:, :, 40] .<= 0.01;
+Plots.heatmap(tmp, title="Ranked <=0.01: no filter")
+tmps = subst.layer[:, :, 40] .<= 0.01;
+Plots.heatmap(tmps)
+# erode(tmp, strel_diamond(tmp))
+tmp1 = opening(tmp, strel_diamond(tmp)) .* tmp;
+Plots.heatmap(tmp1, title="Ranked <=0.01: opening")
+sum(tmp) # dilate(erode(tmp))
+sum(tmp1)
+# thinning(iszero.(tmp)) # 
+f = function(img)
+    #@show img
+    diamond = [
+        0 1 0;
+        1 1 1;
+        0 1 0;
+    ]
+    img1 = copy(img) .* diamond
+    # @show img1
+    v = img1[2,2]
+    # @show v
+    s = sum(img1) >= 3 
+    # @show s
+    return s && v
 end
+tmp2 = mapwindow(f, tmp, (3,3));
+sum(tmp2)
+Plots.heatmap(tmp2, title="Ranked <=0.01 : mapwindow diamond >= 3")
+import StatsBase
+tmp3 = mapwindow(StatsBase.mode, tmp, (3,3)) .* tmp;
+Plots.heatmap(tmp3, title="Ranked <=0.01 : mapwindow mode")
 
-    
+# with time dim on top....
+tmp = subrt.layer[:, :, :] .<= 0.01;
+rtmp = reshape(reduce(+, tmp, dims=3),size(tmp)[1:2]);
+Plots.heatmap(rtmp, title="Ranked <=0.01: original")
+# opening
+tmp1 = opening(tmp, strel_diamond(tmp)) .* tmp;
+rtmp1 = reshape(reduce(+, tmp1, dims=3),size(tmp1)[1:2]);
+Plots.heatmap(rtmp1, title="Ranked <=0.01: opening")
+# diamond 60%
+f3 = function(img)
+    diamond = zeros(3,3,5)
+    diamond[2,2,[1,5]].=1;
+    diamond[2,:,[2,4]].=1;
+    diamond[:,2,[2,4]].=1;
+    diamond[:,:,3] .= 1;
+    img1 = copy(img) .* diamond
+    v = img1[2,2,3]
+    s = sum(img1) >= 14 
+    return s && v
+end
+tmp2 = mapwindow(f3, tmp, (3,3,5));
+rtmp2 = reshape(reduce(+, tmp2, dims=3),size(tmp2)[1:2]);
+Plots.heatmap(rtmp2, title="Ranked <=0.01: mapwindow diamond >= 14")
+# mode
+tmp3 = mapwindow(StatsBase.mode, tmp, (3,3,5)) .* tmp;
+rtmp3 = reshape(reduce(+, tmp3, dims=3),size(tmp3)[1:2]);
+Plots.heatmap(rtmp3, title="Ranked <=0.01 : mapwindow mode (3,3,5)")
 
 
+
+# trend of tmax_smoothed
+jena_tmax = subsetcube(r_t, lat = 50.9, lon = 11.5)
+time_axis = jena_tmax.time[:]
+p1 = PlotlyJS.plot(PlotlyJS.histogram2d(x=time_axis,y=jena_tmax.layer[:]))
 

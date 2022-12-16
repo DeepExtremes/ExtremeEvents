@@ -85,16 +85,19 @@ function smooth(
     overwrite::Bool = true,
     max_cache::Float64 = 5e8
 )
-    function applylowpass(xout,xin;lbord = 20, width=2)
-        # @show xin
+    function applylowpass(xout,xin;lbord=lbord,width=width)
+        # @show size(xin)
         im2 = [xin[j,i] for i in size(xin,2):-1:2,j in 1:(size(xin,1)-1)]
         # @show im2
+        # @show lbord
+        # @show width
         imfiltered = SphericalConvolutions.lowpass(Float64.(im2),lbord = lbord,width=width)
         # @show imfiltered
         xout[1:end-1,end:-1:2] = permutedims(imfiltered)
         xout[end,:] = xout[end-1,:]
         xout[:,1] = xout[:,end]
-        # @show xout
+        # @show size(xout)
+        # @show sum(ismissing(xout))
         xout
     end
 
@@ -108,7 +111,7 @@ function smooth(
     
     # limit number of threads to 1 per worker. (lowpass doesn't work with multiple threads)
     ntr = Dict(w=>1 for w in workers())
-
+    @show ntr
 
     mapCube(
         applylowpass,
@@ -116,7 +119,9 @@ function smooth(
         indims=indims,
         outdims=outdims,
         max_cache=max_cache,
-        nthreads=ntr)
+        nthreads=ntr;
+        lbord=lbord,
+        width=width)
 end
 
 

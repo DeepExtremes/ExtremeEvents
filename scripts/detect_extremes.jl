@@ -35,10 +35,10 @@ tmp = compute_extremes(inputs, pot, outpath; tresne = ne);
 
 print("done.")
 
-# check plot
-# using Plots
-# tmp = Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventCube_ranked_pot0.01_ne0.1.zarr")
-tmp = Cube(outpath)
-include("../src/plots.jl")
-simpleplot(tmp,182, 2019, 4)
+# # check plot
+# # using Plots
+# # tmp = Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventCube_ranked_pot0.01_ne0.1.zarr")
+# tmp = Cube(outpath)
+# include("../src/plots.jl")
+# simpleplot(tmp,182, 2019, 4)
 

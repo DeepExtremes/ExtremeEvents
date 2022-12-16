@@ -31,7 +31,7 @@ function simpleplot(dc::YAXArray,
         end
     end
     if isnothing(colours)
-        colours = palette(:darkterrain, 16)
+        colours = palette(:darkterrain, nlayers^2)
     else
         if typeof(colours) in [PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient]
             ErrorException("colours should be of type ColorGradient")
@@ -44,7 +44,7 @@ function simpleplot(dc::YAXArray,
         replace!(plotdata, replacement);
     end
     # Plots.heatmap(sdc.data[d,:,:]'[end:-1:1,:], c = cgrad(:thermal, categorical = true), zlims = [0,2^nlayers], title = Date("$year") + Day(d))
-    Plots.heatmap(plotdata, c = colours, zlims = [0,2^nlayers], title = Date("$year") + Day(d))
+    Plots.heatmap(plotdata, c = colours, zlims = [0,2^nlayers], title = Date("$year") + Day(d), xlabel="latitude", ylabel="longitude")
 end
 
 # cols = Tuple((Light1 = "#28828F",
