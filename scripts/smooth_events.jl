@@ -1,12 +1,12 @@
 using Distributed
 
-sleep(1)
-addprocs(20)
-sleep(1)
+# sleep(1)
+# addprocs(20)
+# sleep(1)
 
 @everywhere begin
     using Pkg
-    Pkg.activate(".")
+    Pkg.activate("..")
 end
 @everywhere begin
     using Zarr, YAXArrays, EarthDataLab, Statistics, SphericalConvolutions
@@ -35,7 +35,7 @@ end
 
 # tmp = subsetcube(ranked_t, time = (Date(2020,6,15), Date(2020,6,17)))
 # tmp1 = smooth(tmp, "test.zarr"; lbord=40, width=4)
-smoothed_t = smooth(subsetcube(ranked_t, time=(2016,2022)), "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_smoothed_40_2016.zarr"; lbord=40, width=4)
+smoothed_t = smooth(subsetcube(ranked_t, time=(2016,2022)), "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_smoothed_80_2016.zarr"; lbord=80, width=4)
 
 # # close workers
 # t = rmprocs(workers(), waitfor=0)

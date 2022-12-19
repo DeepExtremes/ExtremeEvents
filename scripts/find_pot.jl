@@ -9,13 +9,15 @@ import CSV
 using Plots
 using PlotlyJS
 using Statistics
+using StatsBase
 using ImageMorphology
 using ImageFiltering
 
 inpath_t = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_smoothed.zarr"
 inpath_pei = "/Net/Groups/BGI/scratch/fgans/DeepExtremes/smoothed_pei_ranks.zarr"
 s_t = open_dataset(inpath_t)
-s_t40 = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_smoothed_40.zarr")
+s_t40 = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_smoothed_40_2016.zarr")
+s_t80 = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_smoothed_80_2016.zarr")
 s_pei = open_dataset(inpath_pei)
 s_pei40 = open_dataset("/Net/Groups/BGI/scratch/fgans/DeepExtremes/smoothed_pei_ranks_40.zarr")
 r_t = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_ranked.zarr")
@@ -69,6 +71,7 @@ obs_event = 5# for obs_event = 1:(size(obs)[1])
     # subset smoothed indicators
     subst = subsetcube(s_t, time=period, latitude=lat, longitude=lon)
     subst40 = subsetcube(s_t40, time=period, latitude=lat, longitude=lon)
+    subst80 = subsetcube(s_t80, time=period, latitude=lat, longitude=lon)
     subspei = subsetcube(s_pei, time=period, latitude=lat, longitude=lon)
     subspei40 = subsetcube(s_pei40, time=period, latitude=lat, longitude=lon)
     # histogram smoothed
@@ -84,7 +87,7 @@ obs_event = 5# for obs_event = 1:(size(obs)[1])
     h3 = Plots.histogram(sd90, xlabel = "Smoothed PEI_90", title="bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
     h4 = Plots.histogram(sd180, xlabel = "Smoothed PEI_180", title="bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
     # subset ranked indicators
-    subrt = subsetcube(r_t, time=period, latitude=lat, longitude=lon)
+    subrt = subsetcube(r_t, time=period, latitude=lat, longitude=lon)# readcubedata(subsetcube(Cube(r_t)
     subrpei = subsetcube(r_pei, time=period, latitude=lat, longitude=lon)
     # histogram smoothed
     rt =  reshape( subrt.layer[:,:,:], :);
@@ -99,6 +102,7 @@ obs_event = 5# for obs_event = 1:(size(obs)[1])
     # s1 = PlotlyJS.plot(PlotlyJS.histogram2d(x=rt,y=st), Layout(xaxis_title = "Ranked t2mmax", yaxis_title = "Smoothed t2mmax", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2])))
     s1 = Plots.histogram2d(rt,st)
     # s1f = PlotlyJS.plot(PlotlyJS.histogram2d(x=rt,y=st40), Layout(xaxis_title = "Ranked t2mmax", yaxis_title = "Smoothed t2mmax lbord 40", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2])))
+    s1f = Plots.histogram2d(rt,st40, xlabel= "Ranked t2mmax", ylabel = "Smoothed t2mmax lbord 40") 
     # s1c = PlotlyJS.plot(PlotlyJS.histogram2d(x=st,y=st40), Layout(xaxis_title = "Smoothed t2mmax lbord 20", yaxis_title = "Smoothed t2mmax lbord 40", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2])))
     #savefig(s1,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/hist2d_rt_st.png")
     h2d20 = Plots.histogram2d(rd30,sd30, nbins = 100, xlabel = "Ranked PEI_30", ylabel = "Smoothed PEI_30", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
@@ -118,8 +122,8 @@ tmpt =  [0 0 1 1 0 0 0;
         0 1 1 1 1 0 1;
         0 0 0 1 1 1 1;
         0 0 0 0 1 0 1;]
-tmp0 = reshape(subrt.layer[:,:,:],(:, 1, size(subrt.time)[1])) .<= 0.01
-rtmp0 = reduce(+, tmp0, dims=1)
+tmp0 = reshape(subrt.layer[:,:,:],(:, 1, size(subrt.time)[1])) .<= 0.01;
+rtmp0 = reduce(+, tmp0, dims=1);
 Plots.bar(subrt.time[:],reshape(rtmp0, (:)))
 tmp = subrt.layer[:, :, 40] .<= 0.01;
 Plots.heatmap(tmp, title="Ranked <=0.01: no filter")
@@ -153,15 +157,35 @@ import StatsBase
 tmp3 = mapwindow(StatsBase.mode, tmp, (3,3)) .* tmp;
 Plots.heatmap(tmp3, title="Ranked <=0.01 : mapwindow mode")
 
-# with time dim on top....
+## with time dimension on top....
 tmp = subrt.layer[:, :, :] .<= 0.01;
-rtmp = reshape(reduce(+, tmp, dims=3),size(tmp)[1:2]);
-Plots.heatmap(rtmp, title="Ranked <=0.01: original")
+hm = function(tmp; time_dim = 1, title = missing)
+    rtmp = convert(Matrix{Float64},reshape(reduce(+, tmp, dims=time_dim),size(tmp)[findall(1:length(size(tmp)) .!= time_dim)]));
+    @show size(rtmp)
+    replace!(rtmp, 0 => NaN)
+    Plots.heatmap(rtmp, title = title)
+end
+hmr = hm(tmp, title = "Ranked <=0.01: original")
+Plots.savefig(hmr, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax")
+# smoothed
+tmps40 = subst40.layer[:,:,:] .<= 0.01;
+hms40 = hm(tmps40, time_dim = 3, title = "Smoothed (lbord = 40) <= 0.01")
+Plots.savefig(hms40, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_smoothed40_tmax")
+tmps80 = subst80.layer[:,:,:] .<= 0.01;
+hms80 = hm(tmps80, time_dim = 3, title = "Smoothed (lbord = 80) <= 0.01")
+Plots.savefig(hms80, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_smoothed80_tmax")
+
 # opening
 tmp1 = opening(tmp, strel_diamond(tmp)) .* tmp;
-rtmp1 = reshape(reduce(+, tmp1, dims=3),size(tmp1)[1:2]);
-Plots.heatmap(rtmp1, title="Ranked <=0.01: opening")
+hm1 = hm(tmp1, title="Ranked <=0.01: diamond opening")
+Plots.savefig(hm1, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_opening")
 # diamond 60%
+get_diamond = function(dim::Tuple)
+    Nh = map(x->Int((x+1)/2), dim);
+    range_vec = map(x->cat(1:x, x-1:-1:1, dims = 1), Nh);
+    vecs = map((x,y) -> reshape(x, y), (Nh, 1:length(dim)))
+    out = map(.+, range_vec)
+end
 f3 = function(img)
     diamond = zeros(3,3,5)
     diamond[2,2,[1,5]].=1;
@@ -174,17 +198,73 @@ f3 = function(img)
     return s && v
 end
 tmp2 = mapwindow(f3, tmp, (3,3,5));
-rtmp2 = reshape(reduce(+, tmp2, dims=3),size(tmp2)[1:2]);
-Plots.heatmap(rtmp2, title="Ranked <=0.01: mapwindow diamond >= 14")
+hm2 = hm(tmp2, title="Ranked <=0.01: mapwindow diamond >= 14")
+Plots.savefig(hm2, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_diamond14.png")
 # mode
 tmp3 = mapwindow(StatsBase.mode, tmp, (3,3,5)) .* tmp;
-rtmp3 = reshape(reduce(+, tmp3, dims=3),size(tmp3)[1:2]);
-Plots.heatmap(rtmp3, title="Ranked <=0.01 : mapwindow mode (3,3,5)")
-
-
+hm3 = hm(tmp3, title="Ranked <=0.01 : mapwindow mode (3,3,5)")
+Plots.savefig(hm3, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_mode335")
+# diamond in space 60% + at least 3 contiguous times
+f4 = function(img)
+    # img has size (3,3,5)
+    # 2 d diamond
+    diamond =  [
+        false true false;
+        true  true true;
+        false true false;
+    ];
+    img1 = copy(img) .* diamond
+    # @show img1
+    v = img1[2,2,3]
+    # @show typeof(v)
+    s = sum(img1) >= 3 
+    # @show typeof(s)
+    # 3rd D 
+    img2 = copy(img[2,2,:]);
+    d = all(img2[2:4]) || all(img[1:3]) || all(img[3:5])
+    # @show d
+    return v && s && d
+end
+tmp4 = mapwindow(f4, tmp, (3,3,5));
+hm4 = hm(tmp4, title="Ranked <=0.01: mapwindow spatial diamond >= 3 \n AND 3 contiguous times")
+Plots.savefig(hm4, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_spdiam3_t3")
+# diamond in space 80% + at least 3 contiguous times
+f5 = function(img)
+    # img has size (3,3,5)
+    # 2 d diamond
+    diamond =  [
+        false true false;
+        true  true true;
+        false true false;
+    ];
+    img1 = copy(img) .& diamond
+    # @show img1
+    v = img1[2,2,3]
+    # @show typeof(v)
+    s = sum(img1) >= 4
+    # @show typeof(s)
+    # 3rd D 
+    img2 = copy(img[2,2,:]);
+    d = all(img2[2:4]) || all(img[1:3]) || all(img[3:5])
+    # @show d
+    return v && s && d
+end
+tmp5 = mapwindow(f5, tmp, (3,3,5));
+hm5 = hm(tmp5, title="Ranked <=0.01: mapwindow spatial diamond (3,3) >= 4 \n AND 3 contiguous times")
+Plots.savefig(hm5, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_spdiam4_t3.png")
 
 # trend of tmax_smoothed
 jena_tmax = subsetcube(r_t, lat = 50.9, lon = 11.5)
 time_axis = jena_tmax.time[:]
 p1 = PlotlyJS.plot(PlotlyJS.histogram2d(x=time_axis,y=jena_tmax.layer[:]))
 
+
+# label components tests
+temp = zeros(3,3,5);
+temp[2,2,[1,5]].=1;
+# temp[2,:,[2,4]].=1;
+# temp[:,2,[2,4]].=1;
+temp[:,:,3] .= 1;
+temp
+label_components(temp, strel_diamond((3,3,5)))
+# components that do not touch but are in the the same strucyiral elements are connected.
