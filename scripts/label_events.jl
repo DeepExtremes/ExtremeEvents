@@ -6,7 +6,7 @@ using ImageMorphology, ImageFiltering
 
 pot=0.01
 ne=0.1
-period = 2018:2018#2016:2022 # could be added to file name "*"_"*replace("$period", ":" => "_")*"
+period = 2016:2022 # (Date("2018-06-01"), Date("2018-09-16"))#could be added to file name "*"_"*replace("$period", ":" => "_")*"
 #outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_ranked_pot" * string(pot) * "_ne" * string(ne) * "_sreld335.zarr"
 outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_ranked_pot" * string(pot) * "_ne" * string(ne) * "_Sdiam_T3.zarr"
 #outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_smoothed_pot" * string(pot) * "_ne" * string(ne) * ".zarr"
@@ -60,6 +60,10 @@ end
 # apply filter
 @time filteredarray = mapwindow(filter_sp60_t3, maskarray, (3,3,5));
 
+axs = clastyears.axes[[2,3,1]]
+include("../src/plots.jl");
+hmf = hm(filteredarray, axs=axs)
+
 # use ImageMorphology.label_components to label the connected blobs of events
 # use Fabian's version to wrap around the globe
 include("../src/label.jl")
@@ -67,19 +71,30 @@ include("../src/label.jl")
 size(filteredarray)
 # (2192, 1440, 721) # (time, lon, lat)
 d = 1;
-@time r = label_components(filteredarray,wrapdims=(d,));
-#r = label_components(filteredarray, strel_diamond((3,3,3)));
+@time r = label_components(filteredarray, wrapdims=(d,));
+# # look at results
+# Plots.heatmap(r[:,:,1]'[end:-1:1,:])
+# Plots.heatmap(r[:,:,10]'[end:-1:1,:])
+# Plots.heatmap(r[:,:,20]'[end:-1:1,:])
+# Plots.heatmap(r[:,:,30]'[end:-1:1,:])
+# Plots.heatmap(r[:,:,40]'[end:-1:1,:])
+# Plots.heatmap(r[:,:,50]'[end:-1:1,:])
+# Plots.heatmap(r[:,:,60]'[end:-1:1,:])
+# Plots.heatmap(r[:,:,70]'[end:-1:1,:])
+# Plots.heatmap(r[:,:,80]'[end:-1:1,:])
+# Plots.heatmap(r[:,:,90]'[end:-1:1,:])
+# Plots.heatmap(r[:,:,100]'[end:-1:1,:])
 
 # import PlotlyJS
 # tmp = reshape(r, (:));
 # PlotlyJS.plot(PlotlyJS.histogram(x=tmp[tmp.>0]))
 # define YAXArray
-labelcube = YAXArray(caxes(clastyears), r, chunks = DiskArrays.GridChunks(r,(90,120,120)))
+labelcube = YAXArray(caxes(clastyears), permutedims(r,(3,1,2)), chunks = DiskArrays.GridChunks(r,(90,120,120)))
 # write cube
 labelcube = savecube(labelcube,outpath,overwrite=true)
 
 # check
-using Plots
-labelcube = Cube(outpath)
-include("../src/plots.jl")
-simpleplot(labelcube,182, 2019, 4, colours = cgrad(:darkterrain, 50, categorical = true), replacement = 0=>1e5)
+# using Plots
+# labelcube = Cube(outpath)
+# include("../src/plots.jl")
+# simpleplot(labelcube,100, 2018, 4, colours = cgrad(:darkterrain, 50, categorical = true), replacement = 0=>5e3)

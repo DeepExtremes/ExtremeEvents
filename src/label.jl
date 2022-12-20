@@ -1,5 +1,5 @@
 using ImageMorphology: ImageMorphology, DisjointMinSets, _maybe_build_symmetric_strel, label_components, label_components!, 
-  is_symmetric, strel_split, minlabel, find_root!
+  is_symmetric, strel_split, minlabel, find_root!, union!
 
 function ImageMorphology.label_components!(out::AbstractArray{T}, A::AbstractArray, se; bkg=zero(eltype(A)), wrapdims = ()) where {T<:Integer}
     axes(out) == axes(A) || throw_dmm(axes(out), axes(A))
@@ -7,7 +7,7 @@ function ImageMorphology.label_components!(out::AbstractArray{T}, A::AbstractArr
     is_symmetric(se) || throw(ArgumentError("Non-symmetric structuring element is not supported yet"))
     upper_se, _ = strel_split(CartesianIndex, se)
     fill!(out, zero(T))
-    sets = DisjointMinSets{T}()
+    sets = DisjointMinSets{T}()#DisjointSets{T}()#
     sizehint!(sets.parents, floor(Int, sqrt(length(A))))
     @inbounds for i in CartesianIndices(A)
         val = A[i]
@@ -21,7 +21,8 @@ function ImageMorphology.label_components!(out::AbstractArray{T}, A::AbstractArr
                 label = if ((label == typemax(T)) | (label == newlabel))
                     newlabel
                 else
-                    union!(sets, label, newlabel)
+                    # @show sets, label, newlabel
+                    ImageMorphology.union!(sets, label, newlabel)
                 end
             end
         end
