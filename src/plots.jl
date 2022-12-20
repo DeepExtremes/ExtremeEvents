@@ -47,6 +47,30 @@ function simpleplot(dc::YAXArray,
     Plots.heatmap(plotdata, c = colours, zlims = [0,2^nlayers], title = Date("$year") + Day(d), xlabel="latitude", ylabel="longitude")
 end
 
+# lon, lat heatmap with reduction over time
+axnms = function(axes)
+    types = map(x -> string(typeof(x)), axes)
+    indnms = map(x -> findfirst(":", x)[end] + 1, types)
+    nms = map((x) -> types[x][indnms[x]:(indnms[x]+2)], 1:length(types))
+end
+
+hm = function(tmp; title = missing, axs = axes_rt, fn = +)
+    axs_nms = axnms(axs)
+    time_dim = findfirst(axs_nms .== "tim")
+    lon_dim =  findfirst(axs_nms .== "lon")
+    lat_dim =  findfirst(axs_nms .== "lat")
+    rtmp = convert(Matrix{Float64},dropdims(reduce(fn, tmp, dims=time_dim),dims=time_dim));
+    # @show size(rtmp)
+    replace!(rtmp, 0 => NaN)
+    x = axs[lon_dim][:];
+    y = axs[lat_dim][end:-1:1];
+    # @show x, y
+    z = permutedims(rtmp, (time_dim < lat_dim ? lat_dim-time_dim : lat_dim, time_dim < lon_dim ? lon_dim - time_dim : lon_dim))[end:-1:1,:];   
+    # @show size(z)
+    Plots.heatmap(x, y, z, title = title, xlabel = "longitude", ylabel = "latitude")
+end
+
+
 # cols = Tuple((Light1 = "#28828F",
 # Dark2 = "#6E6E6E",
 # Light2 = "#9E9E9E",

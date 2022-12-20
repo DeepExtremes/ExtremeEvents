@@ -226,3 +226,29 @@ function getextremes!(xout, xin; tres=0.01, tresne = nothing)
     #@show size(xin),size(xout), size(jointar[:])
     xout[:] .= jointar[:]
 end
+
+# filters
+# diamond matrix/array
+function get_diamond(dim1::Int)
+    Nh = Int((dim1+1)/2);
+    range_vec = cat(1:Nh, Nh-1:-1:1, dims = 1);
+    out = (range_vec .+ transpose(range_vec)) .> Nh
+end
+
+
+function get_diamond(dim::Tuple)
+    Nh = map(x->Int((x+1)/2), dim);
+    MNh = maximum(Nh)
+    range_vec = map(x->cat(1:x, x-1:-1:1, dims = 1), Nh);
+    # @show range_vec
+    ind = convert(Vector{Int},ones(length(dim)))
+    fun = function(y) 
+        x = range_vec[y];
+        indc = copy(ind); indc[y] = dim[y]; 
+        return reshape(x, tuple(indc...))
+    end
+    vecs = map(fun, 1:length(dim))
+    # @show vecs
+    # @show reduce(.+,Nh)/length(dim)*(length(dim)-1)# maximum(Nh) * (length(dim)-1) #
+    out = reduce(.+, vecs) .> reduce(.+,Nh)/length(dim)*(length(dim)-1) #    
+end

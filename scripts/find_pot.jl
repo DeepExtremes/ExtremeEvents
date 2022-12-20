@@ -117,141 +117,133 @@ obs_event = 5# for obs_event = 1:(size(obs)[1])
 # e.g. element could only be labelled if > 50% neighbouring pixels are 1
 # that would mean creating another spatial filter
 # opening?
-tmpt =  [0 0 1 1 0 0 0;
-        1 1 0 0 1 0 0;
-        0 1 1 1 1 0 1;
-        0 0 0 1 1 1 1;
-        0 0 0 0 1 0 1;]
-tmp0 = reshape(subrt.layer[:,:,:],(:, 1, size(subrt.time)[1])) .<= 0.01;
-rtmp0 = reduce(+, tmp0, dims=1);
-Plots.bar(subrt.time[:],reshape(rtmp0, (:)))
-tmp = subrt.layer[:, :, 40] .<= 0.01;
-Plots.heatmap(tmp, title="Ranked <=0.01: no filter")
-tmps = subst.layer[:, :, 40] .<= 0.01;
-Plots.heatmap(tmps)
-# erode(tmp, strel_diamond(tmp))
-tmp1 = opening(tmp, strel_diamond(tmp)) .* tmp;
-Plots.heatmap(tmp1, title="Ranked <=0.01: opening")
-sum(tmp) # dilate(erode(tmp))
-sum(tmp1)
-# thinning(iszero.(tmp)) # 
-f = function(img)
-    #@show img
-    diamond = [
-        0 1 0;
-        1 1 1;
-        0 1 0;
-    ]
-    img1 = copy(img) .* diamond
-    # @show img1
-    v = img1[2,2]
-    # @show v
-    s = sum(img1) >= 3 
-    # @show s
-    return s && v
-end
-tmp2 = mapwindow(f, tmp, (3,3));
-sum(tmp2)
-Plots.heatmap(tmp2, title="Ranked <=0.01 : mapwindow diamond >= 3")
-import StatsBase
-tmp3 = mapwindow(StatsBase.mode, tmp, (3,3)) .* tmp;
-Plots.heatmap(tmp3, title="Ranked <=0.01 : mapwindow mode")
+# tmpt =  [0 0 1 1 0 0 0;
+#         1 1 0 0 1 0 0;
+#         0 1 1 1 1 0 1;
+#         0 0 0 1 1 1 1;
+#         0 0 0 0 1 0 1;]
+# tmp0 = reshape(subrt.layer[:,:,:],(:, 1, size(subrt.time)[1])) .<= 0.01;
+# rtmp0 = reduce(+, tmp0, dims=1);
+# Plots.bar(subrt.time[:],reshape(rtmp0, (:)))
+# tmp = subrt.layer[:, :, 40] .<= 0.01;
+# Plots.heatmap(tmp, title="Ranked <=0.01: no filter")
+# tmps = subst.layer[:, :, 40] .<= 0.01;
+# Plots.heatmap(tmps)
+# # erode(tmp, strel_diamond(tmp))
+# tmp1 = opening(tmp, strel_diamond(tmp)) .* tmp;
+# Plots.heatmap(tmp1, title="Ranked <=0.01: opening")
+# sum(tmp) # dilate(erode(tmp))
+# sum(tmp1)
+# # thinning(iszero.(tmp)) # 
+# f = function(img)
+#     #@show img
+#     diamond = [
+#         0 1 0;
+#         1 1 1;
+#         0 1 0;
+#     ]
+#     img1 = copy(img) .* diamond
+#     # @show img1
+#     v = img1[2,2]
+#     # @show v
+#     s = sum(img1) >= 3 
+#     # @show s
+#     return s && v
+# end
+# tmp2 = mapwindow(f, tmp, (3,3));
+# sum(tmp2)
+# Plots.heatmap(tmp2, title="Ranked <=0.01 : mapwindow diamond >= 3")
+# import StatsBase
+# tmp3 = mapwindow(StatsBase.mode, tmp, (3,3)) .* tmp;
+# Plots.heatmap(tmp3, title="Ranked <=0.01 : mapwindow mode")
 
 ## with time dimension on top....
+axes_rt = subrt.layer.axes
 tmp = subrt.layer[:, :, :] .<= 0.01;
-hm = function(tmp; time_dim = 1, title = missing)
-    rtmp = convert(Matrix{Float64},reshape(reduce(+, tmp, dims=time_dim),size(tmp)[findall(1:length(size(tmp)) .!= time_dim)]));
-    @show size(rtmp)
-    replace!(rtmp, 0 => NaN)
-    Plots.heatmap(rtmp, title = title)
-end
+
+
 hmr = hm(tmp, title = "Ranked <=0.01: original")
 Plots.savefig(hmr, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax")
 # smoothed
+axes_st = subst40.layer.axes
 tmps40 = subst40.layer[:,:,:] .<= 0.01;
-hms40 = hm(tmps40, time_dim = 3, title = "Smoothed (lbord = 40) <= 0.01")
+hms40 = hm(tmps40, axs = axes_st, title = "Smoothed (lbord = 40) <= 0.01")
 Plots.savefig(hms40, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_smoothed40_tmax")
 tmps80 = subst80.layer[:,:,:] .<= 0.01;
-hms80 = hm(tmps80, time_dim = 3, title = "Smoothed (lbord = 80) <= 0.01")
+hms80 = hm(tmps80, axs = axes_st, title = "Smoothed (lbord = 80) <= 0.01")
 Plots.savefig(hms80, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_smoothed80_tmax")
+# I'm not sure I trust my hm function to do exactly what I want....
 
 # opening
 tmp1 = opening(tmp, strel_diamond(tmp)) .* tmp;
 hm1 = hm(tmp1, title="Ranked <=0.01: diamond opening")
 Plots.savefig(hm1, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_opening")
 # diamond 60%
-get_diamond = function(dim::Tuple)
-    Nh = map(x->Int((x+1)/2), dim);
-    range_vec = map(x->cat(1:x, x-1:-1:1, dims = 1), Nh);
-    vecs = map((x,y) -> reshape(x, y), (Nh, 1:length(dim)))
-    out = map(.+, range_vec)
-end
+
 f3 = function(img)
-    diamond = zeros(3,3,5)
-    diamond[2,2,[1,5]].=1;
-    diamond[2,:,[2,4]].=1;
-    diamond[:,2,[2,4]].=1;
-    diamond[:,:,3] .= 1;
+    diamond = get_diamond((5,3,3))
     img1 = copy(img) .* diamond
     v = img1[2,2,3]
-    s = sum(img1) >= 14 
+    s = sum(img1) >= sum(diamond)*.6 
     return s && v
 end
-tmp2 = mapwindow(f3, tmp, (3,3,5));
-hm2 = hm(tmp2, title="Ranked <=0.01: mapwindow diamond >= 14")
-Plots.savefig(hm2, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_diamond14.png")
+tmp2 = mapwindow(f3, tmp, (5,3,3));
+hm2 = hm(tmp2, title="Ranked <=0.01: mapwindow diamond (5,3,3) >= 60%")
+Plots.savefig(hm2, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_diamond60.png")
 # mode
-tmp3 = mapwindow(StatsBase.mode, tmp, (3,3,5)) .* tmp;
-hm3 = hm(tmp3, title="Ranked <=0.01 : mapwindow mode (3,3,5)")
+tmp3 = mapwindow(StatsBase.mode, tmp, (5,3,3)) .* tmp;
+hm3 = hm(tmp3, title="Ranked <=0.01 : mapwindow mode (5,3,3)")
 Plots.savefig(hm3, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_mode335")
 # diamond in space 60% + at least 3 contiguous times
 f4 = function(img)
+    img = permutedims(img, (2,3,1))
+    # @show img
     # img has size (3,3,5)
-    # 2 d diamond
-    diamond =  [
-        false true false;
-        true  true true;
-        false true false;
-    ];
-    img1 = copy(img) .* diamond
-    # @show img1
-    v = img1[2,2,3]
+    # central value
+    v = copy(img[2,2,3])
     # @show typeof(v)
-    s = sum(img1) >= 3 
+    # 2 d diamond
+    diamond =  get_diamond(3);
+    #@show diamond
+    # apply diamond spatially on central slice
+    img1 = copy(img[:,:,3]) .& diamond
+    #@show img1
+    s = sum(img1) >= 3
     # @show typeof(s)
     # 3rd D 
     img2 = copy(img[2,2,:]);
-    d = all(img2[2:4]) || all(img[1:3]) || all(img[3:5])
+    d = all(img[1:3]) || all(img2[2:4]) || all(img[3:5])
     # @show d
     return v && s && d
 end
-tmp4 = mapwindow(f4, tmp, (3,3,5));
+tmp4 = mapwindow(f4, tmp, (5,3,3));
 hm4 = hm(tmp4, title="Ranked <=0.01: mapwindow spatial diamond >= 3 \n AND 3 contiguous times")
 Plots.savefig(hm4, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_spdiam3_t3")
-# diamond in space 80% + at least 3 contiguous times
+# diamond in space 60% + at least 5 contiguous times
 f5 = function(img)
-    # img has size (3,3,5)
-    # 2 d diamond
-    diamond =  [
-        false true false;
-        true  true true;
-        false true false;
-    ];
-    img1 = copy(img) .& diamond
-    # @show img1
-    v = img1[2,2,3]
+    img = permutedims(img, (2,3,1))
+    # img has size (3,3,7)
+    # central value
+    v = copy(img[2,2,4])
     # @show typeof(v)
-    s = sum(img1) >= 4
+    # 2 d diamond
+    diamond =  get_diamond(3);
+    #@show diamond
+    # apply diamond spatially on central slice
+    img1 = copy(img[:,:,3]) .& diamond
+    #@show img1
+    s = sum(img1) >= 3
     # @show typeof(s)
     # 3rd D 
     img2 = copy(img[2,2,:]);
-    d = all(img2[2:4]) || all(img[1:3]) || all(img[3:5])
+    d = all(img[1:5]) || all(img2[2:6]) || all(img[3:7])
     # @show d
     return v && s && d
 end
-tmp5 = mapwindow(f5, tmp, (3,3,5));
-hm5 = hm(tmp5, title="Ranked <=0.01: mapwindow spatial diamond (3,3) >= 4 \n AND 3 contiguous times")
-Plots.savefig(hm5, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_spdiam4_t3.png")
+
+tmp5 = mapwindow(f5, tmp, (7,3,3));
+hm5 = hm(tmp5, title="Ranked <=0.01: mapwindow spatial diamond (3,3) >= 3 \n AND 5 contiguous times")
+Plots.savefig(hm5, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_spdiam3_t5.png")
 
 # trend of tmax_smoothed
 jena_tmax = subsetcube(r_t, lat = 50.9, lon = 11.5)
