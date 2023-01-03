@@ -3,11 +3,16 @@ using DataFrames
 import Tables
 import CSV
 # set threshold for extremes detection
-pot = 0.005
+pot = 0.01
 ne = 0.1
 # smoothed events?
-smoothed = true
+smoothed = false
 sm = smoothed ? "smoothed_" : "ranked_"
+# compound events
+compound_events = true
+cmp = compound_events ? "_cmp" : ""
+# filter
+filter = "_Sdiam3_T5" # "_Sdiam4_T4" #
 
 # restrict to small area for testing
 # Germany
@@ -15,13 +20,13 @@ sm = smoothed ? "smoothed_" : "ranked_"
 # "World"
 # region = "World"
 # region doesn't work with longitude 0.0 to 360
-region="Germany"
+# region="Germany"
 
-period = (Date("2019-07-20"), Date("2019-07-30"))#2016:2021 # 
+period = 2016:2021 # (Date("2019-07-20"), Date("2019-07-30"))#
 aperiod = "_2016_2021"#"Summer2019"#
 
 # Open all Data Cubes
-labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_" * sm * "pot" * string(pot) * "_ne" * string(ne) * ".zarr"
+labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_" * sm * "pot" * string(pot) * "_ne" * string(ne) * cmp * filter * ".zarr"
 labels = open_dataset(labelpath)
 
 pei = open_dataset("/Net/Groups/BGI/work_1/scratch/s3/xaida/v2/PEICube.zarr")
@@ -50,19 +55,19 @@ renameaxis!(ter, "Time" => "time")
 # create iterable table with data cube label
 # each chunk can be read in memory
 tab = CubeTable(
-    label    = labels.layer[region=region, time=period], # [region=region,time=period]
-    pei_30  = pei.pei_30[region=region, time=period], 
-    pei_90  = pei.pei_90[region=region, time=period], #
-    pei_180 = pei.pei_180[region=region, time=period], #
-    t2mmax   = era.t2mmax[region=region, time=period], 
-    t2m      = era.t2m[region=region, time=period],
-    t2mmin   = era.t2mmin[region=region, time=period],
-    tp       = era.tp[region=region, time=period],
-    pet      = era.pet[region=region, time=period],
-    event    = eventcube.layer[region=region, time=period],
-    gpp      = gpp[region=region, time=period],
-    nee      = nee[region=region, time=period],
-    ter      = ter[region=region, time=period],
+    label    = labels.layer[time=period], # [region=region,time=period]
+    pei_30  = pei.pei_30[time=period], 
+    pei_90  = pei.pei_90[time=period], #
+    pei_180 = pei.pei_180[time=period], #
+    t2mmax   = era.t2mmax[time=period], 
+    t2m      = era.t2m[time=period],
+    t2mmin   = era.t2mmin[time=period],
+    tp       = era.tp[time=period],
+    pet      = era.pet[time=period],
+    event    = eventcube.layer[time=period],
+    # gpp      = gpp[time=period],
+    # nee      = nee[time=period],
+    # ter      = ter[time=period],
     #landmask = lsmask.lsm[region=region],
     )
 
@@ -85,8 +90,9 @@ sort!(res, by=i->i[end].v, rev=true);
 
 df = toDF(res);
 # write DataFrame out to CSV file
-CSV.write("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_$sm$pot$ne$aperiod.csv", df)
-# df = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_$sm$pot$ne$aperiod.csv", DataFrame)
+outname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_" * sm * "pot" * string(pot) * "_ne" * string(ne)  * cmp * filter * aperiod * ".csv"
+CSV.write(outname, df)
+# df = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_$sm$pot$ne$filter$aperiod.csv", DataFrame)
 # convert back to NamedTuple
 # Tables.rowtable(df)
 

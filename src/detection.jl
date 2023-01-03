@@ -252,3 +252,30 @@ function get_diamond(dim::Tuple)
     # @show reduce(.+,Nh)/length(dim)*(length(dim)-1)# maximum(Nh) * (length(dim)-1) #
     out = reduce(.+, vecs) .> reduce(.+,Nh)/length(dim)*(length(dim)-1) #    
 end
+
+function get_diamond_indices(window)
+    diamond =  get_diamond(window);
+    diamondindices = findall(diamond)
+end
+
+myfilter = function(img)
+    # img has size (3,3,7)
+    # central value
+    v = img[Nh[1],Nh[2],Nh[3]]
+    # @show v
+    # apply diamond spatially on central slice
+    s = sum(diamondindices) do ind
+        view(img,:,:,Nh[3])[ind]
+    end
+    # @show s
+    # 3rd D 
+    d = false;
+    for i in 0:(Nh[3]-1)
+        ind=(Nh[3]-i):((Nh[3]*2)-i-1)
+        d = d || all(view(img,Nh[1],Nh[2],ind))
+        d ? break : d
+    end
+    # @show d
+    return v && s >= (t * length(diamondindices)) && d
+end
+

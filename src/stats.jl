@@ -16,12 +16,12 @@ function defineallstats()
     :pei_90 => Extrema(),
     :pei_180 => WeightedMean(),
     :pei_180 => Extrema(),
-    :gpp => WeightedMean(),
-    :gpp => Extrema(),
-    :nee => WeightedMean(),
-    :nee => Extrema(),
-    :ter => WeightedMean(),
-    :ter => Extrema(),
+    # :gpp => WeightedMean(),
+    # :gpp => Extrema(),
+    # :nee => WeightedMean(),
+    # :nee => Extrema(),
+    # :ter => WeightedMean(),
+    # :ter => Extrema(),
     EventType(),
     # LandShare(),
     Volume(),
@@ -225,7 +225,7 @@ end
 
 
 function fitalldata(tab)
-    allstats = [defineallstats() for i in 1:1e5];
+    allstats = [defineallstats() for i in 1:1e6];
     # iterate over CubeTable
     for t in tab
         # loop on rows
@@ -235,7 +235,12 @@ function fitalldata(tab)
                 stat = allstats[row.label]
                 map(stat) do st
                     # @show st
-                    computestat(st,row)
+                    # skip computestat if stat can't be executed on row (e.g. :gpp => Extrema, for time>2021)
+                    # try
+                        computestat(st,row)
+                    # catch
+                        # do nothing
+                    # end
                 end
             end
         end

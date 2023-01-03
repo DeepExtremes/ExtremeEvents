@@ -55,14 +55,17 @@ axnms = function(axes)
     nms = map((x) -> types[x][indnms[x]:(indnms[x]+2)], 1:length(types))
 end
 
-hm = function(tmp::BitArray{3}; title = missing, axs = axes_rt, fn = +)
+hm = function (tmp::BitArray{3}; title = missing, axs = axes_rt, fn = +)
     axs_nms = axnms(axs)
     time_dim = findfirst(axs_nms .== "tim")
     lon_dim =  findfirst(axs_nms .== "lon")
     lat_dim =  findfirst(axs_nms .== "lat")
-    rtmp = convert(Matrix{Float64},dropdims(reduce(fn, tmp, dims=time_dim),dims=time_dim));
+    rtmp = dropdims(reduce(fn, tmp, dims=time_dim),dims=time_dim);
     # @show size(rtmp)
+    # convert to Float to discard 0 in plot
+    rtmp = convert(Matrix{Float64},rtmp);
     replace!(rtmp, 0 => NaN)
+    # replace!(rtmp, missing => NaN)
     x = axs[lon_dim][:];
     y = axs[lat_dim][end:-1:1];
     # @show x, y
@@ -71,21 +74,9 @@ hm = function(tmp::BitArray{3}; title = missing, axs = axes_rt, fn = +)
     Plots.heatmap(x, y, z, title = title, xlabel = "longitude", ylabel = "latitude")
 end
 
-hm = function(tmp::Array{Bool, 3}; title = missing, axs = axes_rt, fn = +)
-    axs_nms = axnms(axs)
-    time_dim = findfirst(axs_nms .== "tim")
-    lon_dim =  findfirst(axs_nms .== "lon")
-    lat_dim =  findfirst(axs_nms .== "lat")
-    rtmp = convert(Matrix{Float64},dropdims(reduce(fn, tmp, dims=time_dim),dims=time_dim));
-    @show typeof(rtmp)
-    replace!(rtmp, 0 => NaN)
-    @show typeof(rtmp)
-    x = axs[lon_dim][:];
-    y = axs[lat_dim][end:-1:1];
-    @show typeof(x), typeof(y)
-    z = permutedims(rtmp, (time_dim < lat_dim ? lat_dim-time_dim : lat_dim, time_dim < lon_dim ? lon_dim - time_dim : lon_dim))[end:-1:1,:];   
-    @show typeof(z)
-    Plots.heatmap(x, y, z, title = title, xlabel = "longitude", ylabel = "latitude")
+function hm(tmp::Array{Bool, 3},args...;kwargs...)
+    tmp = convert(BitArray{3}, tmp)
+    hm(tmp,args...;kwargs...)
 end
 
 # cols = Tuple((Light1 = "#28828F",

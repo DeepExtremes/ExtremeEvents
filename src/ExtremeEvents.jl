@@ -6,7 +6,7 @@ using Distributed, SlurmClusterManager
 # spatial filter
 using SphericalConvolutions
 # label connected components
-using ImageMorphology
+using ImageMorphology, ImageFiltering
 # stats
 using OnlineStats, WeightedOnlineStats
 using DataFrames
