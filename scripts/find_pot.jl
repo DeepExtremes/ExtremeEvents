@@ -13,6 +13,8 @@ using StatsBase
 using ImageMorphology
 using ImageFiltering
 
+pot = 0.01;
+
 inpath_t = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_smoothed.zarr"
 inpath_pei = "/Net/Groups/BGI/scratch/fgans/DeepExtremes/smoothed_pei_ranks.zarr"
 s_t = open_dataset(inpath_t)
@@ -112,7 +114,7 @@ obs_event = 5# for obs_event = 1:(size(obs)[1])
 # end
 
 # Smoothing is too strong
-# we loose the skewness of histogram during extremes. And too many values that were > 0.1 in ranked are <0.01 in smoothed.
+# we loose the skewness of histogram during extremes. And too many values that were > 0.1 in ranked are <pot in smoothed.
 # would then be better to work on ranked, but set more conditions to labelling
 # e.g. element could only be labelled if > 50% neighbouring pixels are 1
 # that would mean creating another spatial filter
@@ -122,16 +124,16 @@ obs_event = 5# for obs_event = 1:(size(obs)[1])
 #         0 1 1 1 1 0 1;
 #         0 0 0 1 1 1 1;
 #         0 0 0 0 1 0 1;]
-# tmp0 = reshape(subrt.layer[:,:,:],(:, 1, size(subrt.time)[1])) .<= 0.01;
+# tmp0 = reshape(subrt.layer[:,:,:],(:, 1, size(subrt.time)[1])) .<= pot;
 # rtmp0 = reduce(+, tmp0, dims=1);
 # Plots.bar(subrt.time[:],reshape(rtmp0, (:)))
-# tmp = subrt.layer[:, :, 40] .<= 0.01;
-# Plots.heatmap(tmp, title="Ranked <=0.01: no filter")
-# tmps = subst.layer[:, :, 40] .<= 0.01;
+# tmp = subrt.layer[:, :, 40] .<= pot;
+# Plots.heatmap(tmp, title="Ranked <=pot: no filter")
+# tmps = subst.layer[:, :, 40] .<= pot;
 # Plots.heatmap(tmps)
 # # erode(tmp, strel_diamond(tmp))
 # tmp1 = opening(tmp, strel_diamond(tmp)) .* tmp;
-# Plots.heatmap(tmp1, title="Ranked <=0.01: opening")
+# Plots.heatmap(tmp1, title="Ranked <=pot: opening")
 # sum(tmp) # dilate(erode(tmp))
 # sum(tmp1)
 # # thinning(iszero.(tmp)) # 
@@ -152,32 +154,32 @@ obs_event = 5# for obs_event = 1:(size(obs)[1])
 # end
 # tmp2 = mapwindow(f, tmp, (3,3));
 # sum(tmp2)
-# Plots.heatmap(tmp2, title="Ranked <=0.01 : mapwindow diamond >= 3")
+# Plots.heatmap(tmp2, title="Ranked <=pot : mapwindow diamond >= 3")
 # import StatsBase
 # tmp3 = mapwindow(StatsBase.mode, tmp, (3,3)) .* tmp;
-# Plots.heatmap(tmp3, title="Ranked <=0.01 : mapwindow mode")
+# Plots.heatmap(tmp3, title="Ranked <=pot : mapwindow mode")
 
 ## with time dimension on top....
 axes_rt = subrt.layer.axes
-tmp = subrt.layer[:, :, :] .<= 0.01;
+tmp = subrt.layer[:, :, :] .<= pot;
 
 
-hmr = hm(tmp, title = "Ranked <=0.01: original")
-Plots.savefig(hmr, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax")
+hmr = hm(tmp, title = "Ranked <=" * pot * ": original")
+Plots.savefig(hmr, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_pot" * pot)
 # smoothed
 axes_st = subst40.layer.axes
-tmps40 = subst40.layer[:,:,:] .<= 0.01;
-hms40 = hm(tmps40, axs = axes_st, title = "Smoothed (lbord = 40) <= 0.01")
-Plots.savefig(hms40, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_smoothed40_tmax")
-tmps80 = subst80.layer[:,:,:] .<= 0.01;
-hms80 = hm(tmps80, axs = axes_st, title = "Smoothed (lbord = 80) <= 0.01")
-Plots.savefig(hms80, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_smoothed80_tmax")
+tmps40 = subst40.layer[:,:,:] .<= pot;
+hms40 = hm(tmps40, axs = axes_st, title = "Smoothed (lbord = 40) <= " * pot)
+Plots.savefig(hms40, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_smoothed40_tmax_pot" * pot)
+tmps80 = subst80.layer[:,:,:] .<= pot;
+hms80 = hm(tmps80, axs = axes_st, title = "Smoothed (lbord = 80) <= " * pot)
+Plots.savefig(hms80, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_smoothed80_tmax_pot" * pot)
 # I'm not sure I trust my hm function to do exactly what I want....
 
 # opening
 tmp1 = opening(tmp, strel_diamond(tmp)) .* tmp;
-hm1 = hm(tmp1, title="Ranked <=0.01: diamond opening")
-Plots.savefig(hm1, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_opening")
+hm1 = hm(tmp1, title="Ranked <=" * pot * ": diamond opening")
+Plots.savefig(hm1, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_pot" * pot * "_opening")
 # diamond 60%
 
 f3 = function(img)
@@ -188,12 +190,12 @@ f3 = function(img)
     return s && v
 end
 tmp2 = mapwindow(f3, tmp, (5,3,3));
-hm2 = hm(tmp2, title="Ranked <=0.01: mapwindow diamond (5,3,3) >= 60%")
-Plots.savefig(hm2, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_diamond60.png")
+hm2 = hm(tmp2, title="Ranked <=" * pot * ": mapwindow diamond (5,3,3) >= 60%")
+Plots.savefig(hm2, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_pot" * pot * "_diamond60.png")
 # mode
 tmp3 = mapwindow(StatsBase.mode, tmp, (5,3,3)) .* tmp;
-hm3 = hm(tmp3, title="Ranked <=0.01 : mapwindow mode (5,3,3)")
-Plots.savefig(hm3, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_mode335")
+hm3 = hm(tmp3, title="Ranked <=" * pot * " : mapwindow mode (5,3,3)")
+Plots.savefig(hm3, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_pot" * pot * "_mode335")
 # diamond in space 60% + at least 3 contiguous times
 f4 = function(img)
     img = permutedims(img, (2,3,1))
@@ -217,8 +219,8 @@ f4 = function(img)
     return v && s && d
 end
 tmp4 = mapwindow(f4, tmp, (5,3,3));
-hm4 = hm(tmp4, title="Ranked <=0.01: mapwindow spatial diamond >= 3 \n AND 3 contiguous times")
-Plots.savefig(hm4, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_spdiam3_t3")
+hm4 = hm(tmp4, title="Ranked <=" * pot * ": mapwindow spatial diamond >= 3 \n AND 3 contiguous times")
+Plots.savefig(hm4, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_pot" * pot * "_spdiam3_t3")
 # diamond in space 60% + at least 5 contiguous times
 f5 = function(img)
     img = permutedims(img, (2,3,1))
@@ -242,13 +244,14 @@ f5 = function(img)
 end
 
 tmp5 = mapwindow(f5, tmp, (7,3,3));
-hm5 = hm(tmp5, title="Ranked <=0.01: mapwindow spatial diamond (3,3) >= 3 \n AND 5 contiguous times")
-Plots.savefig(hm5, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_spdiam3_t5.png")
+hm5 = hm(tmp5, title="Ranked <=" * pot * ": mapwindow spatial diamond (3,3) >= 3 \n AND 5 contiguous times")
+Plots.savefig(hm5, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_EUsummer2018_ranked_tmax_pot" * pot * "_spdiam3_t5.png")
 
-# trend of tmax_smoothed
+# trend of tmax_ranked
 jena_tmax = subsetcube(r_t, lat = 50.9, lon = 11.5)
 time_axis = jena_tmax.time[:]
-p1 = PlotlyJS.plot(PlotlyJS.histogram2d(x=time_axis,y=jena_tmax.layer[:]))
+tmax = jena_tmax.layer[:];
+p1 = Plots.histogram2d(time_axis[tmax.<=pot],tmax[tmax.<=pot], bins=70)
 
 
 # label components tests
@@ -260,3 +263,50 @@ temp[:,:,3] .= 1;
 temp
 label_components(temp, strel_diamond((3,3,5)))
 # components that do not touch but are in the the same strucyiral elements are connected.
+
+
+# combine events
+tmax = subrt.layer[:, :, :];
+pei30 = subrpei.pei_30[:,:,:];
+pei90 = subrpei.pei_90[:,:,:];
+pei180 = subrpei.pei_180[:,:,:];
+include("../src/detection.jl")
+xout = convert(Vector{UInt8},zeros(reduce(*,size(tmax))));
+xin = reshape(cat(tmax, pei30, pei90, pei180, dims=4),(reduce(*,size(tmax)),4));
+getextremes!(xout, xin, tres = pot);
+extr = reshape(xout, size(tmax));
+maskarray = permutedims(
+    ((extr .> 0x00) .& (extr .< 0x10))[:,:,:],
+    (2,3,1)
+    );
+include("../src/plots.jl")
+ma = convert(Array{Bool,3}, maskarray);
+hm(maskarray)
+
+# check labelled events
+# 
+incube = "labelcube_smoothed_pot0.005_ne0.1"
+#"labelcube_ranked_pot0.01_ne0.1_Sdiam_T5"
+#"labelcube_ranked_pot0.01_ne0.1_Sdiam3_T5"
+labelcube = Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/"*incube*".zarr")
+statsdf = CSV.read(
+    #"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_ranked_0.010.1_Sdiam3_T5_2016_2021_old.csv",
+    #"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_ranked_0.010.1_Sdiam_T5_2016_2021.csv",
+    "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_smoothed_0.0050.1_2016_2021.csv",
+     DataFrame)
+# subset cube to match stats
+for label_row in 1:10
+    period =( Date(statsdf[label_row,:start_time]), Date(statsdf[label_row,:end_time]))
+    #### !!! need to fix longitude to match 0-360 !!!
+    lat = (statsdf[label_row,:latitude_max], statsdf[label_row,:latitude_min])
+    lon = (statsdf[label_row,:longitude_min], statsdf[label_row,:longitude_max])
+    sublabel = subsetcube(labelcube, time=period, latitude=lat, longitude=lon)
+    # load to memory and flag pixels equal to label
+    label = statsdf[label_row, :label]
+    sublabel1 = (sublabel.data .== label)[:,:,:];
+    size(sublabel1)
+    typeof(sublabel1)
+    # view over time
+    h = hm(sublabel1, title = "Event $label from \n $incube", axs = sublabel.axes)
+    Plots.savefig(h, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap" * "_" * incube * "_label_$label.png")
+end
