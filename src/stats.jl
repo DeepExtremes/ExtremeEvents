@@ -340,7 +340,7 @@ function fitsanitycheck(tab, allstats, ievent)
     for t in tab
         # loop on rows
         for row in Tables.rows(t)
-            if row.event > 0x00
+            if row.event > 0x00 && row.event < 0x10
                 # compute stats for current label
                 stat = allstats[ievent]
                 map(stat) do st
@@ -358,22 +358,8 @@ function fitsanitycheck(tab, allstats, ievent)
     return allstats
 end
 
-function sanity_check(obs, tres)
-    # 
-    if tres <= 0.01 
-        #ENV["USER"] == "mweynants"
-        eventspath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventCube_$tres.zarr"
-    else 
-        #ENV["USER"] == "fgans"
-        eventspath = "/Net/Groups/BGI/work_1/scratch/fgans/EventCube_$tres.zarr"
-    end
+function sanity_check(obs, eventspath, peis, era)
     eventcube = open_dataset(eventspath)
-    # load also ERA5 and SPEICube?
-    speis = open_dataset("/Net/Groups/BGI/work_1/scratch/s3/xaida/SPEICube.zarr")
-    era = open_dataset("/Net/Groups/BGI/work_1/scratch/s3/xaida/ERA5Data.zarr")
-    # load LamdSeaMask
-    lsmask = open_dataset("/Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.720.static.nc")
-
     allstats = [defineallstats() for i in 1:(size(obs)[1])];
     for ievent in 1: (size(obs)[1])
         period = (Date(replace(obs.when_from[ievent], "." => "-")) , Date(replace(obs.when_until[ievent], "." => "-")))
@@ -381,15 +367,15 @@ function sanity_check(obs, tres)
         lon = (obs.where_SW[ievent],obs.where_SE[ievent])
         cube_table = CubeTable(
             event    = eventcube.layer[time=period, latitude=lat, longitude=lon],
-            spei_30  = speis.spei_30[time=period, latitude=lat, longitude=lon], 
-            spei_90  = speis.spei_90[time=period, latitude=lat, longitude=lon], #
-            spei_180 = speis.spei_180[time=period, latitude=lat, longitude=lon], #
+            pei_30  = peis.pei_30[time=period, latitude=lat, longitude=lon], 
+            pei_90  = peis.pei_90[time=period, latitude=lat, longitude=lon], #
+            pei_180 = peis.pei_180[time=period, latitude=lat, longitude=lon], #
             t2mmax   = era.t2mmax[time=period, latitude=lat, longitude=lon], 
             t2m      = era.t2m[time=period, latitude=lat, longitude=lon],
             t2mmin   = era.t2mmin[time=period, latitude=lat, longitude=lon],
             tp       = era.tp[time=period, latitude=lat, longitude=lon],
             pet      = era.pet[time=period, latitude=lat, longitude=lon],
-            landmask = lsmask.lsm[latitude=lat, longitude=lon],
+            # landmask = lsmask.lsm[latitude=lat, longitude=lon],
         );
         # run some statitsics (follow stats_extremes?)
         allstats = fitsanitycheck(cube_table, allstats, ievent);

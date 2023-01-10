@@ -49,29 +49,72 @@ function simpleplot(dc::YAXArray,
 end
 
 # lon, lat heatmap with reduction over time
-axnms = function(axes)
+function axnms(axes::Vector{CubeAxis})
     types = map(x -> string(typeof(x)), axes)
     indnms = map(x -> findfirst(":", x)[end] + 1, types)
     nms = map((x) -> types[x][indnms[x]:(indnms[x]+2)], 1:length(types))
 end
 
-hm = function (tmp::BitArray{3}; title = missing, axs = axes_rt, fn = +)
+function modaxs(axs::Vector{CubeAxis};lon = "longitude")
     axs_nms = axnms(axs)
+    lon_dim =  findfirst(axs_nms .== lon[1:3])
+    axs[lon_dim] = RangeAxis(lon, range(axs[lon_dim][1] .- 360, axs[lon_dim][end] .- 360, length = length(axs[lon_dim])))
+    return axs
+end
+
+# function prephm(tmp,axs,fn)
+#     axs_nms = axnms(axs)
+#     time_dim = findfirst(axs_nms .== "tim")
+#     lon_dim =  findfirst(axs_nms .== "lon")
+#     lat_dim =  findfirst(axs_nms .== "lat")
+#     rtmp = dropdims(reduce(fn, tmp, dims=time_dim),dims=time_dim);
+#     # @show size(rtmp)
+#     # convert to Float to discard 0 in plot
+#     rtmp = convert(Matrix{Float64},rtmp);
+#     replace!(rtmp, 0 => NaN)
+#     # replace!(rtmp, missing => NaN)
+#     x = axs[lon_dim][:];
+#     y = axs[lat_dim][end:-1:1];
+#     # @show x, y
+#     z = permutedims(rtmp, (time_dim < lat_dim ? lat_dim-time_dim : lat_dim, time_dim < lon_dim ? lon_dim - time_dim : lon_dim))[end:-1:1,:];   
+#     return x,y,z
+# end
+
+function prephm(tmp,axs,fn;reduced="tim")
+    axs_nms = axnms(axs)
+    red_dim = findfirst(axs_nms .== reduced)
     time_dim = findfirst(axs_nms .== "tim")
     lon_dim =  findfirst(axs_nms .== "lon")
     lat_dim =  findfirst(axs_nms .== "lat")
-    rtmp = dropdims(reduce(fn, tmp, dims=time_dim),dims=time_dim);
+    rtmp = reduce(fn, tmp, dims=red_dim);
     # @show size(rtmp)
     # convert to Float to discard 0 in plot
-    rtmp = convert(Matrix{Float64},rtmp);
+    rtmp = convert(Array{Float64},rtmp);
     replace!(rtmp, 0 => NaN)
     # replace!(rtmp, missing => NaN)
-    x = axs[lon_dim][:];
-    y = axs[lat_dim][end:-1:1];
-    # @show x, y
-    z = permutedims(rtmp, (time_dim < lat_dim ? lat_dim-time_dim : lat_dim, time_dim < lon_dim ? lon_dim - time_dim : lon_dim))[end:-1:1,:];   
-    # @show size(z)
-    Plots.heatmap(x, y, z, title = title, xlabel = "longitude", ylabel = "latitude")
+    # define x, y, z
+    if reduced  == "tim"
+        x = axs[lon_dim][:];
+        y = axs[lat_dim][end:-1:1];
+        z = permutedims(dropdims(rtmp,dims=red_dim), (time_dim < lat_dim ? lat_dim-time_dim : lat_dim, time_dim < lon_dim ? lon_dim - time_dim : lon_dim))[end:-1:1,:];   
+    elseif reduced == "lon"
+        # 
+        x = convert(Vector{Date}, axs[time_dim][:]);
+        y = axs[lat_dim][end:-1:1];
+        z = dropdims(permutedims(rtmp, (lat_dim, time_dim, lon_dim)),dims=3)[end:-1:1,:];   
+    else # reduced == "lat"
+        # 
+        x = axs[lon_dim][:];
+        y = axs[time_dim];
+        z = dropdims(permutedims(rtmp, (time_dim, lon_dim, lat_dim)),dims=3)[end:-1:1,:];   
+    end
+
+    return x,y,z
+end
+
+function hm(tmp::BitArray{3}; title = missing, axs = axes_rt, fn = +, reduced = "tim", xlab = "longitude", ylab = "latitude")
+    x,y,z = prephm(tmp,axs,fn;reduced)
+    Plots.heatmap(x, y, z, title = title, xlabel = xlab, ylabel = ylab)
 end
 
 function hm(tmp::Array{Bool, 3},args...;kwargs...)
@@ -79,6 +122,15 @@ function hm(tmp::Array{Bool, 3},args...;kwargs...)
     hm(tmp,args...;kwargs...)
 end
 
+function hm!(tmp::BitArray{3}; axs = axes_rt, fn = +, reduced = "tim", xlab = "longitude", ylab = "latitude")
+    x,y,z = prephm(tmp,axs,fn;reduced)
+    Plots.heatmap!(x, y, z, xlabel = xlab, ylabel = ylab)
+end
+
+function hm!(tmp::Array{Bool, 3},args...;kwargs...)
+    tmp = convert(BitArray{3}, tmp)
+    hm!(tmp,args...;kwargs...)
+end
 # cols = Tuple((Light1 = "#28828F",
 # Dark2 = "#6E6E6E",
 # Light2 = "#9E9E9E",

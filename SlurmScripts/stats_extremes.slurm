@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name julia_stats
+#SBATCH --job-name jl_st35
 #SBATCH -o ./testjob-%A.out
 #SBATCH -p work
 #SBATCH --ntasks=1

@@ -11,8 +11,9 @@ sm = smoothed ? "smoothed_" : "ranked_"
 # compound events
 compound_events = true
 cmp = compound_events ? "_cmp" : ""
-# filter
-filter = "_Sdiam3_T5" # "_Sdiam4_T4" #
+
+filter_events = true
+filter = filter_events ? "_Sdiam3_T5_new" : "" # "_Sdiam3_T5" #  "_Sdiam4_T4" #
 
 # restrict to small area for testing
 # Germany
@@ -26,7 +27,7 @@ period = 2016:2021 # (Date("2019-07-20"), Date("2019-07-30"))#
 aperiod = "_2016_2021"#"Summer2019"#
 
 # Open all Data Cubes
-labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_" * sm * "pot" * string(pot) * "_ne" * string(ne) * cmp * filter * ".zarr"
+labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_" * sm * "pot" * string(pot) * "_ne" * string(ne) * cmp * filter * aperiod *".zarr"
 labels = open_dataset(labelpath)
 
 pei = open_dataset("/Net/Groups/BGI/work_1/scratch/s3/xaida/v2/PEICube.zarr")
@@ -77,7 +78,7 @@ tab = CubeTable(
 include("../src/stats.jl")
 
 # compute all stats on CubeTable
-res = fitalldata(tab);
+@time res = fitalldata(tab);
 # delete empty lines 
 # sort results by decreasing Volume of events
 sort!(res, by=i->i[end].v, rev=true);
@@ -92,7 +93,9 @@ df = toDF(res);
 # write DataFrame out to CSV file
 outname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_" * sm * "pot" * string(pot) * "_ne" * string(ne)  * cmp * filter * aperiod * ".csv"
 CSV.write(outname, df)
-# df = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_$sm$pot$ne$filter$aperiod.csv", DataFrame)
+print(outname)
+print("\n done!")
+# df = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_" * sm * "pot" * string(pot) * "_ne" * string(ne)  * cmp * filter * aperiod * ".csv", DataFrame)
 # convert back to NamedTuple
 # Tables.rowtable(df)
 

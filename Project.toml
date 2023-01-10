@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataConvenience = "3b531cbf-ee43-4e67-8118-dca2c9372f86"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DiskArrays = "3c3547ce-8d99-4f5e-a174-61eb10b00ae3"

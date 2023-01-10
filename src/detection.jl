@@ -1,3 +1,4 @@
+using YAXArrays, EarthDataLab
 """
     rescale(inputcube::YAXArray, outputpath::String; <keyword arguments>))
 
@@ -268,14 +269,18 @@ myfilter = function(img)
         view(img,:,:,Nh[3])[ind]
     end
     # @show s
-    # 3rd D 
-    d = false;
-    for i in 0:(Nh[3]-1)
-        ind=(Nh[3]-i):((Nh[3]*2)-i-1)
-        d = d || all(view(img,Nh[1],Nh[2],ind))
-        d ? break : d
+    # time (3rd) dimension
+    timewindow = function()
+        d = false;
+        for i in 0:(Nh[3]-1)
+            ind=(Nh[3]-i):((Nh[3]*2)-i-1)
+            d = d || all(view(img,Nh[1],Nh[2],ind))
+            d ? break : d
+        end
+        return d
     end
+    d = timewindow()
     # @show d
-    return v && s >= (t * length(diamondindices)) && d
+    return v && s >= t && d
 end
 

@@ -285,14 +285,18 @@ hm(maskarray)
 
 # check labelled events
 # 
-incube = "labelcube_smoothed_pot0.005_ne0.1"
+incube = "labelcube_ranked_pot0.01_ne0.1_cmp"
+# "labelcube_ranked_pot0.01_ne0.1_tcmp"
+# "labelcube_smoothed_pot0.005_ne0.1"
 #"labelcube_ranked_pot0.01_ne0.1_Sdiam_T5"
 #"labelcube_ranked_pot0.01_ne0.1_Sdiam3_T5"
 labelcube = Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/"*incube*".zarr")
 statsdf = CSV.read(
     #"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_ranked_0.010.1_Sdiam3_T5_2016_2021_old.csv",
     #"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_ranked_0.010.1_Sdiam_T5_2016_2021.csv",
-    "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_smoothed_0.0050.1_2016_2021.csv",
+    # "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_smoothed_0.0050.1_2016_2021.csv",
+    #"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_ranked_pot0.01_ne0.1_tcmp_2016_2021.csv",
+    "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_ranked_pot0.01_ne0.1_cmp_2016_2021.csv",
      DataFrame)
 # subset cube to match stats
 for label_row in 1:10
