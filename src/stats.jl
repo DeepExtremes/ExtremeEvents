@@ -421,3 +421,48 @@ function toDFlab(results)
     return df
 
 end
+
+# mode function, with init and skipmissing
+# init = 0
+# build freq table
+# look for unique values
+# if only one value, set mode = value
+# else 
+# count them
+# select the unique value with the largest count, discarding 0
+function mode(itr::AbstractVector; init = missing)
+    if isempty(itr)
+        return init
+    end
+    vals = unique(itr)
+    if length(vals) == 1
+        return vals[1]
+    end
+    freq = map(vals) do v
+        count(itr .== v)
+    end
+    sp = sortperm(freq, rev=true)
+    if vals[sp[1]] != 0
+        return vals[sp[1]]
+    else
+        return vals[sp[2]]
+    end
+end
+
+function mode(itr::AbstractArray; dims=:, init=0)
+    # apply mode, reducing by dim.
+    if typeof(dims) <: Colon
+        # transform to Vector
+        return mode(itr[dims], init=init)
+    else
+    # elseif typeof(dims) <: Int
+    #     # reduce over single dimension
+    #     sz = collect(size(itr))
+    #     sz[dims] = 1
+    #     output = convert(Array{Int,length(sz)}, zeros(tuple(sz...)))
+    #     # transform array into array of arrays
+    #     ##### ????
+        return mapslices(mode, itr, dims)
+    end
+    
+end

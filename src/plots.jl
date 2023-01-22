@@ -86,7 +86,7 @@ function prephm(tmp,axs,fn;reduced="tim")
     time_dim = findfirst(axs_nms .== "tim")
     lon_dim =  findfirst(axs_nms .== "lon")
     lat_dim =  findfirst(axs_nms .== "lat")
-    rtmp = reduce(fn, tmp, dims=red_dim);
+    rtmp = mapslices(fn, tmp, dims=red_dim)
     # @show size(rtmp)
     # convert to Float to discard 0 in plot
     rtmp = convert(Array{Float64},rtmp);
@@ -112,7 +112,7 @@ function prephm(tmp,axs,fn;reduced="tim")
     return x,y,z
 end
 
-function hm(tmp::BitArray{3}; title = missing, axs = axes_rt, fn = +, reduced = "tim", xlab = "longitude", ylab = "latitude")
+function hm(tmp::BitArray{3}; title = missing, axs = axes_rt, fn = sum, reduced = "tim", xlab = "longitude", ylab = "latitude")
     x,y,z = prephm(tmp,axs,fn;reduced)
     Plots.heatmap(x, y, z, title = title, xlabel = xlab, ylabel = ylab)
 end
@@ -122,7 +122,7 @@ function hm(tmp::Array{Bool, 3},args...;kwargs...)
     hm(tmp,args...;kwargs...)
 end
 
-function hm!(tmp::BitArray{3}; axs = axes_rt, fn = +, reduced = "tim", xlab = "longitude", ylab = "latitude")
+function hm!(tmp::BitArray{3}; axs = axes_rt, fn = sum, reduced = "tim", xlab = "longitude", ylab = "latitude")
     x,y,z = prephm(tmp,axs,fn;reduced)
     Plots.heatmap!(x, y, z, xlabel = xlab, ylabel = ylab)
 end
@@ -130,6 +130,27 @@ end
 function hm!(tmp::Array{Bool, 3},args...;kwargs...)
     tmp = convert(BitArray{3}, tmp)
     hm!(tmp,args...;kwargs...)
+end
+
+function hm!(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = "tim", kwargs...)
+    x,y,z = prephm(tmp,axs,fn;reduced)
+    Plots.heatmap!(x, y, z;kwargs...)
+end
+
+function cf!(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = "tim", kwargs...)
+    x,y,z = prephm(tmp,axs,fn;reduced)
+    Plots.contourf!(x, y, z; kwargs...)
+end
+
+# import PlotUtils
+function getColours(colours::Union{Nothing, PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient};n=10)
+    if isnothing(colours)
+        colours = palette(:darkterrain, n)
+    else
+        if typeof(colours) in [PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient]
+            ErrorException("colours should be of type ColorGradient")
+        end
+    end
 end
 # cols = Tuple((Light1 = "#28828F",
 # Dark2 = "#6E6E6E",
@@ -144,3 +165,57 @@ end
 # DeepAIcols = map(x -> Base.parse(Colorant, x)),
 #               cols
 # )
+
+# using DataFrames, VegaLite
+# function labelplot(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = "tim", xlab = "longitude", ylab = "latitude", title= "", colours = nothing)
+#     x,y,z = prephm(tmp,axs,fn;reduced)
+#     df = DataFrame(x=repeat(x,inner=size(z)[1]), y=repeat(y, size(z)[2]), z=z[:]);
+#     df |> @vlplot(
+#         :rect, 
+#         x={"x:o", title=xlab}, 
+#         y={"y:o", title=ylab}, 
+#         color={
+#             "z:n",
+#             legend={title="Event label"}, 
+#             # scale={domain=[], range=[]},
+#             },
+#         title=title,
+#         )
+# end
+
+# using GeoMakie, CairoMakie
+# function makielabel(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = "tim", xlab = "longitude", ylab = "latitude", title= "", colours = nothing)
+#     x,y,z = prephm(tmp,axs,fn;reduced)
+#     fig = Figure()
+#     ax = GeoAxis(fig[1,1],
+#         source = "+proj=longlat +datum=WGS84", 
+#         dest = "+proj=eqearth",
+#         lonlims=(x[1],x[end]),
+#         latlims=(y[1],y[end]),
+#         coastlines=true)
+#     GeoMakie.surface!(ax, x, y, z; shading = false)
+#     # GeoMakie.heatmap!(ax, x, y, z; shading = false)
+#     fig
+# end
+
+function num2col(i, lbls, cols)
+    j = findfirst(x -> x == i, lbls)
+    return Base.parse(Colorant, cols[j])
+    # if i == 0
+    #     return colorant"white"
+    # elseif i == 1
+    #     return colorant"green"
+    # elseif i == 2
+    #     return colorant"red"
+    # elseif i == 3
+    #     return colorant"black"
+    # end
+end
+#
+# map(x -> num2col(x, ulbls, cols), ulbls)
+# m = rand(ulbls, (10,10));
+# colours = map(x -> num2col(x, ulbls, cols),m)
+# Plots.heatmap(1:10,1:10,m,c=colours,yflip=true)
+# colGRAD = cgrad(collect(cols), categorical=true)
+# Plots.heatmap(1:10,1:10,m,c=colGRAD,yflip=true)
+# plot(colours)
