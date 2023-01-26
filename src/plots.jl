@@ -1,4 +1,5 @@
 using Plots
+# import PlotUtils
 using Dates
 
 """
@@ -58,9 +59,20 @@ end
 function modaxs(axs::Vector{CubeAxis};lon = "longitude")
     axs_nms = axnms(axs)
     lon_dim =  findfirst(axs_nms .== lon[1:3])
-    axs[lon_dim] = RangeAxis(lon, range(axs[lon_dim][1] .- 360, axs[lon_dim][end] .- 360, length = length(axs[lon_dim])))
+    axsl = map(x -> x > 180 ? x-360 : x, axs[lon_dim]) |> sort
+    axs[lon_dim] = RangeAxis(lon, range(axsl[1] , axsl[end], length = length(axsl)))
     return axs
 end
+
+function getshifts(axs::Vector{CubeAxis};lon = "longitude")
+    axs_nms = axnms(axs)
+    lon_dim =  findfirst(axs_nms .== lon[1:3])
+    shifts = [sum(axs[lon_dim] .< 0), 1, 1]
+    dims = ["lon", "lat", "tim"];
+    i = map(x -> findfirst(dims .== x), axs_nms)
+    return shifts[i]
+end
+
 
 # function prephm(tmp,axs,fn)
 #     axs_nms = axnms(axs)
@@ -112,9 +124,9 @@ function prephm(tmp,axs,fn;reduced="tim")
     return x,y,z
 end
 
-function hm(tmp::BitArray{3}; title = missing, axs = axes_rt, fn = sum, reduced = "tim", xlab = "longitude", ylab = "latitude")
+function hm(tmp::BitArray{3}; title = missing, axs = axes_rt, fn = sum, reduced = "tim", xlab = "longitude", ylab = "latitude", kwargs...)
     x,y,z = prephm(tmp,axs,fn;reduced)
-    Plots.heatmap(x, y, z, title = title, xlabel = xlab, ylabel = ylab)
+    Plots.heatmap(x, y, z; title = title, kwargs...)
 end
 
 function hm(tmp::Array{Bool, 3},args...;kwargs...)
@@ -122,9 +134,9 @@ function hm(tmp::Array{Bool, 3},args...;kwargs...)
     hm(tmp,args...;kwargs...)
 end
 
-function hm!(tmp::BitArray{3}; axs = axes_rt, fn = sum, reduced = "tim", xlab = "longitude", ylab = "latitude")
+function hm!(tmp::BitArray{3}; axs = axes_rt, fn = sum, reduced = "tim", xlab = "longitude", ylab = "latitude", kwargs...)
     x,y,z = prephm(tmp,axs,fn;reduced)
-    Plots.heatmap!(x, y, z, xlabel = xlab, ylabel = ylab)
+    Plots.heatmap!(x, y, z; kwargs...)
 end
 
 function hm!(tmp::Array{Bool, 3},args...;kwargs...)
