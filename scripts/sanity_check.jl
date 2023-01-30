@@ -59,14 +59,6 @@ obs.End .= replace.(obs.End, r"\." => "-");
 function labobs(df0::DataFrame, lon, lat, period, obs_event; p=p::Plots.Plot{})
     #
     # plot labelled events flattened over time
-    # or select all labels
-    # fix the longitudes
-    # event spatial bounding box
-    x = [lon[1], lon[1], lon[2], lon[2], lon[1]];
-    x = lon[1] >= 180 ? x.-360 : x
-    y = [lat[1], lat[2], lat[2], lat[1], lat[1]];
-    p = plot!(x, y , label = "");# 
-
     
     # retrive labels and count them
     tab = CubeTable(
@@ -108,13 +100,14 @@ function getx(lon)
     x = lon[1] >= 180 ? x.-360 : x
 end
 
-function labplot!(pl, labels, period, lat, lon, ulbls, lblt)
+function labplot!(pl, labels, period, lat, lon, ulbls, lblt, cols)
     # subset labelcube
     sublabels = Cube(subsetcube(labels, time=period, latitude=lat, longitude=lon))
     # sublabels = Cube(subsetcube(labels, time=periodt, latitude=latt, longitude=lont))
     # load to memory and set all other values to 0 (so that they will be set to NaN by prephm)
     sublabels1 = (sublabels.data)[:,:,:];
-    @time sublabels1 = map(x -> x in ulbls ? x : 0, sublabels1);
+    # @time 
+    sublabels1 = map(x -> x in ulbls ? x : 0, sublabels1);
     # cols = ("#28828F", "#6E6E6E", "#9E9E9E", "#C8C8C8", "#366570", "#8C8C8C", "#57A9BA", "#FFD966", "#EAF1F3")
     if length(lblt) == 1
         if length(ulbls) == 1
@@ -161,7 +154,7 @@ trial = "ranked_pot0.01_ne0.1_cmp_2016_2021"#"ranked_pot0.01_ne0.1_tcmp_Sdiam3_T
     # labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_$trial.zarr"
     labels = open_dataset(labelpath)# labels = Cube(labelpath)
 
-    df0 = DataFrame()
+    global df0 = DataFrame()
     # df0 = CSV.read("/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/SanityCheck_$trial.csv", DataFrame, header=1)
     # df0 = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/SanityCheck_$trial.csv", DataFrame, header=1)
 
@@ -185,8 +178,20 @@ trial = "ranked_pot0.01_ne0.1_cmp_2016_2021"#"ranked_pot0.01_ne0.1_tcmp_Sdiam3_T
             lon = [lon1,lon2]
         end
     end
-    p = plot(title = obs[obs_event,:Event] * " in " * obs[obs_event, :Area] * "\n from " * obs[obs_event, :Start] * " to " * obs[obs_event, :End]);
+    p = plot(title = obs[obs_event,:Event] * " in " * obs[obs_event, :Area] * "\n from " * obs[obs_event, :Start] * " to " * obs[obs_event, :End],
+            xlab = "Longitude",
+            ylab = "Latitude");
+    # fix the longitudes
+    # event spatial bounding box
+    if typeof(lon) <: Vector
+        x = getx(lon0)
+    else
+        x = getx(lon)
+    end
+    y = [lat[1], lat[2], lat[2], lat[1], lat[1]];
     
+    p = plot!(x, y , label = "");# 
+
     if typeof(lon) <: Vector{}
         # do everything twice...
         p, df0 = labobs(df0, lon[1], lat, period, obs_event);
@@ -204,7 +209,9 @@ trial = "ranked_pot0.01_ne0.1_cmp_2016_2021"#"ranked_pot0.01_ne0.1_tcmp_Sdiam3_T
     Plots.savefig(p, path * "fig/plot" * "_" * trial * "_HistEvent_$obs_event" * "_LatLon.png")
 
     # plot all labelled events separately with time dimension flattened + bbox of obs_event
-    p = plot(title = obs[obs_event,:Event] * " in " * obs[obs_event, :Area] * "\n from " * obs[obs_event, :Start] * " to " * obs[obs_event, :End]);
+    p = plot(title = obs[obs_event,:Event] * " in " * obs[obs_event, :Area] * "\n from " * obs[obs_event, :Start] * " to " * obs[obs_event, :End],
+            xlab = "Time",
+            ylab = "Latitude");
     # event spatial bounding box
     x = [period[1], period[1], period[2], period[2], period[1]]
     y = [lat[1], lat[2], lat[2], lat[1], lat[1]];
@@ -254,11 +261,11 @@ trial = "ranked_pot0.01_ne0.1_cmp_2016_2021"#"ranked_pot0.01_ne0.1_tcmp_Sdiam3_T
     end
 
     # maximum 10 graphs per obs_event
-    n = 9
+    n = 11
     # period
     time_lapse = maximum(((period[2] - period[1] + Day(1)) ÷ n, Day(1)));
-    l = @layout [a b ;c d ;e f ;g h ;i j]
-    p = ()
+    l = @layout [a b c d ;e f g h ;i j k l]
+    global p = ()
     pl = Plots.heatmap([1:length(ulbls)' 1:length(ulbls)'  ],
          yticks = (1:length(ulbls),ulbls),
          colorbar=:none,
@@ -307,16 +314,16 @@ trial = "ranked_pot0.01_ne0.1_cmp_2016_2021"#"ranked_pot0.01_ne0.1_tcmp_Sdiam3_T
 
             if typeof(lon) <: Vector
                 for L in lon
-                pl = labplot!(pl, labels, periodt, lato, L, ulbls, lblt)
+                pl = labplot!(pl, labels, periodt, lato, L, ulbls, lblt, cols)
                 end
             else 
-                pl = labplot!(pl, labels, periodt, lato, lono, ulbls, lblt)
+                pl = labplot!(pl, labels, periodt, lato, lono, ulbls, lblt, cols)
             end
             p = (p..., pl)
 
         end
     end
-    p1 = plot(p..., layout=l, size = (450,1000));
+    p1 = plot(p..., layout=l, size = (1000,800));
     # for pl in p
     #     display(pl)
     # end   
