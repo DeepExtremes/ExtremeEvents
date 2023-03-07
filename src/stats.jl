@@ -23,7 +23,7 @@ function defineallstats()
     # :ter => WeightedMean(),
     # :ter => Extrema(),
     EventType(),
-    # LandShare(),
+    LandShare(),
     Volume(),
     )
 end
@@ -67,6 +67,16 @@ function computestat(el::EventLabel,row)
 end
 function newlabel(el::EventLabel, ievent)
     el.el = ievent
+end
+
+# Event Year
+# (better to define type in construct rather than in field)
+mutable struct EventYear{I<:Int64}
+    ey::I
+end
+EventYear() = EventYear(Dates.year(Date(1900,1,1)))
+function computestat(ey::EventYear,row)
+    ey.ey = Dates.year(row.time)
 end
 
 # Event label count
@@ -164,19 +174,20 @@ function computestat(et::EventType, row)
 end
 
 # Land share
-mutable struct LandShare{F<:Float32}
+mutable struct LandShare{F<:Float64}
     ls::F
 end
 LandShare() = LandShare(0.0)
 function computestat(ls::LandShare,row)
-    # print("LandShare old is " * string(ls.ls))
-    # print(row.latitude)
-    try #print(row.landmask) 
-        ls.ls = ls.ls +  (row.landmask >0 ? 1 : 0 ) * cosd(row.latitude) 
+    # println("LandShare old is " * string(ls.ls))
+    # print(row)
+    # println(row.landmask)
+    try  
+        ls.ls = ls.ls +  (row.landmask > 0.5 ? 1 : 0 ) * cosd(row.latitude) 
     catch
-        # print("no data")
+        # println("no data")
     end
-    # print("new LandShare value is $ls")
+    # println("new LandShare value is $ls")
 end
 
 # define function appendresults for all types present in res
@@ -210,6 +221,8 @@ function appendresult(x::EventLabelCount, t)
     (;t...,label = x.el, count = x.c)
 end
 
+appendresult(x::EventYear,t) = (;t...,year=x.ey)
+
 
 """
     This function is used to create a named tuple from a tuple, appending the elements in a loop
@@ -230,7 +243,8 @@ function fitalldata(tab)
     for t in tab
         # loop on rows
         for row in Tables.rows(t)
-            if row.label > 0
+            # compute stats for labels > 0 and over land only
+            if row.label > 0 && row.landmask > 0.5
                 # compute stats for current label
                 stat = allstats[row.label]
                 map(stat) do st
@@ -257,9 +271,9 @@ function toDF(results)
     df = df[map(>(0), df.label), :]
 
     # add derived stats to df
-    df.duration = map(Dates.Day, (df.end_time - df.start_time));
+    df.duration = map(Dates.Day, (df.end_time - df.start_time )) .+ Dates.Day(1);
     # average area (should be multiplied by (Rt=6.371 * 1e3)^2 * (2pi/360 * 0.25)^2) to get sqkm)
-    df.area = map(((x,y) -> x/(Dates.value.(y) + 1)), df.volume, df.duration);
+    df.area = map(((x,y) -> x/(Dates.value.(y))), df.volume, df.duration);
     # Weighted sums need to be divided by Volume
     df.heat = map((x,y) -> round(x/y*100, digits = 2), df.heat, df.volume);
     df.drought30 = map((x,y) -> round(x/y*100, digits = 2), df.drought30, df.volume);
@@ -282,7 +296,7 @@ function toDFtair(results)
     df = df[map(>(0), df.label), :]
 
     # add derived stats to df
-    df.duration = map(Dates.Day, (df.end_time - df.start_time));
+    df.duration = map(Dates.Day, (df.end_time - df.start_time + Dates.Day(1)));
     # average area (should be multiplied by (Rt=6.371 * 1e3)^2 * (2pi/360 * 0.25)^2) to get sqkm)
     df.area = map(((x,y) -> x/(Dates.value.(y) + 1)), df.volume, df.duration);
     # temperature in deg Celsius
@@ -375,7 +389,7 @@ function sanity_check(obs, eventspath, peis, era)
             t2mmin   = era.t2mmin[time=period, latitude=lat, longitude=lon],
             tp       = era.tp[time=period, latitude=lat, longitude=lon],
             pet      = era.pet[time=period, latitude=lat, longitude=lon],
-            # landmask = lsmask.lsm[latitude=lat, longitude=lon],
+            landmask = lsmask.lsm[latitude=lat, longitude=lon],
         );
         # run some statitsics (follow stats_extremes?)
         allstats = fitsanitycheck(cube_table, allstats, ievent);
@@ -466,3 +480,42 @@ function mode(itr::AbstractArray; dims=:, init=0)
     end
     
 end
+
+# aggregate count by Year
+# use EventType and Year
+function definecountyear()
+    (
+    EventYear(),
+    EventType(),
+    )
+end
+
+function countyear(eventcube::Dataset)
+    @show cube_table = CubeTable(
+        event = eventcube.layer,
+        )
+    years = unique(map(Dates.year,eventcube.axes[:time]))
+    allstats = [definecountyear() for iyear in 1:length(years)];
+    # iterate over CubeTable
+    for t in cube_table
+        # loop on rows
+        for row in Tables.rows(t)
+            if row.event > 0
+                # @show row
+                y = Dates.year(row.time)
+                iyear = findfirst(x-> x==y,years)
+                # compute stats for current event
+                stat = allstats[iyear]
+                map(stat) do st
+                    computestat(st,row)
+                end
+            end
+        end
+    end
+    # toDF
+    df = DataFrame(map(collectresults, allstats))
+    # drop empty lines if any
+    df = df[map(>(0), df.year), :]
+    return df    
+end
+
