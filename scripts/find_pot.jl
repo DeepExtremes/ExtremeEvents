@@ -7,7 +7,7 @@ using YAXArrays, EarthDataLab
 using DataFrames
 import CSV
 using Plots
-using PlotlyJS
+# using PlotlyJS
 using Statistics
 using StatsBase
 using ImageMorphology
@@ -22,6 +22,7 @@ s_t40 = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_smooth
 s_t80 = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_smoothed_80_2016.zarr")
 s_pei = open_dataset(inpath_pei)
 s_pei40 = open_dataset("/Net/Groups/BGI/scratch/fgans/DeepExtremes/smoothed_pei_ranks_40.zarr")
+s_pei80 = open_dataset("/Net/Groups/BGI/scratch/fgans/DeepExtremes/smoothed_pei_ranks_80.zarr")
 r_t = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_ranked.zarr")
 r_pei = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/pei_ranks.zarr")
 inputs = (r_t.layer,
@@ -44,8 +45,8 @@ filter!(:Event_type=>!=("flood"), obs1)
 # compute weighted "volume" of each type of event, (min, mean, max) for t2mmax, 
 
 # run stats.jl first
-include("stats.jl")
-
+include("../src/stats.jl")
+include("../src/plots.jl")
 # for tres in [0.001, 0.0025, 0.005, 0.01]
 #     obs_check = sanity_check(obs1, tres);
 
@@ -65,52 +66,76 @@ obs = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventPart2.csv", 
 obs = dropmissing!(obs)
 obs.Start .= replace.(obs.Start, r"\." => "-")
 obs.End .= replace.(obs.End, r"\." => "-")
-obs_event = 5# for obs_event = 1:(size(obs)[1])
+obs_event = 6# for obs_event = 1:(size(obs)[1])
     period =( Date(obs[obs_event,:Start]), Date(obs[obs_event,:End]))
     #### !!! need to fix longitude to match 0-360 !!!
     lat = (obs[obs_event,:North], obs[obs_event,:South])
     lon = (obs[obs_event,:West], obs[obs_event,:East])
+    # subset ranked indicators
+    subrt = subsetcube(r_t, time=period, latitude=lat, longitude=lon)# readcubedata(subsetcube(Cube(r_t)
+    subrpei = subsetcube(r_pei, time=period, latitude=lat, longitude=lon)
     # subset smoothed indicators
     subst = subsetcube(s_t, time=period, latitude=lat, longitude=lon)
     subst40 = subsetcube(s_t40, time=period, latitude=lat, longitude=lon)
     subst80 = subsetcube(s_t80, time=period, latitude=lat, longitude=lon)
     subspei = subsetcube(s_pei, time=period, latitude=lat, longitude=lon)
     subspei40 = subsetcube(s_pei40, time=period, latitude=lat, longitude=lon)
-    # histogram smoothed
-    st =  reshape( subst.layer[:,:,:], :);
-    st40 =  reshape( subst40.layer[:,:,:], :);
-    sd30 = reshape(subspei.pei_30[:,:,:], :);
-    s40d30 = reshape(subspei40.pei_30[:,:,:], :);
-    sd90 = reshape(subspei.pei_90[:,:,:], :);
-    s40d90 = reshape(subspei40.pei_90[:,:,:], :);
-    sd180 = reshape(subspei.pei_180[:,:,:], :);
-    h1 = Plots.histogram(st, xlabel = "Smoothed t2mmax", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
-    h2 = Plots.histogram(sd30, xlabel = "Smoothed PEI_30", title="bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))    
-    h3 = Plots.histogram(sd90, xlabel = "Smoothed PEI_90", title="bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
-    h4 = Plots.histogram(sd180, xlabel = "Smoothed PEI_180", title="bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
-    # subset ranked indicators
-    subrt = subsetcube(r_t, time=period, latitude=lat, longitude=lon)# readcubedata(subsetcube(Cube(r_t)
-    subrpei = subsetcube(r_pei, time=period, latitude=lat, longitude=lon)
-    # histogram smoothed
+    subspei80 = subsetcube(s_pei80, time=period, latitude=lat, longitude=lon)
+    # load to memory
     rt =  reshape( subrt.layer[:,:,:], :);
     rd30 = reshape(subrpei.pei_30[:,:,:], :);
     rd90 = reshape(subrpei.pei_90[:,:,:], :);
     rd180 = reshape(subrpei.pei_180[:,:,:], :);
-    h1 = Plots.histogram(rt, xlabel = "Ranked t2mmax", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
-    h2 = Plots.histogram(rd30, xlabel = "Ranked PEI_30", title="bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))    
-    h3 = Plots.histogram(rd90, xlabel = "Ranked PEI_90", title="bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
-    h4 = Plots.histogram(rd180, xlabel = "Ranked PEI_180", title="bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
+    st =  reshape( subst.layer[:,:,:], :);
+    st40 =  reshape( subst40.layer[:,:,:], :);
+    st80 =  reshape( subst80.layer[:,:,:], :);
+    sd30 = reshape(subspei.pei_30[:,:,:], :);
+    s40d30 = reshape(subspei40.pei_30[:,:,:], :);
+    s80d30 = reshape(subspei80.pei_30[:,:,:], :);
+    sd90 = reshape(subspei.pei_90[:,:,:], :);
+    s40d90 = reshape(subspei40.pei_90[:,:,:], :);
+    s80d90 = reshape(subspei80.pei_90[:,:,:], :);
+    sd180 = reshape(subspei.pei_180[:,:,:], :);
+    s40d180 = reshape(subspei40.pei_180[:,:,:], :);
+    s80d180 = reshape(subspei80.pei_180[:,:,:], :);
+    # histograms ranked versus smoothed
+    cols = palette(:RdBu_6)
+    h1 = Plots.histogram(rt, label = "Ranked", xlabel = "t2mmax", c=cols[1], title= "bbox Lon " * string(lon) * " Lat " * string(lat) * "\n Time " * string(period[1]) * " to " * string(period[2]));
+    h1 = Plots.histogram!(st, label = "Smoothed lbord=20", c=cols[6]);
+    h1 = Plots.histogram!(st40, label = "Smoothed lbord=40", c=cols[5]);
+    h1 = Plots.histogram!(st80, label = "Smoothed lbord=80", c=cols[4])
+    Plots.savefig(h1,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/hist_rt_st_event$obs_event.png")
+   
+    h2 = Plots.histogram(rd30, label = "Ranked", xlabel = "PEI_30", c=cols[1], title="bbox Lon " * string(lon) * " Lat " * string(lat) * "\n Time " * string(period[1]) * " to " * string(period[2]));  
+    h2 = Plots.histogram!(sd30, label = "Smoothed lbord=20", c=cols[6]);
+    h2 = Plots.histogram!(s40d30, label = "Smoothed lbord=40", c=cols[5]);
+    h2 = Plots.histogram!(s80d30, label = "Smoothed lbord=80", c=cols[4])
+    Plots.savefig(h2,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/hist_rd30_sd30_event$obs_event.png")
+
+    h3 = Plots.histogram(rd90, label = "Ranked", xlabel = "PEI_90", c=cols[1], title="bbox Lon " * string(lon) * " Lat " * string(lat) * "\n Time " * string(period[1]) * " to " * string(period[2]));  
+    h3 = Plots.histogram!(sd90, label = "Smoothed lbord=20", c=cols[6]);
+    h3 = Plots.histogram!(s40d90, label = "Smoothed lbord=40", c=cols[5]);
+    h3 = Plots.histogram!(s80d90, label = "Smoothed lbord=80", c=cols[4])
+    Plots.savefig(h3,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/hist_rd90_sd90_event$obs_event.png")
+
+    h4 = Plots.histogram(rd180, label = "Ranked", xlabel = "PEI_180", c=cols[1], title="bbox Lon " * string(lon) * " Lat " * string(lat) * "\n Time " * string(period[1]) * " to " * string(period[2]));  
+    h4 = Plots.histogram!(sd180, label = "Smoothed lbord=20", c=cols[6]);
+    h4 = Plots.histogram!(s40d180, label = "Smoothed lbord=40", c=cols[5]);
+    h4 = Plots.histogram!(s80d180, label = "Smoothed lbord=80", c=cols[4])
+    Plots.savefig(h4,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/hist_rd180_sd180_event$obs_event.png")
+
     # compare distribution of ranked and smoothed
     # s1 = PlotlyJS.plot(PlotlyJS.histogram2d(x=rt,y=st), Layout(xaxis_title = "Ranked t2mmax", yaxis_title = "Smoothed t2mmax", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2])))
-    s1 = Plots.histogram2d(rt,st)
+    s1 = Plots.histogram2d(rt,st,nbins = 100, xlabel= "Ranked t2mmax", ylabel = "Smoothed t2mmax", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * "\n Time " * string(period[1]) * " to " * string(period[2]))
+    Plots.savefig(s1,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/hist2d_rt_st_event$obs_event.png")
     # s1f = PlotlyJS.plot(PlotlyJS.histogram2d(x=rt,y=st40), Layout(xaxis_title = "Ranked t2mmax", yaxis_title = "Smoothed t2mmax lbord 40", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2])))
     s1f = Plots.histogram2d(rt,st40, xlabel= "Ranked t2mmax", ylabel = "Smoothed t2mmax lbord 40") 
     # s1c = PlotlyJS.plot(PlotlyJS.histogram2d(x=st,y=st40), Layout(xaxis_title = "Smoothed t2mmax lbord 20", yaxis_title = "Smoothed t2mmax lbord 40", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2])))
     #savefig(s1,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/hist2d_rt_st.png")
-    h2d20 = Plots.histogram2d(rd30,sd30, nbins = 100, xlabel = "Ranked PEI_30", ylabel = "Smoothed PEI_30", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
-    h2d40 = Plots.histogram2d(rd30,s40d30, nbins = 100, xlabel = "Ranked PEI_30", ylabel = "Smoothed PEI_30 (lbord = 40)", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * " Time " * string(period[1]) * " to " * string(period[2]))
-    savefig(h2d20,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/hist2d_rd30_s20d30.png")
-    savefig(h2d40,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/hist2d_rd30_s40d30.png")
+    h2d20 = Plots.histogram2d(rd30,sd30, nbins = 100, xlabel = "Ranked PEI_30", ylabel = "Smoothed PEI_30", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * "\nfrom " * string(period[1]) * " to " * string(period[2]))
+    h2d40 = Plots.histogram2d(rd30,s40d30, nbins = 100, xlabel = "Ranked PEI_30", ylabel = "Smoothed PEI_30 (lbord = 40)", title= "bbox Lon " * string(lon) * " Lat " * string(lat) * "\nfrom " * string(period[1]) * " to " * string(period[2]))
+    savefig(h2d20,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/hist2d_rd30_s20d30_event$obs_event.png")
+    savefig(h2d40,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/hist2d_rd30_s40d30_event$obs_event.png")
 # end
 
 # Smoothing is too strong
@@ -251,7 +276,7 @@ Plots.savefig(hm5, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/heatmap_E
 jena_tmax = subsetcube(r_t, lat = 50.9, lon = 11.5)
 time_axis = jena_tmax.time[:]
 tmax = jena_tmax.layer[:];
-p1 = Plots.histogram2d(time_axis[tmax.<=pot],tmax[tmax.<=pot], bins=70)
+p1 = Plots.histogram(time_axis[tmax.<=pot], bins=70)
 
 
 # label components tests

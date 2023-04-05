@@ -19,8 +19,8 @@ function simpleplot(dc::YAXArray,
     year::Int, 
     nlayers::Int; 
     variable::Union{Nothing, AbstractString} = nothing,
-    colours::Union{Nothing, PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient} = nothing, 
-    replacement::Any = Pair(nothing,nothing)
+    replacement::Any = Pair(nothing,nothing),
+    kwargs...
     )
     if isnothing(getAxis("Variable", dc))
             sdc = subsetcube(dc, time = year:year)
@@ -31,13 +31,13 @@ function simpleplot(dc::YAXArray,
             sdc = subsetcube(dc, time = year:year, variable = variable)
         end
     end
-    if isnothing(colours)
-        colours = palette(:darkterrain, nlayers^2)
-    else
-        if typeof(colours) in [PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient]
-            ErrorException("colours should be of type ColorGradient")
-        end
-    end
+    # if isnothing(colours)
+    #     colours = palette(:darkterrain, nlayers^2)
+    # else
+    #     if typeof(colours) in [PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient]
+    #         ErrorException("colours should be of type ColorGradient")
+    #     end
+    # end
     # transpose and count backwards to get the map correctly
     plotdata = sdc.data[d,:,:]'[end:-1:1,:];
     # replace 0 
@@ -46,7 +46,7 @@ function simpleplot(dc::YAXArray,
     end
     @show 2^nlayers
     # Plots.heatmap(sdc.data[d,:,:]'[end:-1:1,:], c = cgrad(:thermal, categorical = true), zlims = [0,2^nlayers], title = Date("$year") + Day(d))
-    Plots.heatmap(plotdata, c = colours, zlims = [0,2^nlayers], title = Date("$year") + Day(d), xlabel="latitude", ylabel="longitude")
+    Plots.heatmap(plotdata, zlims = [0,2^nlayers], title = Date("$year") + Day(d), ylabel="latitude", xlabel="longitude", kwargs...)
 end
 
 # lon, lat heatmap with reduction over time
@@ -124,8 +124,9 @@ function prephm(tmp,axs,fn;reduced="tim")
     return x,y,z
 end
 
-function hm(tmp::BitArray{3}; title = missing, axs = axes_rt, fn = sum, reduced = "tim", xlab = "longitude", ylab = "latitude", kwargs...)
+function hm(tmp::BitArray{3}; title = missing, axs = axes_rt, fn = sum, reduced = "tim", kwargs...)
     x,y,z = prephm(tmp,axs,fn;reduced)
+    @show sum(map(x->!isnan(x),z))
     Plots.heatmap(x, y, z; title = title, kwargs...)
 end
 
@@ -147,6 +148,11 @@ end
 function hm!(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = "tim", kwargs...)
     x,y,z = prephm(tmp,axs,fn;reduced)
     Plots.heatmap!(x, y, z;kwargs...)
+end
+
+function hm(tmp::Any; axs = axes_rt, fn = sum, reduced = "tim", kwargs...)
+    x,y,z = prephm(tmp,axs,fn;reduced)
+    Plots.heatmap(x, y, z;kwargs...)
 end
 
 function cf!(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = "tim", kwargs...)
@@ -231,3 +237,43 @@ end
 # colGRAD = cgrad(collect(cols), categorical=true)
 # Plots.heatmap(1:10,1:10,m,c=colGRAD,yflip=true)
 # plot(colours)
+
+
+function plotEvent(df, labelcube, label_row)
+    periodl =( df[label_row,:start_time], df[label_row,:end_time]+Day(1))
+    latl = (df[label_row,:latitude_max], df[label_row,:latitude_min])
+    lonl = (df[label_row,:longitude_min], df[label_row,:longitude_max])
+    sublabels = Cube(subsetcube(labelcube, time=periodl, latitude=latl, longitude=lonl))
+    @show sublabels
+    # load to memory and flag pixels equal to label
+    label = df[label_row, :label];
+    sublabels1 = (sublabels.data .== label)[:,:,:];
+    @show size(sublabels1)
+    if any(lonl.>180)
+        # modify axes
+        axs = modaxs(sublabels.axes)
+        # modify sublabels1: shift lon
+        shifts = getshifts(axs)
+        sublabels1 = circshift(sublabels1, shifts)
+    else
+        axs = sublabels.axes
+    end
+    # # drop longitudes that are 0 and modify axes accordingly
+    # axs_nms = axnms(axs)
+    # no_lon_dim =  findall(axs_nms .!= "lon")
+    # indlon = mapslices(sublabels1,dims=no_lon_dim) do x
+    #     any(x .!= 0)
+    # end
+    # @show (size(indlon))
+    # # i am stuck here
+
+    # view over time
+    p = hm(sublabels1, 
+        axs = axs, 
+        reduced = "tim", 
+        xlab = "Longitude", 
+        ylab = "Latitude", 
+        c = cgrad(:inferno, categorical = true),
+        title = "Event $label \n from " * string(Date(df[label_row,:start_time])) * " to " * string(Date(df[label_row,:end_time]))
+        )  
+end
