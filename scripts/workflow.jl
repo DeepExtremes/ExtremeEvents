@@ -83,10 +83,10 @@ tmp1 = compute_extremes(inputs,0.01, "/Users/mweynants/BGI/temp/tmp1.zarr")
 simpleplot(tmp, 182, 2019, 4)
 simpleplot(tmp1, 182, 2019, 4)
 
-eec = Cube(open_dataset(zopen("https://s3.bgc-jena.mpg.de:9000/xaida/EventCube_0.01.zarr", consolidated = true)))
+eec = Cube(open_dataset(zopen("https://s3.bgc-jena.mpg.de:9000/deepextremes/v2/EventCube_ranked_pot0.01_ne0.1.zarr", consolidated = true, fill_as_missing=false)))
 
 ## connected components
-eec_bin = subsetcube(eec, time = 2019:2019, region="Germany").data[:,:,:] .> 0;
+eec_bin = map(x -> x > 1 && !iseven(x), subsetcube(eec, time = 2019:2019, region="Germany").data[:,:,:]);
 Plots.heatmap(eec_bin[182,:,:]'[end:-1:1,:], c = cgrad(:thermal, categorical = true), title = "Boolean layer")
 # use ImageMorphology.label_components to label the connected blobs of events
 r = label_components(eec_bin);
@@ -95,18 +95,6 @@ findmax(r)
 Plots.heatmap(r[197,:,:]'[end:-1:1,:], c = cgrad(:thermal, categorical = true), zlims = [1, maximum(r)], title = "Connected components")
 # all same event over 1 year...
 
-# plot events
-p0 = simpleplot(subsetcube(eec, time = 2019:2019, region="Germany"), 182, 2019, 4)
-savefig(p0, "../events.png")
-# if selection on 1 day
-eec_bin = subsetcube(eec, time = 2019:2019, region="Germany").data[182,:,:] .> 0;
-p1 = Plots.heatmap(eec_bin'[end:-1:1,:], c = cgrad(:gist_gray, categorical = true), title = "Boolean layer")
-savefig(p1,"../boolean_layer.png")
-r = label_components(eec_bin);
-p2 = Plots.heatmap(r'[end:-1:1,:], c = cgrad(:gist_earth, categorical = true), title = "Connected components")
-savefig(p2,"../connected_comp.png")
-
-
 ranked_pei = Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/pei_ranks.zarr")
 c1 = ranked_pei[time=(Date(2020,6,15),Date(2020,6,17)), variable = "pei_30"]
 tmp = smooth(c1, "smooth_pei.zarr")
@@ -114,4 +102,74 @@ tmp = smooth(c1, "smooth_pei.zarr")
 tmp1 = tmp[:,:,:]
 p = heatmap(tmp1[:,:,1]'[end:-1:1,:])
 p = heatmap(tmp1[:,:,2]'[end:-1:1,:])
+
+# plot event cube
+# dc = open_dataset(zopen("https://s3.bgc-jena.mpg.de:9000/xaida/v2/EventCube_ranked_pot0.01_ne0.1.zarr", consolidated = true, fill_as_missing=false))
+dc = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventCube_ranked_pot0.01_ne0.1.zarr")
+v = [
+        RGBA(1,1,1,0), # 0x00 # 0
+        RGBA(1,0,0,1), # 0x01 # 1 !!
+        RGBA(0,0,.8,1), # 0x02 # 2 
+        RGBA(1,0,.8,1), # 0x03 # 3 !!
+        RGBA(0,0,.6,1), # 0x04 # 4 
+        RGBA(1,0,.6,1), # 0x05 # 5 !!
+        RGBA(0,0,.6,1), # 0x06 # 6 
+        RGBA(1,0,.6,1), # 0x07 # 7 !!
+        RGBA(0,0,.4,1), # 0x08 # 8 
+        RGBA(1,0,.4,1), # 0x09 # 9 !!
+        RGBA(0,0,.4,1), # 0x0a # 10
+        RGBA(1,0,.4,1), # 0x0b # 11!!
+        RGBA(0,0,.4,1), # 0x0c # 12
+        RGBA(1,0,.4,1), # 0x0d # 13!!
+        RGBA(0,0,.4,1), # 0x0e # 14
+        RGBA(1,0,.4,1), # 0x0f # 15!!
+        RGBA(.7,.7,.7,1), # 0x10 # 16
+    ]
+
+period = (Date("2019-06-25"),Date("2019-07-02"))
+D = Date("2019-06-30")
+# D = D + Day(1)
+sdc = Cube(subsetcube(dc, latitude=(30.0,70.0), longitude = (0.0,35.0), time = (D,D+Day(1))))
+
+plotdata = sdc.data[:,:,:];#(sdc.data)[1,:,:]'[end:-1:1,:];
+
+# println(unique(sublabels1))
+
+p = hm(plotdata, axs = sdc.axes, fn = mode, reduced = "tim", c=cgrad(v[2:end], categorical = true),
+    # colorbar=:none,
+    title = "Subset of EventCube on $D",
+    xlabel = "longitude",
+    ylabel = "latitude",
+    zlims = (0,16),
+    )
+
+savefig(p,"../europe_buffer_$D.png")
+
+## Western North America 2021
+D = Date("2021-06-20")
+while D < Date("2021-07-10")
+    D += Day(1)
+    sdc = Cube(subsetcube(dc, latitude=(30.0,65.0), longitude = (220.0,250.0), time = (D,D+Day(1))))
+    plotdata = sdc.data[:,:,:];#(sdc.data)[1,:,:]'[end:-1:1,:];
+    p = hm(plotdata, axs = sdc.axes, fn = mode, reduced = "tim", c=cgrad(v[2:end], categorical = true),
+    # colorbar=:none,
+    title = "Subset of EventCube on $D",
+    xlabel = "longitude",
+    ylabel = "latitude",
+    zlims = (0,16),
+    )
+    savefig(p,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/EventCube_NWA_$D.png")
+end
+
+
+
+# plot events
+# if selection on 1 day
+sdc_bin = map(x -> x > 1 && !iseven(x), sdc);
+# p1 = hm(sdc_bin.data[:,:,:], axs = sdc.axes, fn = mode)
+p1 = Plots.heatmap(sdc_bin.data[1,:,:]'[end:-1:1,:], c = cgrad(:gist_gray, categorical = true), title = "Boolean layer")
+savefig(p1,"../boolean_layer_cmp.png")
+r = label_components(sdc_bin[1,:,:]);
+p2 = Plots.heatmap(r'[end:-1:1,:], c = cgrad(:gist_earth, categorical = true), title = "Connected components")
+savefig(p2,"../connected_comp_cmp.png")
 
