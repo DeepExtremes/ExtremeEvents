@@ -12,9 +12,13 @@ compound_events = true
 cmp = compound_events ? "_cmp" : ""
 filter_events = false
 filter = filter_events ? "_Sdiam3_T5" : ""
+filter_land = true
+land = filter_land ? "_land" : ""
+# region = "Italy"
+
 # set window and t accordingly
 #outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_ranked_pot" * string(pot) * "_ne" * string(ne) * "_sreld335.zarr"
-outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_ranked_pot" * string(pot) * "_ne" * string(ne) * cmp * filter * aperiod *".zarr"
+outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_ranked_pot" * string(pot) * "_ne" * string(ne) * cmp * filter * aperiod * land * ".zarr"
 #outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_smoothed_pot" * string(pot) * "_ne" * string(ne) * ".zarr"
 
 inpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventCube_ranked_pot" * string(pot) * "_ne" * string(ne) * ".zarr"
@@ -35,7 +39,7 @@ if compound_events
     #     (2,3,1)
         # );
     @time maskarray = permutedims(
-        ((clastyears.data .> 0x01) .& (broadcast(x->isodd(x),clastyears.data)))[:,:,:],
+        ((broadcast(x->isodd(x),clastyears.data)) .& (clastyears.data .> 0x01))[:,:,:],
         (2,3,1)
         );
     # 136.463942 seconds (14.02 M allocations: 28.601 GiB, 0.68% gc time, 2.64% compilation time)
@@ -46,6 +50,26 @@ else
         (2,3,1)
         );
 end
+
+# import Plots
+# red = reshape(reduce(+,maskarray, dims=3), size(maskarray)[1:2]);
+# size(red)
+# Plots.heatmap(red)
+
+if filter_land
+    lsm = subsetcube(
+    Cube(open_dataset("/Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.721.static.nc")),
+    time=DateTime("2019-01-01T13:00:00"),
+    # region = region,
+    )
+    lsmask = lsm.data .> 0.5;
+    @time for t in 1: size(maskarray)[3]
+        maskarray[:,:,t] = ifelse.(lsmask, maskarray[:,:,t], 0)
+    end
+end
+# Plots.heatmap(lsmask)
+# red1 = reshape(reduce(+,maskarray, dims=3), size(maskarray)[1:2]);
+# Plots.heatmap(red1)
 
 if filter_events
     # filter maskarray to remove small events
