@@ -12,8 +12,14 @@ sm = smoothed ? "smoothed_" : "ranked_"
 compound_events = true
 cmp = compound_events ? "_cmp" : ""
 
-filter_events = true
+filter_events = false
 filter = filter_events ? "_Sdiam3_T5_new" : "" # "_Sdiam3_T5" #  "_Sdiam4_T4" #
+
+filter_land = false
+land = filter_land ? "_land" : ""
+
+# stats run on land only
+landonly = "_landonly"
 
 # restrict to small area for testing
 # Germany
@@ -21,13 +27,13 @@ filter = filter_events ? "_Sdiam3_T5_new" : "" # "_Sdiam3_T5" #  "_Sdiam4_T4" #
 # "World"
 # region = "World"
 # region doesn't work with longitude 0.0 to 360
-# region="Germany"
+# region="Luxembourg"
 
 period = 2016:2021 # (Date("2019-07-20"), Date("2019-07-30"))#
 aperiod = "_2016_2021"#"Summer2019"#
 
 # Open all Data Cubes
-labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_" * sm * "pot" * string(pot) * "_ne" * string(ne) * cmp * filter * aperiod *".zarr"
+labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_" * sm * "pot" * string(pot) * "_ne" * string(ne) * cmp * filter * aperiod * land * ".zarr"
 labels = open_dataset(labelpath)
 
 pei = open_dataset("/Net/Groups/BGI/work_1/scratch/s3/xaida/v2/PEICube.zarr")
@@ -41,6 +47,8 @@ eventcube = open_dataset(eventspath)
 # LandSeaMask# LandSeaMask
 # not in the same grid now !!!
 # lsmask = open_dataset("/Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.720.static.nc")
+lsmask = open_dataset("/Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.721.static.nc")
+lsmask_notime = subsetcube(lsmask, time=DateTime("2019-01-01T13:00:00"))
 
 # Fluxcom carbon fluxes (gC m^(-2) year^(-1))
 # gross primary productivity
@@ -56,7 +64,7 @@ renameaxis!(ter, "Time" => "time")
 # create iterable table with data cube label
 # each chunk can be read in memory
 tab = CubeTable(
-    label    = labels.layer[time=period], # [region=region,time=period]
+    label    = labels.layer[time=period], # [region=region,time=period] # [time=period]
     pei_30  = pei.pei_30[time=period], 
     pei_90  = pei.pei_90[time=period], #
     pei_180 = pei.pei_180[time=period], #
@@ -66,10 +74,10 @@ tab = CubeTable(
     tp       = era.tp[time=period],
     pet      = era.pet[time=period],
     event    = eventcube.layer[time=period],
-    # gpp      = gpp[time=period],
-    # nee      = nee[time=period],
-    # ter      = ter[time=period],
-    #landmask = lsmask.lsm[region=region],
+    # gpp      = gpp[ time=period],
+    # nee      = nee[ time=period],
+    # ter      = ter[ time=period],
+    landmask = lsmask_notime.lsm#[region=region],
     )
 
 #tab[1]
@@ -89,9 +97,9 @@ sort!(res, by=i->i[end].v, rev=true);
 # first convert tuple to named tuple
 
 
-df = toDF(res);
+df = toDF(res)
 # write DataFrame out to CSV file
-outname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_" * sm * "pot" * string(pot) * "_ne" * string(ne)  * cmp * filter * aperiod * ".csv"
+outname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_" * sm * "pot" * string(pot) * "_ne" * string(ne)  * cmp * filter * aperiod * land * landonly * ".csv"
 CSV.write(outname, df)
 print(outname)
 print("\n done!")
