@@ -23,25 +23,6 @@ function rescale(
     max_cache::Float64 = 1e9
 )  
 
-"""
-    rank_transform!(xout,xin)
-
-Transforms input into values between 0 and 1
-"""
-    function rank_transform!(xout, xin; multiplier = nothing)
-        # modify the xin columns for which sign need to be changed
-        if !isnothing(multiplier)
-            #@show xin[1:10]
-            xin .*= multiplier
-            #@show xin[1:10]
-        end
-        N=length(xout)
-        for (i,si) in enumerate(sortperm(xin))
-            xout[si]=i/N
-        end
-        xout
-    end
-
     # apply rank_transform to time series
     indims = InDims("Time")
     outdims = OutDims(
@@ -63,6 +44,27 @@ Transforms input into values between 0 and 1
 end
 
 # should write another method for input::Tuple{YAXArray}
+
+
+"""
+    rank_transform!(xout,xin)
+
+Transforms input into values between 0 and 1
+"""
+function rank_transform!(xout, xin; multiplier = nothing)
+        # modify the xin columns for which sign need to be changed
+        if !isnothing(multiplier)
+            #@show xin[1:10]
+            xin .*= multiplier
+            #@show xin[1:10]
+        end
+        N=length(xout)
+        for (i,si) in enumerate(sortperm(xin))
+            xout[si]=i/N
+        end
+        xout
+end
+
 
 """
     smooth(inputcube::YAXArray, outputpath::AbstractString; <keyword arguments>)
