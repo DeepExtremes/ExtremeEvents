@@ -264,10 +264,10 @@ trial = "ranked_pot0.01_ne0.1_cmp_2016_2021" # "ranked_pot0.01_ne0.1_cmp_2016_20
     end
 
     # maximum 10 graphs per obs_event
-    n = 11
+    n = 14
     # period
     time_lapse = maximum(((period[2] - period[1] + Day(1)) ÷ n, Day(1)));
-    l = @layout [a b c d ;e f g h ;i j k l]
+    l = @layout [a b c d e; f g h i j; k l m n o]
     global p = ()
     pl = Plots.heatmap([1:length(ulbls)' 1:length(ulbls)'  ],
          yticks = (1:length(ulbls),ulbls),
@@ -284,7 +284,7 @@ trial = "ranked_pot0.01_ne0.1_cmp_2016_2021" # "ranked_pot0.01_ne0.1_cmp_2016_20
     p = (p..., pl)
     for t in 1:n
         # aggregate over time by mode
-        periodt = (period[1] + (t - 1) * time_lapse, period[1] + t * time_lapse - Day(1))
+        periodt = (period[1] + (t - 1) * time_lapse, period[1] + t * time_lapse)
         # println(periodt)
         # plot bounding box
         pl = plot(x, y, 
@@ -298,7 +298,7 @@ trial = "ranked_pot0.01_ne0.1_cmp_2016_2021" # "ranked_pot0.01_ne0.1_cmp_2016_20
             ylims = ylims,
             );
         # skip timestep if no data
-        ind = df0.obs_event .== obs_event .&& df0.start_time .<= periodt[2] .&& df0.end_time .>= periodt[1];   
+        ind = df0.obs_event .== obs_event .&& df0.start_time .< periodt[2] .&& df0.end_time .>= periodt[1];   
         if !any(ind)
             global p = (p..., pl);
             continue
