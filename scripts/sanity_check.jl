@@ -69,7 +69,7 @@ function labobs(df0::DataFrame, lon, lat, period, obs_event; p=p::Plots.Plot{})
     # toDF
     labcountdf = DataFrame(map(collectresults, labcount));
     # remove event with few voxels (arbitrarily I had 99, but maybe lower to 13) and empty lines
-    # labcountdf = labcountdf[map(>(13), labcountdf.count), :]
+    labcountdf = labcountdf[map(>(13), labcountdf.count), :]
     # extract stats from events
     df = filter(:label => in(labcountdf.label), events)
     if isempty(df)
