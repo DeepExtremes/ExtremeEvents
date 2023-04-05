@@ -1,5 +1,5 @@
 # check that documented events get detected by analyse_events
-using Revise, YAXArrays, EarthDataLab, OnlineStats, WeightedOnlineStats, Zarr
+using YAXArrays, EarthDataLab, OnlineStats, WeightedOnlineStats, Zarr
 using DataFrames, Dates
 import CSV
 import StatsBase
@@ -68,8 +68,8 @@ function labobs(df0::DataFrame, lon, lat, period, obs_event; p=p::Plots.Plot{})
     sort!(labcount, by=i->i[end].c, rev=true);
     # toDF
     labcountdf = DataFrame(map(collectresults, labcount));
-    # remove event with few voxels and empty lines
-    labcountdf = labcountdf[map(>(99), labcountdf.count), :]
+    # remove event with few voxels (arbitrarily I had 99, but maybe lower to 13) and empty lines
+    # labcountdf = labcountdf[map(>(13), labcountdf.count), :]
     # extract stats from events
     df = filter(:label => in(labcountdf.label), events)
     if isempty(df)
@@ -147,12 +147,14 @@ function expand(x::Tuple{Float64, Float64})
     return (x1, x2)
 end
 # for trial in ("ranked_pot0.01_ne0.1_cmp_2016_2021")#,"ranked_pot0.01_ne0.1_tcmp_2016_2021"# "ranked_pot0.01_ne0.1_tcmp_2016_2021","ranked_pot0.01_ne0.1_cmp_Sdiam3_T5_new_2016_2021")
-trial = "ranked_pot0.01_ne0.1_cmp_2016_2021"#"ranked_pot0.01_ne0.1_tcmp_Sdiam3_T5_2016_2021" # "ranked_pot0.01_ne0.1_cmp_2016_2021"
+trial = "ranked_pot0.01_ne0.1_cmp_2016_2021" # "ranked_pot0.01_ne0.1_cmp_2016_2021_land"#"ranked_pot0.01_ne0.1_tcmp_Sdiam3_T5_2016_2021" # "ranked_pot0.01_ne0.1_cmp_2016_2021" # 
+# events_all = CSV.read(path * "EventStats_ranked_pot0.01_ne0.1_cmp_2016_2021.csv", DataFrame)
     events = CSV.read(path * "EventStats_$trial.csv", DataFrame)
     # look for intersection between spatial and temporal range of events from the table or directly in the labelcube
     labelpath = path * "labelcube_$trial.zarr"
     # labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_$trial.zarr"
     labels = open_dataset(labelpath)# labels = Cube(labelpath)
+    # labels_all = open_dataset(path * "labelcube_ranked_pot0.01_ne0.1_cmp_2016_2021.zarr")
 
     global df0 = DataFrame()
     # df0 = CSV.read("/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/SanityCheck_$trial.csv", DataFrame, header=1)
@@ -160,7 +162,7 @@ trial = "ranked_pot0.01_ne0.1_cmp_2016_2021"#"ranked_pot0.01_ne0.1_tcmp_Sdiam3_T
 
     # loop over observed events
     for obs_event in 1 : nrow(obs)
-    # obs[obs_event,:]
+    print(obs[obs_event,:])
     period =( Date(obs[obs_event,:Start]), Date(obs[obs_event,:End])+Day(1))
     lat = (obs[obs_event,:North], obs[obs_event,:South])
     lon = (obs[obs_event,:West], obs[obs_event,:East])
@@ -194,12 +196,13 @@ trial = "ranked_pot0.01_ne0.1_cmp_2016_2021"#"ranked_pot0.01_ne0.1_tcmp_Sdiam3_T
 
     if typeof(lon) <: Vector{}
         # do everything twice...
-        p, df0 = labobs(df0, lon[1], lat, period, obs_event);
-        p, df0 = labobs(df0, lon[2], lat, period, obs_event);
+        p, df1 = labobs(df0, lon[1], lat, period, obs_event);
+        p, df1 = labobs(df0, lon[2], lat, period, obs_event);
     else
         # do only once
-        p, df0 = labobs(df0, lon, lat, period, obs_event);
+        p, df1 = labobs(df0, lon, lat, period, obs_event);
     end
+    global df0 = df1
 
     # print(size(df0))
     # print("\n")
@@ -297,7 +300,7 @@ trial = "ranked_pot0.01_ne0.1_cmp_2016_2021"#"ranked_pot0.01_ne0.1_tcmp_Sdiam3_T
         # skip timestep if no data
         ind = df0.obs_event .== obs_event .&& df0.start_time .<= periodt[2] .&& df0.end_time .>= periodt[1];   
         if !any(ind)
-            p = (p..., pl);
+            global p = (p..., pl);
             continue
         else
             # pl = DataFrame(x=x,y=y, order=1:length(x)) |> @vlplot(:line, x=:x, y=:y, order=:order) # something wrong with the order in which data are plotted
@@ -319,7 +322,7 @@ trial = "ranked_pot0.01_ne0.1_cmp_2016_2021"#"ranked_pot0.01_ne0.1_tcmp_Sdiam3_T
             else 
                 pl = labplot!(pl, labels, periodt, lato, lono, ulbls, lblt, cols)
             end
-            p = (p..., pl)
+            global p = (p..., pl)
 
         end
     end
@@ -337,7 +340,7 @@ end
 
     unique!(df0)
     # export to csv
-    # CSV.write(path * "SanityCheck_$trial.csv", df0)
+    CSV.write(path * "SanityCheck_$trial.csv", df0)
 
     # end
 # CSV.write(path * "RecentEvents.csv", obs)
