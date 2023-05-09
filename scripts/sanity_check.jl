@@ -54,6 +54,8 @@ include("../src/plots.jl")
 obs = dropmissing!(obs)
 obs.Start .= replace.(obs.Start, r"\." => "-");
 obs.End .= replace.(obs.End, r"\." => "-");
+# export to latex table
+show(stdout, MIME("text/latex"),obs)
 
 # helper fn
 function labobs(df0::DataFrame, lon, lat, period, obs_event; p=p::Plots.Plot{})
