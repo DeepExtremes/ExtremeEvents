@@ -1,4 +1,5 @@
-# module ExtremeEvents
+module ExtremeEvents
+using Revise
 # load all needed packages
 using YAXArrays, EarthDataLab, Statistics, Zarr, DiskArrays
 # distributed computing
@@ -39,4 +40,4 @@ include("detection.jl")
 include("stats.jl")
 include("plots.jl")
 #include("sanity_check.jl")
-# end
+end
