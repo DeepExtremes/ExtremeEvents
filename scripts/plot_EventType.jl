@@ -96,7 +96,7 @@ using StatsPlots
 # group by indicator
 dfp1 = df |>
     # pivot_longer
-    (df -> stack(df, Not(:ev), variable_name = :Year)) |>
+    (df -> stack(df, Not(:ev), variable_name = :Year, value_name = :Area)) |>
     # filter
     (df -> subset(df, :ev => x-> x.>0 .&& x.<16)) |>
     # :ev to UInt8
@@ -107,4 +107,18 @@ dfp1 = df |>
     (df -> transform(df, :EventType => ByRow(x -> ((x & 0x04) > 0)) => :d90)) |>
     (df -> transform(df, :EventType => ByRow(x -> ((x & 0x08) > 0)) => :d180))
 
-@df dfp1
+function single_event_plot(df::DataFrame, var::Symbol)
+    df = dfp1 |> 
+        (df -> subset(df, var)) |>
+        (df -> groupby(df, :Year)) |> 
+        (gdf -> combine(gdf, :Area => sum))
+    @df df  plot(:Year, :Area_sum, label = String(var))
+    print("Sum area over time for " * String(var) * ": ")
+    print(sum(df.Area_sum))
+end
+single_event_plot(dfp1, :heat)
+single_event_plot(dfp1, :d30)
+single_event_plot(dfp1, :d90)
+single_event_plot(dfp1, :d180)
+
+# sum area over time is correctly always the same
