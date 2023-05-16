@@ -61,15 +61,15 @@ pot = 0.01
 ne = 0.1
 outname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/YearlyEventType_ranked_pot" * string(pot) * "_ne" * string(ne) * "_fabian_land.csv"
 CSV.write(outname, df)
-df = CSV.read(outname)
+df = CSV.read(outname, DataFrame)
 
 function macrotype(x)
     if x == 1
-        y = "Heatwave"
+        y = "Only hot"
     elseif iseven(x)
-        y = "Drought"
+        y = "Only dry (any)"
     else
-        y = "compound"
+        y = "Hot and dry"
     end
     return y
 end
@@ -78,6 +78,8 @@ end
 dfp = df |> 
     # pivot_longer
     (df -> stack(df, Not(:ev), variable_name = :Year, value_name = :Area)) |>
+    # relative land area
+    (df -> transform(df, :Area => (x -> x./sum(x) .*100 .* (2021-1950+1)) => :Area_pc)) |>
     # filter
     (df -> subset(df, :ev => x-> x.>0 .&& x.<16)) |>
     # :ev to UInt8
@@ -87,16 +89,20 @@ dfp = df |>
     # group by year and MacroType
     (df -> groupby(df, [:Year, :MacroType])) |>
     # sum area
-    (gdf -> combine(gdf, :Area => sum))
+    (gdf -> combine(gdf, :Area_pc => sum))
 
     # plot
 using StatsPlots
-@df dfp plot(:Year, :Area_sum, group = :MacroType, legend = :top)
+@df dfp plot(:Year, :Area_pc_sum, group = :MacroType, 
+    legend = :top, xlabel = "Year", ylabel = "Percentage of land area")
+savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_macroType.png")
 
 # group by indicator
 dfp1 = df |>
     # pivot_longer
     (df -> stack(df, Not(:ev), variable_name = :Year, value_name = :Area)) |>
+    # relative land area
+    (df -> transform(df, :Area => (x -> x./sum(x) .*100 .* (2021-1950+1)) => :Area_pc)) |>
     # filter
     (df -> subset(df, :ev => x-> x.>0 .&& x.<16)) |>
     # :ev to UInt8
@@ -108,17 +114,54 @@ dfp1 = df |>
     (df -> transform(df, :EventType => ByRow(x -> ((x & 0x08) > 0)) => :d180))
 
 function single_event_plot(df::DataFrame, var::Symbol)
-    df = dfp1 |> 
+    df = df |> 
         (df -> subset(df, var)) |>
         (df -> groupby(df, :Year)) |> 
-        (gdf -> combine(gdf, :Area => sum))
-    @df df  plot(:Year, :Area_sum, label = String(var))
+        (gdf -> combine(gdf, :Area_pc => sum))
+    @df df  plot(:Year, :Area_pc_sum, label = String(var))
     print("Sum area over time for " * String(var) * ": ")
     print(sum(df.Area_sum))
 end
-single_event_plot(dfp1, :heat)
-single_event_plot(dfp1, :d30)
-single_event_plot(dfp1, :d90)
-single_event_plot(dfp1, :d180)
+
+function single_event_plot!(p::Plots.Plot, df::DataFrame, var::Symbol)
+    df = df |> 
+        (df -> subset(df, var)) |>
+        (df -> groupby(df, :Year)) |> 
+        (gdf -> combine(gdf, :Area_pc => sum))
+    @df df plot!(p, :Year, :Area_pc_sum, label = String(var), legend=:top)
+    print("Sum area over time for " * String(var) * ": ")
+    println(sum(df.Area_pc_sum))
+    return p
+end
+p = plot(xlabel = "Year", ylabel = "Percentage of land area");
+for var in [:heat, :d30, :d90, :d180]
+    single_event_plot!(p, dfp1, var)
+end
+p
+savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_EventType.png")
 
 # sum area over time is correctly always the same
+# there seems to be something wrong with the ERA5 extension (1950-1978)
+
+# trend on last 50 years (1972 to 2021)
+using RollingFunctions
+function single_event_smooth_plot!(p::Plots.Plot, df::DataFrame, var::Symbol)
+    df = df |> 
+        (df -> subset(df, var)) |>
+        (df -> subset(df, :Year => x -> x .> "1991")) |>
+        (df -> groupby(df, :Year)) |> 
+        (gdf -> combine(gdf, :Area_pc => sum)) |>
+        (df -> transform(df, :Area_pc_sum => x -> runmean(x, 5)))
+    # print(df)
+    @df df plot!(p, :Year, :Area_pc_sum_function, label = String(var), legend=:top)
+    return p
+end
+p = plot(title = "Running Mean (5)", xlabel = "Year", ylabel = "Percentage of land area");
+for var in [:heat, :d30, :d90, :d180]
+    single_event_smooth_plot!(p, dfp1, var)
+end
+p
+savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/smoothedLandArea_by_EventType.png")
+
+
+
