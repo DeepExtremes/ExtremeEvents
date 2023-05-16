@@ -1,6 +1,6 @@
 # Plot area by year by event type
 using Revise
-using YAXArrays, Zarr, WeightedOnlineStats, OnlineStats, DataFrames, Dates
+using YAXArrays, Zarr, WeightedOnlineStats, OnlineStats, DataFrames, Dates, NetCDF
 
 addprocs(8)
 @everywhere begin
@@ -15,20 +15,20 @@ end
     allhists = Dict(i=>WeightedHist(-0.5:1.0:32.5) for i in 1950:2021)
     for k in keys(dfg)
         dfs = dfg[k]
-        fit!(allhists[k[1]], dfs.event, cosd.(dfs.latitude) .* lsm > 0.5)
+        fit!(allhists[k[1]], dfs.event, cosd.(dfs.latitude) .* (dfs.lsm .> 0.5))
     end
-    @show myid()
     allhists
 end
 
 ds = open_dataset("/Net/Groups/BGI/work_1/scratch/s3/xaida/v2/EventCube_ranked_pot0.01_ne0.1.zarr/")
-lsm = open_dataset("Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.721.static.nc")
+lsm = open_dataset("/Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.721.static.nc")
 lsm_notime = subsetcube(lsm, time = DateTime("2019-01-01T13:00:00"))
 
-sds = subsetcube(ds, time = (2021:2021), longitude = (), latitude = ())
+# sds = subsetcube(ds, time = (1998:1998), longitude = (325.0,326.0), latitude = (45.0,46.0))
+# slsm = subsetcube(lsm_notime, longitude = (325.0,326.0), latitude = (45.0,46.0))
 
-t = CubeTable(event = ds.layer,
-            lsm = lsm_notime.lsm)
+t = CubeTable(event = sds.layer,
+            lsm = slsm.lsm)
 
 annualstats = pmapreduce(mergefun,t) do tab
     fit1(DataFrame(tab))
@@ -48,7 +48,7 @@ labels = map([UInt8(i) for _ in 1:1, i in 1:16]) do i
     ((i & 0x08) > 0) && (n = join((n,"D180"),"_"))
     lstrip(n,'_')
 end
-p = plot(1950:2021,allres_norm[1:end-1,:]',labels=labels,lw=1,size=(800,400),dpi=300)
+p = plot(1950:2021,allres_norm[1:end-1,:]',labels=labels,lw=1,size=(800,400),dpi=300, legend = :outerbottom)
 
 savefig(p,"n_extremes_land.png")
 
