@@ -1,13 +1,13 @@
 # Plot area by year by event type
 using Revise
-using YAXArrays, Zarr, WeightedOnlineStats, OnlineStats, DataFrames, Dates, NetCDF
+using YAXArrays, Zarr, WeightedOnlineStats, OnlineStats, DataFrames, Dates, NetCDF, Distributed
 
 addprocs(8)
 @everywhere begin
     using Pkg
-    Pkg.activate("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/ExtremeEvents/")
+    Pkg.activate("/Net/Groups/BGI/scratch/mweynants/ExtremeEvents/")
 end
-@everywhere using ParallelUtilities, YAXArrays, Zarr, WeightedOnlineStats, OnlineStats, DataFrames, Dates
+@everywhere using ParallelUtilities, YAXArrays, Zarr, WeightedOnlineStats, OnlineStats, DataFrames, Dates, NetCDF
 @everywhere mergefun(h1,h2) = Dict(k=>merge!(h1[k],h2[k]) for k in keys(h1))
 @everywhere function fit1(df)
     df.y = year.(df.time)
@@ -58,7 +58,6 @@ savefig(p,"n_extremes_land.png")
 
 # save to csv
 import CSV
-using DataFrames
 # not sure about this one
 df = DataFrame(allres)
 pot = 0.01
@@ -116,14 +115,18 @@ cols = [:white,
     ] 
 @df df |> 
     (df -> stack(df, Not(:ev), variable_name = :Year, value_name = :Area)) |>
-    (df -> DataFrames.transform(df, :Area => (x -> x./sum(x) .*100 .* (2021-1950+1)) => :Area_pc) |>
+    (df -> groupby(df, :Year)) |>
+    (df -> DataFrames.transform(df, :Area => (x -> x./sum(x) .*100) => :Area_pc) |>
     (df -> subset(df, :ev => x-> x.>0 .&& x.<16)) 
-    ) plot(:Year, :Area_pc,
+    ) groupedbar(:Year, :Area_pc,
      group = :ev, legend = :outerright, lw = 1,
     xlabel = "Year", 
     ylabel = "Percentage of annual days and land area affected",
-    size=(800,500), dpi=300, left_margin = (5, :mm),
-    colour = cols[2:end]',)
+    size=(900,500), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),
+    colour = cols[2:end]',
+    bar_position = :stack,
+    xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021)))
+
 savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_Int8.png")
 
 
@@ -143,7 +146,8 @@ dfp = df |>
     # pivot_longer
     (df -> stack(df, Not(:ev), variable_name = :Year, value_name = :Area)) |>
     # relative land area
-    (df -> DataFrames.transform(df, :Area => (x -> x./sum(x) .*100 .* (2021-1950+1)) => :Area_pc)) |>
+    (df -> groupby(df, :Year)) |>
+    (df -> DataFrames.transform(df, :Area => (x -> x./sum(x) .*100 ) => :Area_pc)) |>
     # filter
     (df -> subset(df, :ev => x-> x.>0 .&& x.<16)) |>
     # :ev to UInt8
@@ -156,20 +160,39 @@ dfp = df |>
     (gdf -> combine(gdf, :Area_pc => sum))
 
     # plot
-@df dfp plot(:Year, :Area_pc_sum, group = :MacroType, 
+colours = [colorant"#65498C" colorant"#002D5A" colorant"#FFB86F" ]
+p = @df dfp groupedbar(:Year, :Area_pc_sum, group = :MacroType, 
     legend = :top, lw = 1,
     xlabel = "Year", 
     ylabel = "Percentage of annual days and land area affected",
-    size=(800,450), dpi=300, left_margin = (5, :mm),
-    colour = [colorant"#65498C" colorant"#002D5A" colorant"#FFB86F" ])
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_macroType.png")
+    size=(800,460), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),
+    colour = colours,
+    bar_position = :stack,
+    xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021)))
+savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_macroType.png")
+p = @df dfp groupedbar(:Year, :Area_pc_sum, group = :MacroType, 
+    legend = :top, lw = 1,
+    xlabel = "Year", 
+    ylabel = "Percentage of annual days and land area affected",
+    size=(800,460), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),
+    colour = colours,
+    bar_position = :dodge,
+    xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021)))
+for (type,i) in zip(levels(dfp.MacroType), 1:3)
+    tops = sort(subset(dfp,:MacroType => x -> x .== type), :Area_pc_sum, rev = true)[1:20,:]
+    println(tops)
+    hline!(p,[tops[20,:Area_pc_sum]], color = colours[i], label = "top 20 years")
+end
+p
+savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_macroType_top20.png")
 
 # group by indicator
 dfp1 = df |>
     # pivot_longer
     (df -> stack(df, Not(:ev), variable_name = :Year, value_name = :Area)) |>
     # relative land area
-    (df -> DataFrames.transform(df, :Area => (x -> x./sum(x) .*100 .* (2021-1950+1)) => :Area_pc)) |>
+    (df -> groupby(df, :Year)) |>
+    (df -> DataFrames.transform(df, :Area => (x -> x./sum(x) .*100) => :Area_pc)) |>
     # filter
     (df -> subset(df, :ev => x-> x.>0 .&& x.<16)) |>
     # :ev to UInt8
@@ -180,15 +203,15 @@ dfp1 = df |>
     (df -> DataFrames.transform(df, :EventType => ByRow(x -> ((x & 0x04) > 0)) => :d90)) |>
     (df -> DataFrames.transform(df, :EventType => ByRow(x -> ((x & 0x08) > 0)) => :d180))
 
-function single_event_plot(df::DataFrame, var::Symbol)
-    df = df |> 
-        (df -> subset(df, var)) |>
-        (df -> groupby(df, :Year)) |> 
-        (gdf -> combine(gdf, :Area_pc => sum))
-    @df df  plot(:Year, :Area_pc_sum, label = String(var))
-    print("Sum area over time for " * String(var) * ": ")
-    print(sum(df.Area_sum))
-end
+# function single_event_plot(df::DataFrame, var::Symbol)
+#     df = df |> 
+#         (df -> subset(df, var)) |>
+#         (df -> groupby(df, :Year)) |> 
+#         (gdf -> combine(gdf, :Area_pc => sum))
+#     @df df  plot(:Year, :Area_pc_sum, label = String(var))
+#     print("Sum area over time for " * String(var) * ": ")
+#     print(sum(df.Area_sum))
+# end
 
 function single_event_plot!(p::Plots.Plot, df::DataFrame, var::Symbol, color::Color)
     df = df |> 
@@ -212,9 +235,31 @@ for (var, color) in zip([:heat, :d30, :d90, :d180], color_palette)
 end
 p
 savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_EventType.png")
-
 # sum area over time is correctly always the same
-# there seems to be something wrong with the ERA5 extension (1950-1978)
+# is there something wrong with the ERA5 extension (1950-1978)? Too many droughts?
+
+# try with layout with 3 subplots 
+function single_event_bar(p::Tuple, df::DataFrame, var::Symbol, color::Color)
+    df = df |> 
+        (df -> subset(df, var)) |>
+        (df -> groupby(df, :Year)) |> 
+        (gdf -> combine(gdf, :Area_pc => sum))
+    b = @df df bar(:Year, :Area_pc_sum, 
+        label = String(var), 
+        legend=:top,
+        color = color
+        )
+    return p = (p..., b)
+end
+l = @layout [a;b;c;d]
+p = ()
+for (var, color) in zip([:heat, :d30, :d90, :d180], color_palette)
+    p = single_event_bar(p, dfp1, var, color)
+end
+plot(p... , layout = l)
+
+savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_EventTypeSubplot.png")
+
 
 # trend on last 50 years (1972 to 2021)
 using RollingFunctions
@@ -222,7 +267,7 @@ function single_event_smooth_plot!(p::Plots.Plot, df::DataFrame, var::Symbol, co
     df = df |> 
         (df -> subset(df, var)) |>
         (df -> subset(df, :Year => x -> x .> "1991")) |>
-        (df -> groupby(df, :Year)) |> 
+        # (df -> groupby(df, :Year)) |> 
         (gdf -> combine(gdf, :Area_pc => sum)) |>
         (df -> DataFrames.transform(df, :Area_pc_sum => x -> runmean(x, 10)))
     # print(df)
