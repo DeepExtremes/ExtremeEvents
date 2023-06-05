@@ -14,7 +14,7 @@ end
 
 trial = "ranked_pot0.01_ne0.1_cmp_2016_2021"
 landonly = "_landonly"
-events = CSV.read(path * "EventStats_" * trial * "_landonly.csv", DataFrame)
+events = CSV.read(path * "EventStats_" * trial * landonly * ".csv", DataFrame)
 # look for intersection between spatial and temporal range of events from the table or directly in the labelcube
 labelpath = path * "labelcube_$trial.zarr"
 # labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_$trial.zarr"
@@ -43,9 +43,18 @@ p1 = Plots.scatter(log10.(events.area[1001:end]), days[1001:end],
     label = "smaller events",
     xlabel = "log10 (Area)",
     ylabel = "duration",
+    color = :grey60,
+    markershape = :circle,
+    markersize = 2,
+    markerstrokecolor = :grey60,
     )
-Plots.scatter!(log10.(events.area[1:1000]), days[1:1000],color=:red,label="1000 largest events in Volume")
-savefig(path * "events_area_vs_duration_$trial$landonly.png")
+Plots.scatter!(log10.(events.area[1:1000]), days[1:1000],
+    label="1000 largest events in Volume", 
+    color = :grey30,
+    markershape = :circle,
+    markersize = 2,
+    markerstrokecolor = :grey30,)
+savefig(p1,path * "events_area_vs_duration_$trial$landonly.png")
 
 Plots.scatter(log10.(events.area[1:1000]), days[1:1000],color=:red,label="1000 largest events in Volume")
 
@@ -130,3 +139,7 @@ tmp1.data[:,:]
 #  missing  missing  missing
 #  missing  missing  missing
 #  missing  missing  missing
+
+print(events[1:10,1:10])
+print(events[1:10,11:20])
+print(events[1:10,21:end])
