@@ -64,6 +64,16 @@ function OnlineStatsBase._merge!(
 
 
     n = o.n + o2.n
+    if n == 0
+        # need to keep only the part where n>0
+        if o.n > 0
+            return o
+        elseif o2.n > 0
+            return o2
+        else # if both are 0, return one or the other
+            return o
+        end
+    end
     W = smooth(o.W, o2_W, o2.n / n)
     γ1 = (o.W * o.n) / (W * n)
     γ2 = (o2_W * o2.n) / (W * n)
