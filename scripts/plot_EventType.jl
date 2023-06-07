@@ -186,6 +186,52 @@ end
 p
 savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_macroType_top20.png")
 
+# compound
+p = @df dfp|> 
+    (df -> filter(:MacroType => ==("Hot and dry"), df)) bar(:Year, :Area_pc_sum, 
+    legend = :top, lw = 1,
+    xlabel = "Year", 
+    ylabel = "Percentage of annual days and land area affected",
+    size=(800,460), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),
+    colour = colours,
+    bar_position = :stack,
+    label = "Hot and dry",
+    xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021)))
+
+tops = sort(subset(dfp,:MacroType => x -> x .==("Hot and dry")), :Area_pc_sum, rev = true)[1:20,:]
+hline!(p,[tops[20,:Area_pc_sum]], color = colours, label = "top 20 years")
+savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_hotndry_top20.png")
+
+p = @df dfp|> 
+    (df -> filter(:MacroType => ==("Hot and dry"), df)
+    ) scatter(1950:2021, :Area_pc_sum, 
+    legend = :top, lw = 1,
+    xlabel = "Year", 
+    ylabel = "Percentage of annual days and land area affected",
+    size=(800,460), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),
+    colour = colours,
+    smooth = true,
+    label = "Hot and dry",
+    xrotation = 45.0, xtickfontsize = 6,)
+savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_hotndry_scatter.png")
+
+p = @df dfp|> 
+    (df -> filter(:MacroType => ==("Hot and dry"), df)) |>
+    (df -> transform(df, :Year => ByRow(x -> parse(Int, x)) => :yr)) |>
+    (df -> subset(df, :yr => x -> x .>=1970)
+    ) scatter(:yr, :Area_pc_sum, 
+    legend = :top, lw = 1,
+    xlabel = "Year", 
+    ylabel = "Percentage of annual days and land area affected",
+    size=(800,460), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),
+    colour = colours,
+    smooth = true,
+    label = "Hot and dry",
+    xrotation = 45.0, xtickfontsize = 6,)
+savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_hotndry_scatter_1970.png")
+
+
+
 # group by indicator
 dfp1 = df |>
     # pivot_longer
