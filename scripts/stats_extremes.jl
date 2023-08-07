@@ -29,8 +29,8 @@ landonly = "_landonly"
 # region doesn't work with longitude 0.0 to 360
 # region="Luxembourg"
 
-period = 2016:2021 # (Date("2019-07-20"), Date("2019-07-30"))#
-aperiod = "_2016_2021"#"Summer2019"#
+period = 1950:2021 # 2016:2021 # (Date("2019-07-20"), Date("2019-07-30"))#
+aperiod = "_1950_2021" # "_2016_2021"#"Summer2019"#
 
 # Open all Data Cubes
 labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_" * sm * "pot" * string(pot) * "_ne" * string(ne) * cmp * filter * aperiod * land * ".zarr"

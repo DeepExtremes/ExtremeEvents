@@ -6,13 +6,13 @@ using ImageMorphology, ImageFiltering
 
 pot=0.01
 ne=0.1
-period = 2016:2022 # (Date("2018-06-01"), Date("2018-09-16"))#could be added to file name "*"_"*replace("$period", ":" => "_")*"
-aperiod = "_2016_2021"
+period = 1950:2022 #2016:2022 # (Date("2018-06-01"), Date("2018-09-16"))#could be added to file name "*"_"*replace("$period", ":" => "_")*"
+aperiod = "_1950_2021" #"_2016_2021"
 compound_events = true
 cmp = compound_events ? "_cmp" : ""
 filter_events = false
 filter = filter_events ? "_Sdiam3_T5" : ""
-filter_land = true
+filter_land = false
 land = filter_land ? "_land" : ""
 # region = "Italy"
 
@@ -43,6 +43,7 @@ if compound_events
         (2,3,1)
         );
     # 136.463942 seconds (14.02 M allocations: 28.601 GiB, 0.68% gc time, 2.64% compilation time)
+    # 1950-2021: 2084.692204 seconds (16.20 M allocations: 317.017 GiB, 0.35% gc time, 0.21% compilation time)
 
 else
     @time maskarray = permutedims(
@@ -102,6 +103,7 @@ size(filteredarray)
 d = 1;
 @time r = label_components(filteredarray, wrapdims=(d,));
 # 8.853066 seconds (159.63 k allocations: 16.965 GiB, 1.89% gc time, 1.12% compilation time)
+# 1950-2021 166.081424 seconds (162.74 k allocations: 203.452 GiB, 0.01% gc time, 0.11% compilation time)
 
 # # look at results
 # Plots.heatmap(r[:,:,1]'[end:-1:1,:])
@@ -117,9 +119,10 @@ d = 1;
 # Plots.heatmap(r[:,:,100]'[end:-1:1,:])
 
 # define YAXArray
-labelcube = YAXArray(caxes(clastyears), permutedims(r,(3,1,2)), chunks = DiskArrays.GridChunks(r,(90,120,120)))
+@time labelcube = YAXArray(caxes(clastyears)[[2, 3, 1]], r, chunks = DiskArrays.GridChunks(r,(120,120,90)))
+# @time labelcube = YAXArray(caxes(clastyears), permutedims(r,(3,1,2)), chunks = DiskArrays.GridChunks(r,(90,120,120))) # ERROR: OutOfMemoryError()
 # write cube
-labelcube = savecube(labelcube,outpath,overwrite=true)
+@time labelcube = savecube(labelcube,outpath,overwrite=true)
 print("done!")
 # check
 # using Plots

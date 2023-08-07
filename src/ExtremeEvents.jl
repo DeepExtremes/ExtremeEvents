@@ -1,7 +1,7 @@
 module ExtremeEvents
 using Revise
 # load all needed packages
-using YAXArrays, EarthDataLab, Statistics, Zarr, DiskArrays
+using YAXArrays, EarthDataLab, Statistics, Zarr, DiskArrays, DiskArrayTools
 # distributed computing
 using Distributed, SlurmClusterManager
 # spatial filter
