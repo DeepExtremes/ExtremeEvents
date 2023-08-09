@@ -80,8 +80,8 @@ map(to_run) do (varname,outvarname,ext,aggfun)
     # add aggregation function to properties
     c.properties["aggfun"] = string(aggfun)
 
-    # set time axis until 2029 for later updates, but keep empty
-    c2 = YAXArray([c.longitude,c.latitude,RangeAxis("time",Date(1950,1,1):Day(1):Date(2029,12,31))],a2,c.properties)
+    # set time axis 
+    c2 = YAXArray([c.longitude,c.latitude,RangeAxis("time", Date(1950,1,1):Day(1):Date(2022,12,31))],a2,c.properties)
 
     nt = (Symbol(outvarname)=>c2,)
     ds = Dataset(;nt...)
