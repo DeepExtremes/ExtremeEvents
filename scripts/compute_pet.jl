@@ -153,7 +153,7 @@ pmap(1950:2022) do yr #
     outds = YAXArrays.Datasets.createdataset(
         YAXArrayBase.ZarrDataset,
         outaxes,
-        path = "/Net/Groups/BGI/scratch/mweynants/PETv3/$yr.zarr",
+        path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/PET/$yr.zarr",
         persist = true,
         T=Union{Missing,Float32},
         overwrite=true,

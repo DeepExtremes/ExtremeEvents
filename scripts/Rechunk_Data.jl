@@ -91,6 +91,6 @@ map(to_run) do (varname,outvarname,ext,aggfun)
     # writefac: read/write speed factor. Estimate of time ratio between reading input and writing output.
     # Usually reading input is faster than writing output, hence default value is 4.0
     # Here reading is much slower than writing because we aggregate on the fly the hourly data to daily, therefore value is set to 0.1.
-    savedataset(ds, path="/scratch/mweynants/ERA5CubeDE.zarr",append=true, max_cache=3e8,writefac=0.1)
+    savedataset(ds, path="/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr",append=true, max_cache=3e8,writefac=0.1)
     nothing
 end
