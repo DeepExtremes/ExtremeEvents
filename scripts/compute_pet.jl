@@ -10,13 +10,12 @@ end
 end
 
 @everywhere using EarthDataLab, YAXArrays, Dates, YAXArrayBase
-
 # Variables: 
 # t2m temperature at 2 meters [K]
 # u10 10 m u-wind component [m s^(-1)]
 # v10 10 m v-wind component [m s^(-1)]
 # sp surface pressure [Pa]
-# snr surface net radiation [J m^(-2)]
+# snr surface net radiation [J m^(-2)] accumulated over 1 hour
 # vpd_cf = swvp-vp Saturation water vapour pressure - vapour pressure = vapour pressure deficit [hPa] cf ?
 @everywhere begin 
     varlist = (:t2m, :u10, :v10, :sp, :snr, :vpd_cf)
@@ -26,7 +25,6 @@ end
     lsm = lsmask.lsm[time=Date(2019)]
     # load data to memory
     lsmdata = lsm[:,:]
-
 
 """
     This function is used to convert the units of the input variables to approprate units.
@@ -46,18 +44,23 @@ function unit_conv(t2m_K, u10m_m_s,v10m_m_s,sp_Pa,snr_J_m2,vpd_hPa,lsm)
     # Net downward radiation.
     snr_MJ_m2 = snr_J_m2 / 1e6
     
-    # Surface pressure Pa to KPa.
+    # Surface pressure Pa to kPa.
     sp_kPa = sp_Pa / 1000.
  
-    # soil heat flux
+    # Vapour pressure deficit hPa to kPa
     vpd_kPa = vpd_hPa / 10
 
     # soil heat flux (condition, day, night) 
     G_MJ_m2 = snr_MJ_m2 < 0.0 ? snr_MJ_m2*0.1 : snr_MJ_m2*0.5 
     # mask out sea
     G_MJ_m2 = lsm > 0.5 ? G_MJ_m2 : 0.0
+
+    # add Cd denominator constant for time step (condition, day, night) 
+    # For daily PET, Cd = 0.34
+    # effect of changing Cd between day and night is negligeable when integrated over 24 hours.
+    Cd = snr_MJ_m2 < 0.0 ? 0.24 : 0.96
     
-    return t2m_C, ws2m_m_s, snr_MJ_m2, G_MJ_m2, sp_kPa, vpd_kPa
+    return t2m_C, ws2m_m_s, snr_MJ_m2, G_MJ_m2, sp_kPa, vpd_kPa, Cd
 end
 
 
@@ -68,6 +71,7 @@ function calculate_pet(
         G_J_m2,        # Ground Heat Flux
         sp_kPa,        # Surface Pressure
         vpd_kPa,       # Vapour pressure deficit kPa
+        Cd             # Cd denominator constant for time step
         )     
     """
     This is the function that calculate the PET based on the PM method.
@@ -97,12 +101,20 @@ function calculate_pet(
 
     
     # Calculate ET0, equation 6 in FAO Crop ET - Chap. 2 (https://www.fao.org/3/x0490e/x0490e06.htm#equation)
+    # also Walter et al. 2001 The ASCE Standardized Reference Evapotranspiration Equation 
     numerator = 0.408*delta_kPa_C*(snr_MJ_m2 - G_J_m2) + 
             psychometric_kPa_c*(37/(t2m_C+273))*ws2m_m_s*vpd_kPa
-    denominator = delta_kPa_C + psychometric_kPa_c*(1 + 0.34*ws2m_m_s)
+
+    denominator = delta_kPa_C + psychometric_kPa_c*(1 + Cd * ws2m_m_s)
+    # according to ASCE, denominator should vary between day and night: 
+    # coefficient 0.34 (which is valid for daily PM) 
+    # should be replaced by
+    # 0.24 during daytime
+    # 0.96 during nighttime
     
     ET0_mm_hr = numerator / denominator
     
+    # express ET0 as a negative (upward) flux
     ET0_mm_hr = -max(zero(ET0_mm_hr),ET0_mm_hr)
     return ET0_mm_hr
 end    
@@ -116,14 +128,19 @@ function pet_with_units(t2m_K, u10m_m_s,v10m_m_s,sp_Pa,snr_J_m2,vpd_hPa,lsm)
     calculate_pet(o...)
 end
 
-end
+end # begin
 
 # run function pet_with_units on era5 0d25_hourly data
 # for each year
-pmap(1950:2021) do yr
+pmap(1950:2022) do yr # 
     # get all variables from varlist into new dataset
     allvars = map(varlist) do vn
-        ds = YAXArrays.Datasets.open_mfdataset("/Net/Groups/data_BGC/era5/e1/0d25_hourly/$vn/$yr/*.nc")
+        # @show vn
+        # select only files that are NOT "era5_backextention"
+        filelist = readdir("/Net/Groups/data_BGC/era5/e1/0d25_hourly/$vn/$yr/", join = true)
+        filter!(!contains("back_extension"),filelist)
+        filter!(endswith(".nc"),filelist)
+        ds = YAXArrays.Datasets.open_mfdataset(filelist)
         # replaces vn by first values
         vn=>first(values(ds.cubes))
     end
@@ -131,17 +148,18 @@ pmap(1950:2021) do yr
     # time resolution: day
     tr = Date(yr):Day(1):Date(yr,12,31)
     # define dimensions' axes
-    outaxes = [ds.longitude, ds.latitude, RangeAxis("Time",tr)]
+    outaxes = [RangeAxis("longitude",-180.0:0.25:179.75), ds.latitude, RangeAxis("Time",tr)]
     # create empty dataset
     outds = YAXArrays.Datasets.createdataset(
         YAXArrayBase.ZarrDataset,
         outaxes,
-        path = "/Net/Groups/BGI/work_1/scratch/fgans/PET/$yr.zarr",
+        path = "/Net/Groups/BGI/scratch/mweynants/PETv3/$yr.zarr",
         persist = true,
         T=Union{Missing,Float32},
         overwrite=true,
         chunksize = (1440,721,1),
     )[1]
+
     # loop around days and agregate hourly data to daily
     for d in tr
         loadeddata = map(allvars) do v
@@ -162,5 +180,16 @@ pmap(1950:2021) do yr
     end
 end
 
-
-
+# using Plots
+# p = heatmap(outar[:,:])
+# figname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/PET_20210101_mela.png"
+# Plots.savefig(p, figname)
+# # compare with old
+# pet_2021 = open_dataset("/Net/Groups/BGI/work_1/scratch/fgans/PET/2021.zarr")
+# tmp = subsetcube(pet_2021, time=d);
+# p = heatmap(tmp.layer[:,:])
+# figname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/PET_20210101_fabian.png"
+# Plots.savefig(p, figname)
+# # diff
+# p = heatmap(outar[:,:] - tmp.layer[:,:], title = "Effect of day/night coefficient")
+# # negligible (<1e-6) so no need to implement it!
