@@ -72,10 +72,10 @@ map(to_run) do (varname,outvarname,ext,aggfun)
     c = era5varcube(varname,ext=ext)    
     a2 = DiskArrayTools.AggregatedDiskArray(c.data,(1,1,24),aggfun) # aggfun instead of mean
 
-    #Fix bug in 1950 January precip, just place in March
-    if varname in ("tp","ssrd")
-        a2.a.parents[1]=a2.a.parents[3]
-    end
+    # #Fix bug in 1950 January precip, just place in March
+    # if varname in ("tp","ssrd")
+    #     a2.a.parents[1]=a2.a.parents[3]
+    # end
 
     # add aggregation function to properties
     c.properties["aggfun"] = string(aggfun)
