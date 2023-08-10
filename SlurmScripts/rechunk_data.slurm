@@ -4,9 +4,9 @@
 #SBATCH -p work
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem-per-cpu=30GB
+#SBATCH --mem-per-cpu=120GB
 #SBATCH --time=48:00:00
 
 export JULIA_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
-julia --project=../ ../Rechunk_Data.jl
+julia --project=../ ../scripts/Rechunk_Data.jl

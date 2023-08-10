@@ -11,7 +11,7 @@ end
 
 @everywhere begin
     using Pkg
-    Pkg.activate(@__DIR__)
+    Pkg.activate("$(@__DIR__)/..")
 end
 
 @everywhere begin
@@ -64,8 +64,8 @@ to_run = [
     ("t2m","t2m","an",mean),
     ("t2m","t2mmax","an",maximum),
     ("t2m","t2mmin","an",minimum),
-    ("tp","tp","fc",sum),
-    ("ssrd","ssrd","fc",sum),
+    # ("tp","tp","fc",sum),
+    # ("ssrd","ssrd","fc",sum),
 ]
 
 map(to_run) do (varname,outvarname,ext,aggfun)
@@ -91,6 +91,6 @@ map(to_run) do (varname,outvarname,ext,aggfun)
     # writefac: read/write speed factor. Estimate of time ratio between reading input and writing output.
     # Usually reading input is faster than writing output, hence default value is 4.0
     # Here reading is much slower than writing because we aggregate on the fly the hourly data to daily, therefore value is set to 0.1.
-    savedataset(ds, path="/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr",append=true, max_cache=3e8,writefac=0.1)
+    savedataset(ds, path="/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr",append=true, max_cache=3e8,writefac=0.1)
     nothing
 end
