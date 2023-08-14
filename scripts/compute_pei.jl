@@ -1,3 +1,6 @@
+# The precipitation evaporation index (PEI) is a moving average of the water balance between daily 
+# potential evapotranspiration and precipitation.
+# The moving wiindow is 30, 90 or 180 days.
 using SlurmClusterManager, Distributed
 
 using EarthDataLab, YAXArrays, Zarr, RollingFunctions, DiskArrays
@@ -29,10 +32,10 @@ outdims = OutDims("Time",windowax,
     overwrite=true,
 )
 
-@everywhere function compute_spei(xout, xin, windows)
+@everywhere function compute_pei(xout, xin, windows)
     for i in eachindex(windows)
         xout[:,i] = runmean(xin, windows[i])
     end
 end
 
-spei = mapCube(compute_spei,diffcube,windowsizes; indims, outdims, max_cache=1e9, showprog = true)
+spei = mapCube(compute_pei,diffcube,windowsizes; indims, outdims, max_cache=1e9, showprog = true)
