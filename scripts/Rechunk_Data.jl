@@ -68,7 +68,7 @@ to_run = [
     # ("ssrd","ssrd","fc",sum),
 ]
 
-map(to_run) do (varname,outvarname,ext,aggfun)
+pmap(to_run) do (varname,outvarname,ext,aggfun)
     c = era5varcube(varname,ext=ext)    
     a2 = DiskArrayTools.AggregatedDiskArray(c.data,(1,1,24),aggfun) # aggfun instead of mean
 
