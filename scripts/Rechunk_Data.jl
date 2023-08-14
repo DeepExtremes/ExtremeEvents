@@ -1,3 +1,6 @@
+using Pkg
+Pkg.activate("$(@__DIR__)/..")
+
 using SlurmClusterManager, Distributed
 
 using NetCDF
@@ -70,8 +73,8 @@ end
 
 
 to_run = [
-    ("t2m","t2m","an",mean),
-    ("t2m","t2mmax","an",maximum),
+    # ("t2m","t2m","an",mean),
+    # ("t2m","t2mmax","an",maximum),
     ("t2m","t2mmin","an",minimum),
     # ("tp","tp","fc",sum),
     # ("ssrd","ssrd","fc",sum),
