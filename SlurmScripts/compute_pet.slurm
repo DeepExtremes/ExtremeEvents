@@ -9,4 +9,4 @@
 
 export JULIA_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
-julia --project=../ --heap-size-hint=7GB ../compute_pet.jl
+julia --project=../ --procs=${SLURM_NTASKS} --heap-size-hint=7GB ../compute_pet.jl
