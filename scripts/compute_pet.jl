@@ -6,7 +6,7 @@ end
 
 @everywhere begin
     using Pkg
-    Pkg.activate(@__DIR__)
+    Pkg.activate("$(@__DIR__)/..")
 end
 
 @everywhere using EarthDataLab, YAXArrays, Dates, YAXArrayBase
@@ -148,7 +148,7 @@ pmap(1950:2022) do yr #
     # time resolution: day
     tr = Date(yr):Day(1):Date(yr,12,31)
     # define dimensions' axes
-    outaxes = [RangeAxis("longitude",-180.0:0.25:179.75), ds.latitude, RangeAxis("Time",tr)]
+    outaxes = [ds.longitude, ds.latitude, RangeAxis("Time",tr)]
     # create empty dataset
     outds = YAXArrays.Datasets.createdataset(
         YAXArrayBase.ZarrDataset,
