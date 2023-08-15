@@ -1,4 +1,4 @@
-using YAXArrays, EarthDataLab
+using YAXArrays, EarthDataLab, DiskArrays
 """
     rescale(inputcube::YAXArray, outputpath::String; <keyword arguments>))
 
@@ -10,7 +10,7 @@ Rescale time series between 0 and 1
 * `multiplier`: multiplies input before scaling. Typically -1 if data need to be reversed for extremes detection. Defaults to `nothing` for no multiplication.
 * `backend`: Backend for writing cube to disk. Defaults to :zarr
 * `overwrite`: If false, output will only be written to outputpath if no such file exists. Defaults to true.
-* `chunksize`: Size of chunks of output cube.
+* `chunksize`: A Dict specifying the chunksizes for the output dimensions of the cube, or `:input` (default) to copy chunksizes from input cube axes or `:max` to not chunk the inner dimensions
 * `max_cache`: Maximum cache size. Defaults to 1e9.
 """
 function rescale(
@@ -19,7 +19,7 @@ function rescale(
     multiplier::Union{Int64,Nothing} = nothing,
     backend::Symbol = :zarr,
     overwrite::Bool = true,
-    chunksize::Dict{String, Int64} = Dict("Time"=>1000),
+    chunksize::Any = :input, #Dict("Time"=>1000), # eachchunk(inputcube)
     max_cache::Float64 = 1e9
 )  
 
@@ -160,12 +160,12 @@ function compute_extremes(
     indims = ntuple(_->InDims("Time"),length(input))
     #@show indims
     outdims = OutDims("Time",
-    outtype=UInt8,
-    chunksize = :input, 
-    path = outputpath,
-    overwrite=overwrite,
-    backend=backend,
-)
+        outtype = UInt8,
+        chunksize = :input, 
+        path = outputpath,
+        overwrite=overwrite,
+        backend=backend,
+    )
     mapCube(getextremes!, input; indims=indims, outdims=outdims, max_cache=max_cache, tres = tres, tresne = tresne)
 end
 # method for YAXArray
@@ -193,11 +193,11 @@ function compute_extremes(
     indims = InDims("Time","Variable",)
     #@show indims
     outdims = OutDims("Time",
-        outtype=UInt8,
+        outtype = UInt8,
         chunksize = :input, 
         path = outputpath,
-        overwrite=overwrite,
-        backend=backend,
+        overwrite = overwrite,
+        backend = backend,
     )
 
     mapCube(getextremes!,c; indims=indims, outdims=outdims, max_cache=max_cache, tres = tres, tresne = tresne)

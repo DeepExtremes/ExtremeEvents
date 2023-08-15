@@ -1,41 +1,50 @@
-using Distributed
+using SlurmClusterManager, Distributed
+
+#Quick check if we are in a slurm job
+if haskey(ENV,"SLURM_CPUS_PER_TASK")
+    addprocs(SlurmManager())
+end
+
+@everywhere begin
+    using Pkg
+    Pkg.activate("$(@__DIR__)/..")
+end
 
 # sleep(1)
 # addprocs(20)
 # sleep(1)
 
 @everywhere begin
-    using Pkg
-    Pkg.activate("..")
-end
-@everywhere begin
     using Zarr, YAXArrays, EarthDataLab, Statistics, SphericalConvolutions
     include("../src/detection.jl")
 end
 
-zg = zopen("/Net/Groups/BGI/work_1/scratch/s3/xaida/v2/ERA5Data.zarr",consolidated=true, fill_as_missing = false)
+zg = zopen("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr",consolidated=true, fill_as_missing = false)
 era = open_dataset(zg)
 tair = era.t2mmax#[time=1980:2021]
 
-# pei = open_dataset("/Net/Groups/BGI/work_1/scratch/s3/xaida/v2/PEICube.zarr")
-# peicube = Cube(pei)
+pei = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/PEICube.zarr")
+peicube = Cube(pei)
+
+# TO DO : find a way to give the variable a name!
 
 # daily maximum temperature extremes of interest are in the upper range, so we multiply values by -1 before we normalize them
-ranked_t = if ispath("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_ranked.zarr")
-    Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_ranked.zarr")    
+ranked_t = if ispath("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/tmax_ranked.zarr")
+    Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/tmax_ranked.zarr")    
 else
-    rescale(tair,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_ranked.zarr", multiplier = -1)
+    rescale(tair,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/tmax_ranked.zarr", multiplier = -1)
 end
-# # # PEI values of interest are in the lower range (P-E << 0), so we don't transform them before we normalize them
-# ranked_pei = if ispath("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/pei_ranks.zarr")
-#     Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/pei_ranks.zarr")    
-# else
-#     rescale(peicube,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/pei_ranks.zarr")
-# end
+
+# PEI values of interest are in the lower range (P-E << 0), so we don't transform them before we normalize them
+ranked_pei = if ispath("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/pei_ranks.zarr")
+    Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/pei_ranks.zarr")    
+else
+    rescale(peicube,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/pei_ranks.zarr")
+end
 
 # tmp = subsetcube(ranked_t, time = (Date(2020,6,15), Date(2020,6,17)))
 # tmp1 = smooth(tmp, "test.zarr"; lbord=40, width=4)
-smoothed_t = smooth(subsetcube(ranked_t, time=(2016,2022)), "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_smoothed_80_2016.zarr"; lbord=80, width=4)
+# smoothed_t = smooth(subsetcube(ranked_t, time=(2016,2022)), "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/tmax_smoothed_80_2016.zarr"; lbord=80, width=4)
 
 # # close workers
 # t = rmprocs(workers(), waitfor=0)

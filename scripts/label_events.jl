@@ -1,7 +1,7 @@
 ## connected components
 using YAXArrays, EarthDataLab
 using Statistics, DiskArrays
-using ImageMorphology, ImageFiltering
+using ImageMorphology#, ImageFiltering
 
 
 pot=0.01
@@ -119,6 +119,7 @@ d = 1;
 # Plots.heatmap(r[:,:,100]'[end:-1:1,:])
 
 # define YAXArray
+# TO DO : find a way to give the variable a name!
 @time labelcube = YAXArray(caxes(clastyears)[[2, 3, 1]], r, chunks = DiskArrays.GridChunks(r,(120,120,90)))
 # @time labelcube = YAXArray(caxes(clastyears), permutedims(r,(3,1,2)), chunks = DiskArrays.GridChunks(r,(90,120,120))) # ERROR: OutOfMemoryError()
 # write cube
