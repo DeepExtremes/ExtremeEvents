@@ -36,9 +36,9 @@ The precipitation evaporation index (PEI) is a moving average of the water balan
 sbatch compute_pei.slurm
 ```
 
-## Temporal ranking and spatial smoothing
+## Temporal rescaling and spatial smoothing
 
-The time series of the four indiactors: t2mmax, PEI_30, PEI_90 and PEI_180 are rescaled between 0 and 1. A convolutional spatial filter is run on the results to smoothe the edges of the extreme events.
+The time series of the four indicators: t2mmax, PEI_30, PEI_90 and PEI_180 are rescaled between 0 and 1. A convolutional spatial filter is run on the results to smoothe the extent of the extreme events.
 
 ```
 sbatch smooth_events.slurm
