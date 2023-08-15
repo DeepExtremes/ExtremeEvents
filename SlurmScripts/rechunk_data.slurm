@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name rchk_tp
-#SBATCH -o ./rechunk-tp-%A.out
+#SBATCH --job-name rchk_era
+#SBATCH -o ./rechunk-era-%A.out
 #SBATCH -p work
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
