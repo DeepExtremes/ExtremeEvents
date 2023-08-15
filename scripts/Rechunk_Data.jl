@@ -54,7 +54,16 @@ end
     end
     @assert length(fshort)==1
     fnow = joinpath("/Net/Groups/data_BGC/era5/e1/0d25_hourly/$(settings.varname)/$(y)/",fshort[1])
-    nts = daysinmonth(y,m)*24
+    ntsa = daysinmonth(y,m)*24
+    # check that data array has the right size
+    mfd = open_dataset(fnow)
+    nts = length(mfd.axes[:time])
+    nlons = length(mfd.axes[:longitude])
+    nlats = length(mfd.axes[:latitude])
+    @assert nts == ntsa "Problem with $fshort : time axis has length $nts instead of $ntsa"
+    @assert nlons == 1440 "Problem with $fshort : longitude axis has length $(nlons) instead of 1440"
+    @assert nlats == 721 "Problem with $fshort : latitude axis has length $(nlats) instead of 721"
+    ## 
     a = settings.T_NC(fnow,settings.varname,(settings.spatsize...,nts))
     settings.T_CF(a,settings.cfargs...)
 end
