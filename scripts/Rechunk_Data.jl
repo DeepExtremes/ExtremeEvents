@@ -73,15 +73,13 @@ end
 
 
 to_run = [
-    # ("t2m","t2m","an",mean),
-    # ("t2m","t2mmax","an",maximum),
-    # ("t2m","t2mmin","an",minimum),
-    ("tp","tp","fc",sum),
+    ("t2m","t2m","an",mean),
+    ("t2m","t2mmax","an",maximum),
+    ("t2m","t2mmin","an",minimum),
+    # ("tp","tp","fc",sum),
     # ("ssrd","ssrd","fc",sum),
 ]
 
-# parallel mapping over variables
-# p
 map(to_run) do (varname,outvarname,ext,aggfun)
     c = era5varcube(varname,ext=ext)    
     a2 = DiskArrayTools.AggregatedDiskArray(c.data,(1,1,24),aggfun) # aggfun instead of mean
