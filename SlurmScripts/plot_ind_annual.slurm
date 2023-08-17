@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name julia_ind
-#SBATCH -o ./ind-%A.out
+#SBATCH -o ./ind18-%A.out
 #SBATCH -p work
 #SBATCH --ntasks=5
 #SBATCH --nodes=1
@@ -10,4 +10,4 @@
 
 export JULIA_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
-julia --project=../ --procs=${SLURM_NTASKS} --heap-size-hint=8GB ../scripts/plot_ind_annual.jl
+julia --project=../ --procs=${SLURM_NTASKS} ../scripts/plot_ind_annual.jl
