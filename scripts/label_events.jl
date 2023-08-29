@@ -7,7 +7,7 @@ using ImageMorphology#, ImageFiltering
 pot=0.01
 ne=0.1
 period = 1950:2022 #2016:2022 # (Date("2018-06-01"), Date("2018-09-16"))#could be added to file name "*"_"*replace("$period", ":" => "_")*"
-aperiod = "_1950_2021" #"_2016_2021"
+aperiod = "_1950_2022" #"_2016_2021"
 compound_events = true
 cmp = compound_events ? "_cmp" : ""
 filter_events = false
@@ -18,10 +18,10 @@ land = filter_land ? "_land" : ""
 
 # set window and t accordingly
 #outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_ranked_pot" * string(pot) * "_ne" * string(ne) * "_sreld335.zarr"
-outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_ranked_pot" * string(pot) * "_ne" * string(ne) * cmp * filter * aperiod * land * ".zarr"
+outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/labelcube_ranked_pot" * string(pot) * "_ne" * string(ne) * cmp * filter * aperiod * land * ".zarr"
 #outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_smoothed_pot" * string(pot) * "_ne" * string(ne) * ".zarr"
 
-inpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventCube_ranked_pot" * string(pot) * "_ne" * string(ne) * ".zarr"
+inpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/EventCube_ranked_pot" * string(pot) * "_ne" * string(ne) * ".zarr"
 # inpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventCube_smoothed_pot" * string(pot) * "_ne" * string(ne) * ".zarr"
 c = Cube(inpath)
 
