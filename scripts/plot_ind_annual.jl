@@ -26,21 +26,27 @@ end
 @everywhere mergefun!(h1,h2) = Dict(k=>merge!(h1[k],h2[k]) for k in keys(h1))
 @everywhere function fit1(df)
     df.y = year.(df.time)
-    dfg = groupby(df,:y)
-    variable_names = ["t2mmin", "t2m", "t2mmax", "tp", "pet", "pei_30", "pei_90", "pei_180"]
-    allstats = Dict(i*"."*j => MyWeightedVariance() for i = string.(1950:2021), j = variable_names)
+    dfg = groupby(df,[:y, :cont])####### !!!
+    variable_names = ["t2mmin", "t2m", "t2mmax", "tp", ]# ["pet", "pei_30", "pei_90", "pei_180"]
+    continents = range(0,8)
+    allstats = Dict("$(i).$(j).$(k)" => MyWeightedVariance() for i = string.(1950:2022), j = variable_names, k = continents)
     for k = keys(dfg), j = variable_names
-        dfs = dfg[k]
-        fit!(allstats[string(k[1])*"."*j], dfs[!,j], cosd.(dfs.latitude) .* (dfs.lsm .> 0.5))
+        if !ismissing(k[2])
+            dfs = dfg[k] ### !!!
+            fit!(allstats["$(k[1]).$(j).$(k[2])"], dfs[!,j], cosd.(dfs.latitude) .* (dfs.lsm .> 0.5))
+        end
     end
     return allstats
 end
 # i'm not sure that a good idea: will each chunk be touched only once? Should be 
 
-pei = open_dataset("/Net/Groups/BGI/work_1/scratch/s3/xaida/v2/PEICube.zarr")
+pei = open_dataset("/Net/Groups/BGI/work_1/scratch/s3/xaida/v3/PEICube.zarr")
 
-zg = zopen("/Net/Groups/BGI/work_1/scratch/s3/xaida/v2/ERA5Data.zarr",consolidated=true, fill_as_missing = false)
+zg = zopen("/Net/Groups/BGI/work_1/scratch/s3/xaida/v3/ERA5Data.zarr",consolidated=true, fill_as_missing = false)
 era = open_dataset(zg)
+
+cont = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/era5-continents/output/continents.zarr")
+
 lsm = open_dataset("/Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.721.static.nc")
 lsm_notime = subsetcube(lsm, time = DateTime("2019-01-01T13:00:00"))
 
@@ -55,6 +61,7 @@ function ct(;lon, lat, tim)
         pei_180 = pei.pei_180[time = tim, longitude = lon, latitude = lat],
         ssrd = era.ssrd[time = tim, longitude = lon, latitude = lat],
         tp = era.tp[time = tim, longitude = lon, latitude = lat],
+        cont = cont.cont[longitude = lon, latitude = lat],
         pet = era.pet[time = tim, longitude = lon, latitude = lat],
         lsm = lsm_notime.lsm[longitude = lon, latitude = lat])
     return t
@@ -95,13 +102,13 @@ end
 # 16500.125021 seconds (8.60 M allocations: 454.161 MiB, 0.00% gc time, 0.02% compilation time)
 rmprocs(workers())
 
-allres = vec([fn(annualstats[i*"."*j]) for fn = (mean, var), i = string.(1950:2021), j = ["t2mmin", "t2m", "t2mmax", "tp", "pet", "pei_30", "pei_90", "pei_180"]])
-allx = vec([i*"."*s*"."*j for  s=["mean","var"], i = string.(1950:2021), j = ["t2mmin", "t2m", "t2mmax", "tp", "pet", "pei_30", "pei_90", "pei_180"]])
+allres = vec([fn(annualstats[i*"."*j]) for fn = (mean, var), i = string.(1950:2022), j = ["t2mmin", "t2m", "t2mmax", "tp", "pet", "pei_30", "pei_90", "pei_180"]])
+allx = vec([i*"."*s*"."*j for  s=["mean","var"], i = string.(1950:2022), j = ["t2mmin", "t2m", "t2mmax", "tp", "pet", "pei_30", "pei_90", "pei_180"]])
 
 import CSV
 df = DataFrame(x = allx, value = allres) |>
-    (df -> DataFrames.transform(df, :x => ByRow(x -> split(x, ".")) => [:yr, :stat, :variable]))
-outname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/indicators_annual_wstats_land_$region.csv"
+    (df -> DataFrames.transform(df, :x => ByRow(x -> split(x, ".")) => [:yr, :stat, :variable, :continent]))
+outname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/indicators_annual_wstats_continents.csv"
 CSV.write(outname, df)
 
 print("done.")
