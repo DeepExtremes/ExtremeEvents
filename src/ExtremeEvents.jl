@@ -1,4 +1,10 @@
 module ExtremeEvents
+
+# change depots to fix mess in scratch ?
+# export JULIA_DEPOT_PATH=/Net/Groups/BGI/scratch/mweynants/julia_depots_new
+
+using Pkg;Pkg.add(url="https://github.com/meggart/SPhericalConvolutions.jl.git")
+
 using Revise
 # load all needed packages
 using YAXArrays, EarthDataLab, Statistics, Zarr, DiskArrays, DiskArrayTools
