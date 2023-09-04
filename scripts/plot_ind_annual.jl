@@ -40,9 +40,9 @@ end
 end
 # i'm not sure that a good idea: will each chunk be touched only once? Should be 
 
-pei = open_dataset("/Net/Groups/BGI/work_1/scratch/s3/xaida/v3/PEICube.zarr")
+pei = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/PEICube.zarr")
 
-zg = zopen("/Net/Groups/BGI/work_1/scratch/s3/xaida/v3/ERA5Data.zarr",consolidated=true, fill_as_missing = false)
+zg = zopen("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Data.zarr",consolidated=true, fill_as_missing = false)
 era = open_dataset(zg)
 
 cont = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/era5-continents/output/continents.zarr")
@@ -155,7 +155,7 @@ p = @df tdf scatter(
         # xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021))
         )
 display(p)
-savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/t2mmax_mean_annual_land$(region).png")
+savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/t2mmax_mean_annual_land$(region).png")
 
 # PEI
 pdf = df |> 
@@ -172,7 +172,27 @@ p1 = @df pdf scatter(
             colour = [colorant"#002D5A", colorant"#A6C5E8", colorant"#4C7FB8", ]',
             # xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021))
             )
-savefig(p1, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/pei_mean_annual_land$region.png")
+savefig(p1, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/pei_mean_annual_land$region.png")
+
+# TP
+df1 = df |> 
+(df -> filter(:continent => ==(rf), df)) |>
+(df -> filter(:stat => ==("mean"), df)) |>
+(df -> filter(:variable => x -> contains(x,"tp"), df))
+
+p2 = @df df1 scatter(
+            :yr, :value, smooth = true,
+            legend = :outerright, lw = 1,
+            title = region,
+            xlabel = "Year", 
+            ylabel = "Yearly continental average of \nPrecipitation over land",
+            size=(900,500), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),
+            colour = [colorant"#A6C5E8", colorant"#4C7FB8", colorant"#002D5A"]',
+            # xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021))
+            )
+display(p2)
+
+end
 
 # TP and PET
 edf = df |> 
@@ -191,27 +211,24 @@ p2 = @df edf scatter(
             colour = [colorant"#A6C5E8", colorant"#4C7FB8", colorant"#002D5A"]',
             # xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021))
             )
-savefig(p2, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/tp_pet_mean_annual_land$region.png")
+savefig(p2, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/tp_pet_mean_annual_land$region.png")
        
 scatter( 1950:2022, p_e, smooth = true, label = "tp+pet", color = colorant"#4C7FB8",
-    title = region,
     xlabel = "Year", ylabel = "Difference of continental annual averages of \n total precipitation and potential evapotranspiration",
     title = rn,
     size=(900,500), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),)
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/tp_pet_mean_annual_land$region.png")
+savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/tp_pet_mean_annual_land$region.png")
 scatter(1950:2022, df[df.stat .== "mean" .&& df.variable .== "tp", :value], smooth = true, color = colorant"#002D5A",
     title = region,
     label = "tp", xlabel = "Year", ylabel = "Continental annual average of \n total precipitation",
     size=(900,500), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),)
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/tp_mean_annual_land$region.png")
+savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/tp_mean_annual_land$region.png")
 #hline!([sum(df[df.stat .== "mean" .&& df.variable .== "tp", :value])./(2021-1950+1)], label = "time series mean")
 scatter(1950:2022, df[df.stat .== "mean" .&& df.variable .== "pet", :value], smooth = true, color = colorant"#A6C5E8",
     title = region,
     label = "pet", xlabel = "Year", ylabel = "Continental annual average of \n potential evapotranspiration",
     size=(900,500), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),)
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/pet_mean_annual_land$region.png")
-
-
+savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/pet_mean_annual_land$region.png")
 
 tvdf = df |> 
     (df -> filter(:continent => ==(rf), df)) |>
@@ -228,7 +245,7 @@ p3 = @df tvdf scatter(
         colour = [colorant"#ffab56", colorant"#ff9223", colorant"#ffd1a2"]',
         # xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021))
         )
-savefig(p3, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/t2mmax_std_annual_land$region.png")
+savefig(p3, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/t2mmax_std_annual_land$region.png")
 
 pvdf = df |> 
         (df -> filter(:continent => ==(rf), df)) |>
@@ -245,7 +262,7 @@ p4 = @df pvdf scatter(
             colour = [colorant"#002D5A",colorant"#A6C5E8", colorant"#4C7FB8", ]',
             # xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021))
             )
-savefig(p4, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/pei_std_annual_land$region.png")
+savefig(p4, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/pei_std_annual_land$region.png")
 
 pvdf = df |> 
         (df -> filter(:continent => ==(rf), df)) |>
@@ -262,18 +279,18 @@ p5 = @df pvdf scatter(
             colour = [colorant"#A6C5E8", colorant"#4C7FB8", colorant"#002D5A"]',
             # xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021))
             )
-savefig(p5, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/tp_pet_std_annual_land$region.png")
+savefig(p5, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/tp_pet_std_annual_land$region.png")
         
 scatter(1950:2022, sqrt.(df[df.stat .== "var" .&& df.variable .== "tp", :value]), smooth = true, color = colorant"#002D5A",
     title = region,
     label = "tp", xlabel = "Year", ylabel = "Continental annual standard deviation of \n total precipitation",
     size=(900,500), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),)
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/tp_std_annual_land$region.png")
+savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/tp_std_annual_land$region.png")
 #hline!([sum(df[df.stat .== "mean" .&& df.variable .== "tp", :value])./(2021-1950+1)], label = "time series mean")
 scatter(1950:2022, sqrt.(df[df.stat .== "var" .&& df.variable .== "pet", :value]), smooth = true, color = colorant"#A6C5E8",
     title = region,
     label = "pet", xlabel = "Year", ylabel = "Gloabl annual standard deviation of \n potential evapotranspiration",
     size=(900,500), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),)
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/pet_std_annual_land$region.png")
+savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/pet_std_annual_land$region.png")
 
 end
