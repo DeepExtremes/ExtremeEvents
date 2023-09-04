@@ -3,17 +3,6 @@
 # PEI_30, _90, _180
 
 using YAXArrays, Zarr, WeightedOnlineStats, OnlineStats, DataFrames, Dates, NetCDF, Distributed
-region = "" # World: "" # "Europe"
-if region == ""
-    latbound = (-90.0,90.0)
-    lonbound = (0.0,360.0)
-elseif region == "Europe" # 35°N to 72°N and the longitudes 25°W to 65°E.
-    latbound = (35.0,72.0)
-    lonbound = [(360.0 - 25.0, 360.0),(0.0,65.0)]
-else 
-    # abort
-    error("region not set")
-end
 
 addprocs(10)
 @everywhere begin
@@ -27,7 +16,7 @@ end
 @everywhere function fit1(df)
     df.y = year.(df.time)
     dfg = groupby(df,[:y, :cont])####### !!!
-    variable_names = ["t2mmin", "t2m", "t2mmax", "tp", ]# ["pet", "pei_30", "pei_90", "pei_180"]
+    variable_names = ["t2mmin", "t2m", "t2mmax", "tp", "pet", "pei_30", "pei_90", "pei_180"]
     continents = range(0,8)
     allstats = Dict("$(i).$(j).$(k)" => MyWeightedVariance() for i = string.(1950:2022), j = variable_names, k = continents)
     for k = keys(dfg), j = variable_names
@@ -40,9 +29,9 @@ end
 end
 # i'm not sure that a good idea: will each chunk be touched only once? Should be 
 
-pei = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/PEICube.zarr")
+pei = open_dataset("/Net/Groups/BGI/work_1/scratch/s3/xaida/v2/PEICube.zarr")
 
-zg = zopen("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Data.zarr",consolidated=true, fill_as_missing = false)
+zg = zopen("/Net/Groups/BGI/work_1/scratch/s3/xaida/v2/ERA5Data.zarr",consolidated=true, fill_as_missing = false)
 era = open_dataset(zg)
 
 cont = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/era5-continents/output/continents.zarr")
@@ -83,34 +72,27 @@ end
 # # NaNs introduced. if I skip the wi = 0 with MyWeightedVariance, it works (no division by 0 anymore)
 # latbound = (45.5,46.0)
 # lonbound = [(359.5,360.0), (0.0,0.5)]
-timebound = (1950:2022)
+latbound = (-90.0,90.0)
+lonbound = (0.0,360.0)
+timebound = (1950:1978)
 
-if typeof(lonbound) <: Vector
-    # split into 2 CubeTables, then merge
-    @time annualstats = mapreduce(mergefun!, lonbound) do lonbox
-        t = ct(lon = lonbox, lat = latbound, tim = timebound)
-        @time annualstats = pmapreduce(mergefun!, t) do tab
-            fit1(DataFrame(tab))
-        end
-    end
-else
-    t = ct(lon = lonbound, lat = latbound, tim = timebound)
-    @time annualstats = pmapreduce(mergefun!,t) do tab
-        fit1(DataFrame(tab))
-    end
+t = ct(lon = lonbound, lat = latbound, tim = timebound)
+@time annualstats = pmapreduce(mergefun!,t) do tab
+    fit1(DataFrame(tab))
 end
+
 # 16500.125021 seconds (8.60 M allocations: 454.161 MiB, 0.00% gc time, 0.02% compilation time)
 rmprocs(workers())
 
 ### !! Need to aggregate all continents before saving to csv
 
-allres = vec([fn(annualstats["$i.$j.$k"]) for fn = (mean, var), i = string.(1950:2021), j = ["t2mmin", "t2m", "t2mmax", "tp", ], k = range(0,8)]) # "pet", "pei_30", "pei_90", "pei_180"
-allx = vec(["$i.$s.$j.$k" for  s=["mean","var"], i = string.(1950:2021), j = ["t2mmin", "t2m", "t2mmax", "tp", ], k = range(0,8)]) # "pet", "pei_30", "pei_90", "pei_180"
+allres = vec([fn(annualstats["$i.$j.$k"]) for fn = (mean, var), i = string.(1950:1978), j = ["t2mmin", "t2m", "t2mmax", "tp","pet", "pei_30", "pei_90", "pei_180" ], k = range(0,8)]) # 
+allx = vec(["$i.$s.$j.$k" for  s=["mean","var"], i = string.(1950:1978), j = ["t2mmin", "t2m", "t2mmax", "tp", "pet", "pei_30", "pei_90", "pei_180"], k = range(0,8)]) # 
 
 import CSV
 df = DataFrame(x = allx, value = allres) |>
     (df -> DataFrames.transform(df, :x => ByRow(x -> split(x, ".")) => [:yr, :stat, :variable, :continent]))
-outname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/indicators_annual_wstats_continents.csv"
+outname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/indicators_annual_wstats_continents_backext.csv"
 CSV.write(outname, df)
 
 print("done.")
@@ -154,8 +136,8 @@ p = @df tdf scatter(
         colour = [colorant"#ffab56", colorant"#ff9223", colorant"#ffd1a2"]',
         # xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021))
         )
-display(p)
-savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/t2mmax_mean_annual_land$(region).png")
+# display(p)
+savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/t2mmax_mean_annual_land_backext_$(region).png")
 
 # PEI
 pdf = df |> 
@@ -172,7 +154,7 @@ p1 = @df pdf scatter(
             colour = [colorant"#002D5A", colorant"#A6C5E8", colorant"#4C7FB8", ]',
             # xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021))
             )
-savefig(p1, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/pei_mean_annual_land$region.png")
+savefig(p1, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/pei_mean_annual_land_backext$region.png")
 
 # TP
 df1 = df |> 
@@ -190,15 +172,14 @@ p2 = @df df1 scatter(
             colour = [colorant"#A6C5E8", colorant"#4C7FB8", colorant"#002D5A"]',
             # xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021))
             )
-display(p2)
+# display(p2)
 
-end
 
 # TP and PET
 edf = df |> 
         (df -> filter(:continent => ==(rf), df)) |>
         (df -> filter(:stat => ==("mean"), df)) |>
-        (df -> filter(:variable => (x -> x=="tp" || x=="pet"), df)) 
+        (df -> filter(:variable => x -> contains(x,"tp") || contains(x, "pet"), df)) 
 p_e = edf[edf.variable .== "tp" , :value]  .+ edf[edf.variable .== "pet", :value]   
 
 p2 = @df edf scatter(
@@ -211,24 +192,24 @@ p2 = @df edf scatter(
             colour = [colorant"#A6C5E8", colorant"#4C7FB8", colorant"#002D5A"]',
             # xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021))
             )
-savefig(p2, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/tp_pet_mean_annual_land$region.png")
+savefig(p2, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/tp_pet_mean_annual_land_backext$region.png")
        
 scatter( 1950:2022, p_e, smooth = true, label = "tp+pet", color = colorant"#4C7FB8",
     xlabel = "Year", ylabel = "Difference of continental annual averages of \n total precipitation and potential evapotranspiration",
     title = rn,
     size=(900,500), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),)
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/tp_pet_mean_annual_land$region.png")
+savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/tp_pet_mean_annual_land_backext$region.png")
 scatter(1950:2022, df[df.stat .== "mean" .&& df.variable .== "tp", :value], smooth = true, color = colorant"#002D5A",
     title = region,
     label = "tp", xlabel = "Year", ylabel = "Continental annual average of \n total precipitation",
     size=(900,500), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),)
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/tp_mean_annual_land$region.png")
+savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/tp_mean_annual_land_backext$region.png")
 #hline!([sum(df[df.stat .== "mean" .&& df.variable .== "tp", :value])./(2021-1950+1)], label = "time series mean")
 scatter(1950:2022, df[df.stat .== "mean" .&& df.variable .== "pet", :value], smooth = true, color = colorant"#A6C5E8",
     title = region,
     label = "pet", xlabel = "Year", ylabel = "Continental annual average of \n potential evapotranspiration",
     size=(900,500), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),)
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/pet_mean_annual_land$region.png")
+savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/pet_mean_annual_land_backext$region.png")
 
 tvdf = df |> 
     (df -> filter(:continent => ==(rf), df)) |>
@@ -245,7 +226,7 @@ p3 = @df tvdf scatter(
         colour = [colorant"#ffab56", colorant"#ff9223", colorant"#ffd1a2"]',
         # xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021))
         )
-savefig(p3, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/t2mmax_std_annual_land$region.png")
+savefig(p3, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/t2mmax_std_annual_land_backext$region.png")
 
 pvdf = df |> 
         (df -> filter(:continent => ==(rf), df)) |>
@@ -262,7 +243,7 @@ p4 = @df pvdf scatter(
             colour = [colorant"#002D5A",colorant"#A6C5E8", colorant"#4C7FB8", ]',
             # xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021))
             )
-savefig(p4, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/pei_std_annual_land$region.png")
+savefig(p4, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/pei_std_annual_land_backext$region.png")
 
 pvdf = df |> 
         (df -> filter(:continent => ==(rf), df)) |>
@@ -279,18 +260,18 @@ p5 = @df pvdf scatter(
             colour = [colorant"#A6C5E8", colorant"#4C7FB8", colorant"#002D5A"]',
             # xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021))
             )
-savefig(p5, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/tp_pet_std_annual_land$region.png")
+savefig(p5, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/tp_pet_std_annual_land_backext$region.png")
         
 scatter(1950:2022, sqrt.(df[df.stat .== "var" .&& df.variable .== "tp", :value]), smooth = true, color = colorant"#002D5A",
     title = region,
     label = "tp", xlabel = "Year", ylabel = "Continental annual standard deviation of \n total precipitation",
     size=(900,500), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),)
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/tp_std_annual_land$region.png")
+savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/tp_std_annual_land_backext$region.png")
 #hline!([sum(df[df.stat .== "mean" .&& df.variable .== "tp", :value])./(2021-1950+1)], label = "time series mean")
 scatter(1950:2022, sqrt.(df[df.stat .== "var" .&& df.variable .== "pet", :value]), smooth = true, color = colorant"#A6C5E8",
     title = region,
     label = "pet", xlabel = "Year", ylabel = "Gloabl annual standard deviation of \n potential evapotranspiration",
     size=(900,500), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),)
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/pet_std_annual_land$region.png")
+savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/pet_std_annual_land_backext$region.png")
 
 end
