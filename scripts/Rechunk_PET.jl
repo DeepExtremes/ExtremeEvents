@@ -19,6 +19,10 @@ outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr"
 
 ds = YAXArrays.Datasets.open_mfdataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/PET/*.zarr")
 ds = setchunks(ds,(lon=60,lat=60,time=5844))
-# need to find a way to rename cubes from :layer to :pet
+# need to find a way to 
+# - rename cubes from :layer to :pet
+# - rename axis Time to time
+renameaxis!(ds, "Time" => "time")
 
 savedataset(ds, path=outpath,append=true,max_cache=1e9)
+println("Done!")

@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name julia_smooth
-#SBATCH -o ./testjob-%A.out
+#SBATCH --job-name tmax_jl
+#SBATCH -o ./tmax-%A.out
 #SBATCH -p work
 #SBATCH --ntasks=20
 #SBATCH --nodes=1
@@ -10,4 +10,4 @@
 
 export JULIA_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
-julia --project=../ --procs=${SLURM_NTASKS} ../scripts/smooth_events.jl
+julia --project=../ ../scripts/smooth_events.jl

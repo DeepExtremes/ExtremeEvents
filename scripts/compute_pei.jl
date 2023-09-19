@@ -15,13 +15,14 @@ end
     Pkg.activate("$(@__DIR__)/..")
 end
 
-zg = zopen("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Data.zarr",consolidated=true, fill_as_missing = false)
+zg = zopen("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr",consolidated=true, fill_as_missing = false)
 ds = open_dataset(zg)
 # seems that missing are considered missing even if fill_as_missing = false
 
 # tp is in m/day, while pet is in mm/day
 # downward fluxes are >0
-diffcube = map((i,j)-> i*1e3+j,ds.tp,ds.pet)
+# pet is named layer for the moment
+diffcube = map((i,j)-> i*1e3+j,ds.tp,ds.layer)
 
 windowsizes = [30,90,180]
 windowax = CategoricalAxis("Variable",map(ws->string("pei_",ws),windowsizes))
