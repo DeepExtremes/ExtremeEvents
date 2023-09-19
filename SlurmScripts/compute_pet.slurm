@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name pet_jl18
-#SBATCH -o ./pet-%A.out
+#SBATCH --job-name pet2_jl18
+#SBATCH -o ./pet-last-%A.out
 #SBATCH -p work
 #SBATCH --nodes=1
 #SBATCH --ntasks=8
