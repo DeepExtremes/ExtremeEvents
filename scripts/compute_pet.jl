@@ -132,10 +132,11 @@ end # begin
 
 # run function pet_with_units on era5 0d25_hourly data
 # for each year
-pmap([1959; 1961; 1962; 1963; 1964; 1965;]) do yr # 1950:2022 # [1950:1952; 1958; 1960; 1966:2022] # [1953:1957; 1959; 1960:1965] 
+
+pmap(2022) do yr # 1950:2022 # [1950:1952; 1958; 1960; 1966:2022] # [1953:1957; 1959; 1960:1965] # [1959; 1961; 1962; 1963; 1964; 1965;]
     # get all variables from varlist into new dataset
     allvars = map(varlist) do vn
-        # @show vn
+        @show vn
         # select only files that are NOT "era5_backextention"
         filelist = readdir("/Net/Groups/data_BGC/era5/e1/0d25_hourly/$vn/$yr/", join = true)
         filter!(!contains("back_extension"),filelist)
