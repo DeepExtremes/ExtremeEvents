@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name jl_rchk
-#SBATCH -o ./rechunk-%A.out
+#SBATCH -o ./rchk-pet-%A.out
 #SBATCH -p work
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
