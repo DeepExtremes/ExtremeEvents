@@ -45,9 +45,11 @@ ds = setchunks(ds,(lon=60,lat=60,time=5844))
 savedataset(ds, path=outpath,append=true,max_cache=1e9)
 println("Done!")
 
-# rm -rf /Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr/Time
-# rm -rf /Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr/layer
-
-
 
 # consolidate metadata
+# manually edit .zmetadata: modify per dimensions :Time => :time
+# rm -rf /Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr/Time
+# rm -rf /Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr/layer
+# consolidate metadata
+
+

@@ -21,8 +21,7 @@ ds = open_dataset(zg)
 
 # tp is in m/day, while pet is in mm/day
 # downward fluxes are >0
-# pet is named layer for the moment
-diffcube = map((i,j)-> i*1e3+j,ds.tp,ds.layer)
+diffcube = map((i,j)-> i*1e3+j,ds.tp,ds.pet)
 
 windowsizes = [30,90,180]
 windowax = CategoricalAxis("Variable",map(ws->string("pei_",ws),windowsizes))
@@ -39,4 +38,4 @@ outdims = OutDims("Time",windowax,
     end
 end
 
-spei = mapCube(compute_pei,diffcube,windowsizes; indims, outdims, max_cache=1e9, showprog = true)
+pei = mapCube(compute_pei,diffcube,windowsizes; indims, outdims, max_cache=1e9, showprog = true)
