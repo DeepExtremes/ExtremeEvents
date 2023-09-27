@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name julia_detect
-#SBATCH -o ./testjob-%A.out
+#SBATCH -o ./detect-%A.out
 #SBATCH -p work
 #SBATCH --ntasks=10
 #SBATCH --nodes=1
@@ -10,4 +10,4 @@
 
 export JULIA_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
-julia --project=../ --procs=${SLURM_NTASKS} ../scripts/detect_extremes.jl
+julia --project=../ ../scripts/detect_extremes.jl
