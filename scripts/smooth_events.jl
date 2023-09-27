@@ -23,8 +23,8 @@ zg = zopen("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr",con
 era = open_dataset(zg)
 tair = era.t2mmax#[time=1980:2021]
 
-# pei = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/PEICube.zarr")
-# peicube = Cube(pei)
+pei = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/PEICube.zarr")
+peicube = Cube(pei)
 
 # TO DO : find a way to give the variable a name!
 
@@ -36,11 +36,11 @@ else
 end
 
 # PEI values of interest are in the lower range (P-E << 0), so we don't transform them before we normalize them
-# ranked_pei = if ispath("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/pei_ranks.zarr")
-#     Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/pei_ranks.zarr")    
-# else
-#     rescale(peicube,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/pei_ranks.zarr")
-# end
+ranked_pei = if ispath("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/pei_ranks.zarr")
+    Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/pei_ranks.zarr")    
+else
+    rescale(peicube,"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/pei_ranks.zarr")
+end
 
 # tmp = subsetcube(ranked_t, time = (Date(2020,6,15), Date(2020,6,17)))
 # tmp1 = smooth(tmp, "test.zarr"; lbord=40, width=4)
