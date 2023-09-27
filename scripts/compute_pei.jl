@@ -3,8 +3,6 @@
 # The moving wiindow is 30, 90 or 180 days.
 using SlurmClusterManager, Distributed
 
-using EarthDataLab, YAXArrays, Zarr, RollingFunctions, DiskArrays
-
 #Quick check if we are in a slurm job
 if haskey(ENV,"SLURM_CPUS_PER_TASK")
     addprocs(SlurmManager())
@@ -14,6 +12,8 @@ end
     using Pkg
     Pkg.activate("$(@__DIR__)/..")
 end
+
+@everywhere using EarthDataLab, YAXArrays, Zarr, RollingFunctions, DiskArrays
 
 zg = zopen("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr",consolidated=true, fill_as_missing = false)
 ds = open_dataset(zg)
