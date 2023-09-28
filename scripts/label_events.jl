@@ -1,7 +1,8 @@
 ## connected components
 using YAXArrays, EarthDataLab
 using Statistics, DiskArrays
-using ImageMorphology#, ImageFiltering
+using ImageMorphology
+import ImageFiltering
 
 
 pot=0.01
@@ -10,7 +11,7 @@ period = 1950:2022 #2016:2022 # (Date("2018-06-01"), Date("2018-09-16"))#could b
 aperiod = "_1950_2022" #"_2016_2021"
 compound_events = true
 cmp = compound_events ? "_cmp" : ""
-filter_events = false
+filter_events = true
 filter = filter_events ? "_S1_T3" : "" #"_Sdiam3_T5"
 filter_land = false
 land = filter_land ? "_land" : ""
@@ -18,10 +19,10 @@ land = filter_land ? "_land" : ""
 
 # set window and t accordingly
 #outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_ranked_pot" * string(pot) * "_ne" * string(ne) * "_sreld335.zarr"
-outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/labelcube_ranked_pot" * string(pot) * "_ne" * string(ne) * cmp * filter * aperiod * land * ".zarr"
+outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/labelcube_ranked_pot$(pot)_ne$ne$cmp$filter$aperiod$land.zarr"
 #outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_smoothed_pot" * string(pot) * "_ne" * string(ne) * ".zarr"
 
-inpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/EventCube_ranked_pot" * string(pot) * "_ne" * string(ne) * ".zarr"
+inpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/EventCube_ranked_pot$(pot)_ne$ne.zarr"
 # inpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventCube_smoothed_pot" * string(pot) * "_ne" * string(ne) * ".zarr"
 c = Cube(inpath)
 
@@ -44,6 +45,7 @@ if compound_events
         );
     # 136.463942 seconds (14.02 M allocations: 28.601 GiB, 0.68% gc time, 2.64% compilation time)
     # 1950-2021: 2084.692204 seconds (16.20 M allocations: 317.017 GiB, 0.35% gc time, 0.21% compilation time)
+    # 1950-2022: 1784.978296 seconds (15.26 M allocations: 326.052 GiB, 0.09% gc time, 0.21% compilation time)
 
 else
     @time maskarray = permutedims(
@@ -85,7 +87,7 @@ if filter_events
     diamondindices = get_diamond_indices(window[1])
     t = 0.6 * length(diamondindices);
     # use ImageFiltering.mapwindow to apply filter
-    @time filteredarray = mapwindow(myfilter, maskarray, window);
+    @time filteredarray = ImageFiltering.mapwindow(myfilter, maskarray, window);
     # !!! 32027.975212 seconds (98.20 G allocations: 3.299 TiB, 1.51% gc time, 0.00% compilation time)
 else
     filteredarray = maskarray;
@@ -129,4 +131,4 @@ print("done!")
 # using Plots
 # labelcube = Cube(outpath)
 # include("../src/plots.jl")
-# simpleplot(labelcube,100, 2018, 4, colours = cgrad(:darkterrain, 50, categorical = true), replacement = 0=>5e3)
+# simpleplot(labelcube,Date("2019-07-25"), 4, colours = cgrad(:darkterrain, 50, categorical = true), replacement = 0=>5e3)
