@@ -11,7 +11,7 @@ aperiod = "_1950_2022" #"_2016_2021"
 compound_events = true
 cmp = compound_events ? "_cmp" : ""
 filter_events = false
-filter = filter_events ? "_Sdiam3_T5" : ""
+filter = filter_events ? "_S1_T3" : "" #"_Sdiam3_T5"
 filter_land = false
 land = filter_land ? "_land" : ""
 # region = "Italy"
@@ -78,7 +78,7 @@ if filter_events
     # diamond in space 60% + at least 3 contiguous times
     # myfilter function needs following global variables
     # set window (time window: Tx: x*2-1)
-    window = (3,3,9)
+    window = (1,1,7) #(3,3,9)
     # central get_diamond_indices
     Nh = map(x->Int((x+1)/2), window);
     # indices of 2D diamond
