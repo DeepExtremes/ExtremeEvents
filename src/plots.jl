@@ -39,7 +39,7 @@ function simpleplot(dc::YAXArray,
     #     end
     # end
     # transpose and count backwards to get the map correctly
-    plotdata = sdc.data[d,:,:]'[end:-1:1,:];
+    plotdata = sdc.data[:,:,d]'[end:-1:1,:];
     # replace 0 
     if !isa(replacement, Pair{Nothing, Nothing})
         replace!(plotdata, replacement);
@@ -47,6 +47,48 @@ function simpleplot(dc::YAXArray,
     @show 2^nlayers
     # Plots.heatmap(sdc.data[d,:,:]'[end:-1:1,:], c = cgrad(:thermal, categorical = true), zlims = [0,2^nlayers], title = Date("$year") + Day(d))
     Plots.heatmap(plotdata, zlims = [0,2^nlayers], title = Date("$year") + Day(d), ylabel="latitude", xlabel="longitude", kwargs...)
+end
+
+"""
+    simpleplot(
+        dc::YAXArray,
+        date::Date, 
+        variable::Union{nothing, AbstractString} = nothing,
+        replacement::Union{nothing, Pair{::Any, ::Any} = nothing,
+        kwargs...
+        )
+    Plots a heatmap of cube `dc` on Date `date`.
+"""
+function simpleplot(dc::YAXArray, 
+    date::Date; 
+    variable::Union{Nothing, AbstractString} = nothing,
+    replacement::Any = Pair(nothing,nothing),
+    kwargs...
+    )
+    if isnothing(getAxis("Variable", dc))
+            sdc = subsetcube(dc, time = date)
+    else
+        if isnothing(variable)
+            ErrorException("Please specify `variable` to be plotted")
+        else
+            sdc = subsetcube(dc, time = date, variable = variable)
+        end
+    end
+    # if isnothing(colours)
+    #     colours = palette(:darkterrain, nlayers^2)
+    # else
+    #     if typeof(colours) in [PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient]
+    #         ErrorException("colours should be of type ColorGradient")
+    #     end
+    # end
+    # transpose and count backwards to get the map correctly
+    plotdata = sdc.data[:,:]'[end:-1:1,:];
+    # replace 0 
+    if !isa(replacement, Pair{Nothing, Nothing})
+        replace!(plotdata, replacement);
+    end
+    # Plots.heatmap(sdc.data[d,:,:]'[end:-1:1,:], c = cgrad(:thermal, categorical = true), zlims = [0,2^nlayers], title = Date("$year") + Day(d))
+    Plots.heatmap(plotdata; title = date, ylabel="latitude", xlabel="longitude", kwargs...)
 end
 
 # lon, lat heatmap with reduction over time
