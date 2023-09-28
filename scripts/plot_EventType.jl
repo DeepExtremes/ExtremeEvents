@@ -111,7 +111,7 @@ cols = [:white,
     colorant"#65498C", # 13 Medium Purple (Dark)
     colorant"#002D5A", # 14 Dark Blue
     colorant"#65498C", # 15 Medium Purple (Dark)
-    colorant"#65498C", # 16
+    colorant"#BBBBBB", # 16
     ] 
 @df df |> 
     (df -> stack(df, Not(:ev), variable_name = :Year, value_name = :Area)) |>
