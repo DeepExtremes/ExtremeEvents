@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name jl_lbl
-#SBATCH -o ./label-%A.out
+#SBATCH -o ./labelF-%A.out
 #SBATCH -p big
 #SBATCH --nodes=1
 #SBATCH --ntasks=1

@@ -39,7 +39,7 @@ end
     
 compound_events = true
 cmp = compound_events ? "_cmp" : ""
-filter_events = false
+filter_events = true
 filter = filter_events ? "_S1_T3" : "" #"_Sdiam3_T5"
 filter_land = false
 land = filter_land ? "_land" : ""
