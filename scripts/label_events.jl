@@ -1,30 +1,64 @@
 ## connected components
-using YAXArrays, EarthDataLab
-using Statistics, DiskArrays
-using ImageMorphology
-import ImageFiltering
+
+using SlurmClusterManager, Distributed
+
+#Quick check if we are in a slurm job
+if haskey(ENV,"SLURM_CPUS_PER_TASK")
+    addprocs(SlurmManager())
+end
+
+@everywhere begin
+    using Pkg
+    Pkg.activate("$(@__DIR__)/..")
+end
+
+@everywhere using YAXArrays, EarthDataLab, Statistics, DiskArrays, ImageMorphology
+@everywhere import ImageFiltering
+
+# 
+@everywhere include("../src/detection.jl")
+
+# use ImageMorphology.label_components to label the connected blobs of events
+# use Fabian's version to wrap around the globe
+@everywhere include("../src/label.jl")
 
 
-pot=0.01
-ne=0.1
-period = 1950:2022 #2016:2022 # (Date("2018-06-01"), Date("2018-09-16"))#could be added to file name "*"_"*replace("$period", ":" => "_")*"
-aperiod = "_1950_2022" #"_2016_2021"
+# split period into 13 years periods with 3 years overlap
+# period = 1950:2022 #2016:2022 # (Date("2018-06-01"), Date("2018-09-16"))#could be added to file name "*"_"*replace("$period", ":" => "_")*"
+# aperiod = "_1950_2022" #"_2016_2021"
+y = 1950; p = [y:(y+12)]
+while y < 2010
+    global y += 10
+    append!(p,[y:(y+12)])
+end
+# period = p
+# aperiod = map( x -> replace(string(x), ":" => "_", r"^" => "_"),p)
+@everywhere begin
+    pot=0.01
+    ne=0.1
+    
 compound_events = true
 cmp = compound_events ? "_cmp" : ""
-filter_events = true
+filter_events = false
 filter = filter_events ? "_S1_T3" : "" #"_Sdiam3_T5"
 filter_land = false
 land = filter_land ? "_land" : ""
-# region = "Italy"
+region = ""; # "Germany"
+
 
 # set window and t accordingly
 #outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_ranked_pot" * string(pot) * "_ne" * string(ne) * "_sreld335.zarr"
-outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/labelcube_ranked_pot$(pot)_ne$ne$cmp$filter$aperiod$land.zarr"
+# outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/labelcube_ranked_pot$(pot)_ne$ne$cmp$filter$aperiod$land.zarr"
 #outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_smoothed_pot" * string(pot) * "_ne" * string(ne) * ".zarr"
 
 inpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/EventCube_ranked_pot$(pot)_ne$ne.zarr"
 # inpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventCube_smoothed_pot" * string(pot) * "_ne" * string(ne) * ".zarr"
 c = Cube(inpath)
+end
+
+@sync @distributed for period in p
+    @show aperiod = replace(string(period), ":" => "_", r"^" => "_")
+    outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/labelcube_ranked_pot$(pot)_ne$ne$cmp$filter$aperiod$land$region.zarr"
 
 clastyears = subsetcube(c, time=period)
 # create binary array flagging all events (regardless of type of event) and load to memory
@@ -76,7 +110,6 @@ end
 
 if filter_events
     # filter maskarray to remove small events
-    include("../src/detection.jl")
     # diamond in space 60% + at least 3 contiguous times
     # myfilter function needs following global variables
     # set window (time window: Tx: x*2-1)
@@ -96,9 +129,6 @@ end
 # include("../src/plots.jl");
 # hmf = hm(filteredarray, axs=axs)
 
-# use ImageMorphology.label_components to label the connected blobs of events
-# use Fabian's version to wrap around the globe
-include("../src/label.jl")
 # set d to longitude dimension 
 size(filteredarray)
 # (lon, lat, time)
@@ -132,3 +162,5 @@ print("done!")
 # labelcube = Cube(outpath)
 # include("../src/plots.jl")
 # simpleplot(labelcube,Date("2019-07-25"), 4, colours = cgrad(:darkterrain, 50, categorical = true), replacement = 0=>5e3)
+
+end
