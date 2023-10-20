@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name jl_st
-#SBATCH -o ./testjob-%A.out
+#SBATCH -o ./stat-%A.out
 #SBATCH -p work
 #SBATCH --ntasks=8
 #SBATCH --cpus-per-task=1

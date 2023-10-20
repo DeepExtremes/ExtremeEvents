@@ -65,7 +65,7 @@ include("../src/stats.jl")
 # Open all Data Cubes
 pei = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/PEICube.zarr")
 
-zg = zopen("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Data.zarr",consolidated=true, fill_as_missing = false)
+zg = zopen("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr",consolidated=true, fill_as_missing = false)
 era = open_dataset(zg)
 
 eventspath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventCube_" * sm * "pot" * string(pot) * "_ne" * string(ne) * ".zarr"
