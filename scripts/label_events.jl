@@ -45,6 +45,20 @@ filter_land = false
 land = filter_land ? "_land" : ""
 region = ""; # "Germany"
 
+if filter_events
+    # filter maskarray to remove small events
+    # diamond in space 100% + at least 3 contiguous times
+    # set window (time window: Tx: x*2-1)
+    window = (1,1,7) #(3,3,9)
+    # # myfilter function needs following global variables (avoid computing them multiple times)
+    # central get_diamond_indices
+    Nh = map(x->Int((x+1)/2), window);
+    # # only time filter
+    # Nh = Int((window[3] + 1) /2 )
+    # indices of 2D diamond
+    diamondindices = get_diamond_indices(window[1])
+    t = length(diamondindices); # 0.6 * length(diamondindices);
+end
 
 # set window and t accordingly
 #outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_ranked_pot" * string(pot) * "_ne" * string(ne) * "_sreld335.zarr"
@@ -80,6 +94,7 @@ if compound_events
     # 136.463942 seconds (14.02 M allocations: 28.601 GiB, 0.68% gc time, 2.64% compilation time)
     # 1950-2021: 2084.692204 seconds (16.20 M allocations: 317.017 GiB, 0.35% gc time, 0.21% compilation time)
     # 1950-2022: 1784.978296 seconds (15.26 M allocations: 326.052 GiB, 0.09% gc time, 0.21% compilation time)
+    # 2000-2022: 199.699789 seconds (215.27 k allocations: 72.378 GiB, 0.11% gc time)
 
 else
     @time maskarray = permutedims(
@@ -109,19 +124,12 @@ end
 # Plots.heatmap(red1)
 
 if filter_events
-    # filter maskarray to remove small events
-    # diamond in space 60% + at least 3 contiguous times
-    # myfilter function needs following global variables
-    # set window (time window: Tx: x*2-1)
-    window = (1,1,7) #(3,3,9)
-    # central get_diamond_indices
-    Nh = map(x->Int((x+1)/2), window);
-    # indices of 2D diamond
-    diamondindices = get_diamond_indices(window[1])
-    t = 0.6 * length(diamondindices);
     # use ImageFiltering.mapwindow to apply filter
     @time filteredarray = ImageFiltering.mapwindow(myfilter, maskarray, window);
-    # !!! 32027.975212 seconds (98.20 G allocations: 3.299 TiB, 1.51% gc time, 0.00% compilation time)
+    # # 1916-2021 !!! 32027.975212 seconds (98.20 G allocations: 3.299 TiB, 1.51% gc time, 0.00% compilation time)
+    # 2000-2022 ! 36920.514462 seconds (98.73 G allocations: 3.383 TiB, 0.82% gc time) (up to 44000 seconds)
+    # @time filteredarray = ImageFiltering.mapwindow(mytimefilter, maskarray, window);
+
 else
     filteredarray = maskarray;
 end
@@ -134,9 +142,10 @@ size(filteredarray)
 # (lon, lat, time)
 d = 1;
 @time r = label_components(filteredarray, wrapdims=(d,));
-# 8.853066 seconds (159.63 k allocations: 16.965 GiB, 1.89% gc time, 1.12% compilation time)
+# 1916-2021 8.853066 seconds (159.63 k allocations: 16.965 GiB, 1.89% gc time, 1.12% compilation time)
 # 1950-2021 166.081424 seconds (162.74 k allocations: 203.452 GiB, 0.01% gc time, 0.11% compilation time)
-
+# 1950-2022 24.839224 seconds (60 allocations: 36.733 GiB, 1.19% gc time
+ 
 # # look at results
 # Plots.heatmap(r[:,:,1]'[end:-1:1,:])
 # Plots.heatmap(r[:,:,10]'[end:-1:1,:])
@@ -156,6 +165,8 @@ d = 1;
 # @time labelcube = YAXArray(caxes(clastyears), permutedims(r,(3,1,2)), chunks = DiskArrays.GridChunks(r,(90,120,120))) # ERROR: OutOfMemoryError()
 # write cube
 @time labelcube = savecube(labelcube,outpath,overwrite=true)
+# 1950-2022 : split into 13 years periods: 111.350276 seconds (378.92 k allocations: 81.960 GiB, 59.26% gc time)
+
 print("done!")
 # check
 # using Plots

@@ -68,7 +68,7 @@ sbatch compute_events.slurm
 *Output*: EventCube.zarr
 
 ### Label extreme events
-Unique labels are assigned to blobs of compound hot and dry extremes, i.e. where values are uneven (masimum temperature extremes) and larger than one (PEI extremes), connected in space and time. A filter is applied before runnning the connected component analysis: temperature extremes must last at least three consecutive days.
+Unique labels are assigned to blobs of co-occurrent hot and dry extremes, i.e. where values are uneven (t2mmax extremes) and larger than one (PEI extremes), connected in space and time. A filter is applied before runnning the connected component analysis: temperature extremes must last at least three consecutive days.
 
 *Note*: this will reduce the total number of tmax extremes in the cube...
 
@@ -79,13 +79,13 @@ sbatch label_events.slurm
 ```
 
 *Output*: 
-- labelcube_ranked_pot0.01_ne0.1_cmp_1950_1962.zarr
-- labelcube_ranked_pot0.01_ne0.1_cmp_1960_1972.zarr
-- labelcube_ranked_pot0.01_ne0.1_cmp_1970_1982.zarr
-- labelcube_ranked_pot0.01_ne0.1_cmp_1980_1992.zarr
-- labelcube_ranked_pot0.01_ne0.1_cmp_1990_2002.zarr
-- labelcube_ranked_pot0.01_ne0.1_cmp_2000_2012.zarr
-- labelcube_ranked_pot0.01_ne0.1_cmp_2010_2022.zarr
+- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_1950_1962.zarr
+- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_1960_1972.zarr
+- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_1970_1982.zarr
+- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_1980_1992.zarr
+- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_1990_2002.zarr
+- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_2000_2012.zarr
+- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022.zarr
 
 
 ### Compute statistics
