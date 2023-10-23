@@ -27,7 +27,7 @@ sm = smoothed ? "smoothed_" : "ranked_"
 compound_events = true
 cmp = compound_events ? "_cmp" : ""
 
-filter_events = false
+filter_events = true
 filter = filter_events ? "_S1_T3" : ""  #"_Sdiam3_T5_new" # "_Sdiam3_T5" #  "_Sdiam4_T4" #
 
 filter_land = false
@@ -68,7 +68,7 @@ pei = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/PEICube.za
 zg = zopen("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr",consolidated=true, fill_as_missing = false)
 era = open_dataset(zg)
 
-eventspath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventCube_" * sm * "pot" * string(pot) * "_ne" * string(ne) * ".zarr"
+eventspath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/EventCube_" * sm * "pot" * string(pot) * "_ne" * string(ne) * ".zarr"
 eventcube = open_dataset(eventspath)
 
 # LandSeaMask# LandSeaMask
@@ -93,7 +93,7 @@ end # begin
 @sync @distributed for period in p
     @show aperiod = replace(string(period), ":" => "_", r"^" => "_")
 
-labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_" * sm * "pot" * string(pot) * "_ne" * string(ne) * cmp * filter * aperiod * land * ".zarr"
+labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/labelcube_" * sm * "pot" * string(pot) * "_ne" * string(ne) * cmp * filter * aperiod * land * ".zarr"
 labels = open_dataset(labelpath)
 
 
