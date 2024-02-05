@@ -128,10 +128,8 @@ sort!(res, by=i->i[end].v, rev=true);
 # res is a vector of unnamed tuples
 # first convert tuple to named tuple
 df = toDF(res)
-# add colum with aperiod
-df.aperiod = aperiod
 # write DataFrame out to CSV file
-outname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventStats_" * sm * "pot" * string(pot) * "_ne" * string(ne)  * cmp * filter * aperiod * land * landonly * ".csv"
+outname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/EventStats_" * sm * "pot" * string(pot) * "_ne" * string(ne)  * cmp * filter * aperiod * land * landonly * ".csv"
 CSV.write(outname, df)
 print(outname)
 print("\n done!")
@@ -144,4 +142,12 @@ end # pmap
 # close workers
 rmprocs(workers())
 
-# combine tables
+# # combine tables
+# # add colum with aperiod
+# stats_df = DataFrame()
+# for period in p
+#     @show aperiod = replace(string(period), ":" => "_", r"^" => "_") 
+#     df = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/EventStats_" * sm * "pot" * string(pot) * "_ne" * string(ne)  * cmp * filter * aperiod * land * landonly * ".csv", DataFrame)
+#     df.aperiod = repeat(aperiod, size(df, 1))
+#     stats_df = vcat(stats_df, df)
+# end
