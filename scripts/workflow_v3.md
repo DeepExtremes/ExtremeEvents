@@ -96,9 +96,18 @@ sbatch stats_extremes.slurm
 ```
 
 *Output*: 
+- EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1950_1962_landonly.csv
+- EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1960_1972_landonly.csv
+- EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1970_1982_landonly.csv
+- EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1980_1992_landonly.csv
+- EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1990_2002_landonly.csv
+- EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_2000_2012_landonly.csv
+- EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022_landonly.csv
 
 ## Postprocessing
 
+### Sanity check
+
+
 ### Annual continental summary
 
-### Sanity check

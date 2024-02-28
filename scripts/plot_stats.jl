@@ -1,18 +1,21 @@
 using YAXArrays, EarthDataLab, OnlineStats, WeightedOnlineStats, Zarr
+using DimensionalData
+using DimensionalData.LookupArrays
 using DataFrames, Dates
 import CSV
 import StatsBase
-using Plots, Measures
+import Plots
+using Measures
 
 include("../src/plots.jl")
 
 if occursin("/Users", pwd())
     path = "/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/"
 else
-    path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/"
+    path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
 end
 
-trial = "ranked_pot0.01_ne0.1_cmp_2016_2021"
+trial = "ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022"
 landonly = "_landonly"
 events = CSV.read(path * "EventStats_" * trial * landonly * ".csv", DataFrame)
 # look for intersection between spatial and temporal range of events from the table or directly in the labelcube
@@ -21,11 +24,11 @@ labelpath = path * "labelcube_$trial.zarr"
 labels = Cube(labelpath) # labels = open_dataset(labelpath )# 
 # labels_all = open_dataset(path * "labelcube_ranked_pot0.01_ne0.1_cmp_2016_2021.zarr")
 eventcube = open_dataset(path * "EventCube_ranked_pot0.01_ne0.1.zarr")
-lsm = subsetcube(
-    Cube("/Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.721.static.nc"),
-    time=DateTime("2019-01-01T13:00:00"),
+lsm = Cube("/Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.721.static.nc")[
+    Ti = At(DateTime("2019-01-01T13:00:00")),
     # region = region,
-    )
+    ]
+
 Plots.heatmap(lsm.data'[end:-1:1,:])
 lsmask = lsm.data .> 0.5;
 
@@ -35,7 +38,7 @@ p = Plots.histogram(log10.(events.volume[1:1000]),
     ylabel = "# events",
     label = "land only"
     )
-savefig(path * "events_1000_volume_$trial$landonly.png")
+savefig(path * "/fig/events_1000_volume_$trial$landonly.png")
 
 
 days = parse.(Int, replace.(events.duration, r" day(s)?" => "")); days[1:10]
@@ -54,12 +57,23 @@ Plots.scatter!(log10.(events.area[1:1000]), days[1:1000],
     markershape = :circle,
     markersize = 2,
     markerstrokecolor = :grey30,)
-savefig(p1,path * "events_area_vs_duration_$trial$landonly.png")
+savefig(p1,path * "fig/events_area_vs_duration_$trial$landonly.png")
 
 Plots.scatter(log10.(events.area[1:1000]), days[1:1000],color=:red,label="1000 largest events in Volume")
 
-sublabels = subsetcube(labels, latitude = (90, -90))
-
+sublabels = labels[latitude = -90 .. 90]
+# 10158,2018-07-13T00:00:00.0,2018-08-10T00:00:00.0,4.5,57.0,50.0,73.0 # european heatwave
+period = Date("2018-07-13") .. Date("2018-08-10")
+region = "Germany"
+reg_lon = EarthDataLab.known_regions[region][1] .. EarthDataLab.known_regions[region][3]
+reg_lat = EarthDataLab.known_regions[region][2] .. EarthDataLab.known_regions[region][4]
+sublabels = labels[Ti = period, longitude = reg_lon, latitude = reg_lat]
+DimensionalData.dim2key(sublabels.axes)
+sublabels.data[:,:,:]
+subevents = eventcube[Ti = period, longitude = reg_lon, latitude = reg_lat]
+DimensionalData.dim2key(subevents.layer.axes)
+subevents.layer.data[:,:,:]
+### 
 # plot where lsmask AND labels always == 0 (max(labels) == 0)
 p = hm(sublabels.data[:,:,:];
    axs = sublabels.axes, 

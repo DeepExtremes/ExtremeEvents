@@ -92,25 +92,25 @@ function simpleplot(dc::YAXArray,
 end
 
 # lon, lat heatmap with reduction over time
-function axnms(axes::Vector{CubeAxis})
-    types = map(x -> string(typeof(x)), axes)
-    indnms = map(x -> findfirst(":", x)[end] + 1, types)
-    nms = map((x) -> types[x][indnms[x]:(indnms[x]+2)], 1:length(types))
-end
+# function axnms(axes)
+#     types = map(x -> string(typeof(x)), axes)
+#     indnms = map(x -> findfirst(":", x)[end] + 1, types)
+#     nms = map((x) -> types[x][indnms[x]:(indnms[x]+2)], 1:length(types))
+# end
 
-function modaxs(axs::Vector{CubeAxis};lon = "longitude")
-    axs_nms = axnms(axs)
-    lon_dim =  findfirst(axs_nms .== lon[1:3])
+function modaxs(axs;lon = :longitude)
+    axs_nms = DimensionalData.Dimensions.dim2key(axs)
+    lon_dim =  dimnum(axs, lon)
     axsl = map(x -> x > 180 ? x-360 : x, axs[lon_dim]) |> sort
-    axs[lon_dim] = RangeAxis(lon, range(axsl[1] , axsl[end], length = length(axsl)))
+    axs[lon_dim] = Dim{lon}(axsl)#RangeAxis(lon, range(axsl[1] , axsl[end], length = length(axsl)))
     return axs
 end
 
-function getshifts(axs::Vector{CubeAxis};lon = "longitude")
-    axs_nms = axnms(axs)
-    lon_dim =  findfirst(axs_nms .== lon[1:3])
+function getshifts(axs::Tuple{Vararg{DimensionalData.Dimensions.Dimension}};lon = :longitude)
+    axs_nms = DimensionalData.Dimensions.dim2key(axs)
+    lon_dim =  dimnum(axs, lon) #lon_dim =  findfirst(axs_nms .== lon[1:3])
     shifts = [sum(axs[lon_dim] .< 0), 1, 1]
-    dims = ["lon", "lat", "tim"];
+    dims = ["lon", "lat", "ti"];
     i = map(x -> findfirst(dims .== x), axs_nms)
     return shifts[i]
 end
@@ -135,7 +135,7 @@ end
 # end
 
 function prephm(tmp,axs,fn;reduced="tim")
-    axs_nms = axnms(axs)
+    # axs_nms = axnms(axs)
     red_dim = findfirst(axs_nms .== reduced)
     time_dim = findfirst(axs_nms .== "tim")
     lon_dim =  findfirst(axs_nms .== "lon")
@@ -289,7 +289,7 @@ function plotEvent(df, labelcube, label_row)
     @show sublabels
     # load to memory and flag pixels equal to label
     label = df[label_row, :label];
-    sublabels1 = (sublabels.data .== label)[:,:,:];
+    sublabels1 = DimArray((sublabels.data .== label)[:,:,:], sublabels.axes)#(sublabels.data .== label)[:,:,:];
     @show size(sublabels1)
     if any(lonl.>180)
         # modify axes
