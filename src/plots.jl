@@ -1,4 +1,4 @@
-using Plots
+# using Plots
 # import PlotUtils
 using Dates
 
@@ -92,26 +92,27 @@ function simpleplot(dc::YAXArray,
 end
 
 # lon, lat heatmap with reduction over time
-# function axnms(axes)
-#     types = map(x -> string(typeof(x)), axes)
-#     indnms = map(x -> findfirst(":", x)[end] + 1, types)
-#     nms = map((x) -> types[x][indnms[x]:(indnms[x]+2)], 1:length(types))
-# end
+function axnms(axes)
+    nms = DimensionalData.dim2key(axes)
+end
 
 function modaxs(axs;lon = :longitude)
-    axs_nms = DimensionalData.Dimensions.dim2key(axs)
+    # axs_nms = DimensionalData.Dimensions.dim2key(axs)
     lon_dim =  dimnum(axs, lon)
     axsl = map(x -> x > 180 ? x-360 : x, axs[lon_dim]) |> sort
-    axs[lon_dim] = Dim{lon}(axsl)#RangeAxis(lon, range(axsl[1] , axsl[end], length = length(axsl)))
-    return axs
+    axsv = [i for i in axs]
+    axsv[lon_dim] = Dim{lon}(axsl)
+    axst = Tuple(axsv)
+    return axst
 end
 
 function getshifts(axs::Tuple{Vararg{DimensionalData.Dimensions.Dimension}};lon = :longitude)
     axs_nms = DimensionalData.Dimensions.dim2key(axs)
     lon_dim =  dimnum(axs, lon) #lon_dim =  findfirst(axs_nms .== lon[1:3])
+    # lon, lat time shifts
     shifts = [sum(axs[lon_dim] .< 0), 1, 1]
-    dims = ["lon", "lat", "ti"];
-    i = map(x -> findfirst(dims .== x), axs_nms)
+    dims = ["lo", "la", "ti"];
+    i = map(x -> findfirst(dims .== lowercase(string(x))[1:2]), [i for i in axs_nms])
     return shifts[i]
 end
 
@@ -134,93 +135,130 @@ end
 #     return x,y,z
 # end
 
-function prephm(tmp,axs,fn;reduced="tim")
+function prephm(tmp,axs,fn;reduced = :Ti)
     # axs_nms = axnms(axs)
-    red_dim = findfirst(axs_nms .== reduced)
-    time_dim = findfirst(axs_nms .== "tim")
-    lon_dim =  findfirst(axs_nms .== "lon")
-    lat_dim =  findfirst(axs_nms .== "lat")
-    rtmp = mapslices(fn, tmp, dims=red_dim)
+    red_dim = dimnum(axs, reduced)
+    time_dim = dimnum(axs, :Ti)
+    lon_dim =  dimnum(axs, :longitude)
+    lat_dim =  dimnum(axs, :latitude)
+    rtmp = mapslices(fn, tmp, dims=red_dim);
     # @show size(rtmp)
     # convert to Float to discard 0 in plot
     rtmp = convert(Array{Float64},rtmp);
     replace!(rtmp, 0 => NaN)
     # replace!(rtmp, missing => NaN)
     # define x, y, z
-    if reduced  == "tim"
-        x = axs[lon_dim][:];
-        y = axs[lat_dim][end:-1:1];
-        z = permutedims(dropdims(rtmp,dims=red_dim), (time_dim < lat_dim ? lat_dim-time_dim : lat_dim, time_dim < lon_dim ? lon_dim - time_dim : lon_dim))[end:-1:1,:];   
-    elseif reduced == "lon"
+    if reduced  == :Ti
+        x = lookup(axs, lon_dim);
+        y = lookup(axs, lat_dim)[end:-1:1];
+        # z = permutedims(dropdims(rtmp,dims=red_dim), (time_dim < lat_dim ? lat_dim-time_dim : lat_dim, time_dim < lon_dim ? lon_dim - time_dim : lon_dim))[end:-1:1,:];   
+        z = dropdims(permutedims(rtmp,(lon_dim, lat_dim, time_dim)), dims=3)[:,end:-1:1];
+    elseif reduced == :longitude
         # 
-        x = convert(Vector{Date}, axs[time_dim][:]);
-        y = axs[lat_dim][end:-1:1];
-        z = dropdims(permutedims(rtmp, (lat_dim, time_dim, lon_dim)),dims=3)[end:-1:1,:];   
-    else # reduced == "lat"
+        x = convert(Vector{Date}, lookup(axs, time_dim));
+        y = lookup(axs, lat_dim)[end:-1:1];
+        z = dropdims(permutedims(rtmp, (time_dim, lat_dim, lon_dim)),dims=3)[:,end:-1:1];   
+    elseif reduced == :latitude
         # 
-        x = axs[lon_dim][:];
-        y = axs[time_dim];
-        z = dropdims(permutedims(rtmp, (time_dim, lon_dim, lat_dim)),dims=3)[end:-1:1,:];   
+        x = lookup(axs, lon_dim);
+        y = lookup(axs, time_dim);
+        z = dropdims(permutedims(rtmp, (time_dim, lon_dim, lat_dim)),dims=3);   
+    else
+        error("Reduction with $reduced is not defined")
     end
 
     return x,y,z
 end
 
-function hm(tmp::BitArray{3}; title = missing, axs = axes_rt, fn = sum, reduced = "tim", kwargs...)
+# function hm(tmp::BitArray{3}; title = missing, axs = axes_rt, fn = sum, reduced = :Ti, kwargs...)
+#     x,y,z = prephm(tmp,axs,fn;reduced)
+#     sum(map(x->!isnan(x),z))
+#     heatmap(x, y, z; axis = (title = title), kwargs...)
+# end
+
+# function hm(tmp::Array{Bool, 3},args...;kwargs...)
+#     tmp = convert(BitArray{3}, tmp)
+#     hm(tmp,args...;kwargs...)
+# end
+
+# function hm!(tmp::BitArray{3}; axs = axes_rt, fn = sum, reduced = :Ti, xlab = "longitude", ylab = "latitude", kwargs...)
+#     x,y,z = prephm(tmp,axs,fn;reduced)
+#     heatmap!(x, y, z; kwargs...)
+# end
+
+# function hm!(tmp::Array{Bool, 3},args...;kwargs...)
+#     tmp = convert(BitArray{3}, tmp)
+#     hm!(tmp,args...;kwargs...)
+# end
+
+# function hm!(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = :Ti, kwargs...)
+#     x,y,z = prephm(tmp,axs,fn;reduced)
+#     heatmap!(x, y, z;kwargs...)
+# end
+
+function hm(tmp::Any; axs = axes_rt, fn = sum, reduced = :Ti, kwargs...)
     x,y,z = prephm(tmp,axs,fn;reduced)
-    @show sum(map(x->!isnan(x),z))
-    Plots.heatmap(x, y, z; title = title, kwargs...)
+    f = Figure()
+    ax = Axis(f[1, 1])
+    h = heatmap!(ax, x, y, z; kwargs...)
+    return f, ax, h
 end
 
-function hm(tmp::Array{Bool, 3},args...;kwargs...)
-    tmp = convert(BitArray{3}, tmp)
-    hm(tmp,args...;kwargs...)
+function myfig!(fig, lon, lat, data, q, units)
+    ax = GeoAxis(fig[1,1], 
+        limits=(extrema(lon), extrema(lat)), 
+        source="+proj=latlong +datum=WGS84", # src CRS
+        dest="+proj=eqearth", # destination CRS, in which you want to plot
+        coastlines = true # plot coastlines from Natural Earth, as a reference.
+    )
+    s = surface!(ax, lon, lat, data; 
+        colorrange=(-maximum(abs.(q)), maximum(abs.(q))),
+        # highclip=:black,
+        # lowclip=:grey8,
+        #colorscale = sc,
+        colormap, nan_color=:grey80,
+        shading=NoShading,
+    )
+    # # coastlines
+    # cl=lines!(ax, 
+    #     # GeoMakie.coastlines(),
+    #     x1,y1,
+    #     color = :black, linewidth=0.85)
+    # translate!(cl, 0, 0, 1000)
+    Colorbar(fig[1,2], s, label = units)
+    # remove gridlines
+    ax.xgridcolor[] = colorant"transparent";
+    ax.ygridcolor[] = colorant"transparent";
+    ax.xticklabelsvisible = false;
+    ax.yticklabelsvisible = false;
+    return(fig)
 end
 
-function hm!(tmp::BitArray{3}; axs = axes_rt, fn = sum, reduced = "tim", xlab = "longitude", ylab = "latitude", kwargs...)
-    x,y,z = prephm(tmp,axs,fn;reduced)
-    Plots.heatmap!(x, y, z; kwargs...)
-end
 
-function hm!(tmp::Array{Bool, 3},args...;kwargs...)
-    tmp = convert(BitArray{3}, tmp)
-    hm!(tmp,args...;kwargs...)
-end
+# function cf!(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = :Ti, kwargs...)
+#     x,y,z = prephm(tmp,axs,fn;reduced)
+#     contourf!(x, y, z; kwargs...)
+# end
 
-function hm!(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = "tim", kwargs...)
-    x,y,z = prephm(tmp,axs,fn;reduced)
-    Plots.heatmap!(x, y, z;kwargs...)
-end
-
-function hm(tmp::Any; axs = axes_rt, fn = sum, reduced = "tim", kwargs...)
-    x,y,z = prephm(tmp,axs,fn;reduced)
-    Plots.heatmap(x, y, z;kwargs...)
-end
-
-function cf!(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = "tim", kwargs...)
-    x,y,z = prephm(tmp,axs,fn;reduced)
-    Plots.contourf!(x, y, z; kwargs...)
-end
-
-# import PlotUtils
-function getColours(colours::Union{Nothing, PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient};n=10)
-    if isnothing(colours)
-        colours = palette(:darkterrain, n)
-    else
-        if typeof(colours) in [PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient]
-            ErrorException("colours should be of type ColorGradient")
-        end
-    end
-end
-# cols = Tuple((Light1 = "#28828F",
-# Dark2 = "#6E6E6E",
-# Light2 = "#9E9E9E",
-# Accent1 = "#C8C8C8", 
-# Accent2 = "#366570",
-# Accent3 = "#8C8C8C",
-# Accent4 = "#57A9BA",
-# Accent5 = "#FFD966",
-# Accent6 = "#EAF1F3"))
+# # import PlotUtils
+# function getColours(colours::Union{Nothing, PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient};n=10)
+#     if isnothing(colours)
+#         colours = palette(:darkterrain, n)
+#     else
+#         if typeof(colours) in [PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient]
+#             ErrorException("colours should be of type ColorGradient")
+#         end
+#     end
+# end
+# # cols = Tuple((Light1 = "#28828F",
+# # Dark2 = "#6E6E6E",
+# # Light2 = "#9E9E9E",
+# # Accent1 = "#C8C8C8", 
+# # Accent2 = "#366570",
+# # Accent3 = "#8C8C8C",
+# # Accent4 = "#57A9BA",
+# # Accent5 = "#FFD966",
+# # Accent6 = "#EAF1F3"))
 
 # DeepAIcols = map(x -> Base.parse(Colorant, x)),
 #               cols
