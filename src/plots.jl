@@ -1,6 +1,8 @@
 # using Plots
 # import PlotUtils
 using Dates
+using DimensionalData
+using DimensionalData.LookupArrays
 
 """
     simpleplot(
@@ -154,8 +156,8 @@ function prephm(tmp,axs,fn;reduced = :Ti)
         # z = permutedims(dropdims(rtmp,dims=red_dim), (time_dim < lat_dim ? lat_dim-time_dim : lat_dim, time_dim < lon_dim ? lon_dim - time_dim : lon_dim))[end:-1:1,:];   
         z = dropdims(permutedims(rtmp,(lon_dim, lat_dim, time_dim)), dims=3)[:,end:-1:1];
     elseif reduced == :longitude
-        # 
-        x = convert(Vector{Date}, lookup(axs, time_dim));
+        # x = convert(Vector{Date}, lookup(axs, time_dim));
+        x = lookup(axs, time_dim);
         y = lookup(axs, lat_dim)[end:-1:1];
         z = dropdims(permutedims(rtmp, (time_dim, lat_dim, lon_dim)),dims=3)[:,end:-1:1];   
     elseif reduced == :latitude
@@ -181,22 +183,25 @@ end
 #     hm(tmp,args...;kwargs...)
 # end
 
-# function hm!(tmp::BitArray{3}; axs = axes_rt, fn = sum, reduced = :Ti, xlab = "longitude", ylab = "latitude", kwargs...)
-#     x,y,z = prephm(tmp,axs,fn;reduced)
-#     heatmap!(x, y, z; kwargs...)
-# end
+# axs::Tuple{Vararg{DimensionalData.Dimensions.Dimension}
+function hm!(ax, tmp::BitArray{3}, axs::Tuple{Vararg{DimensionalData.Dimensions.Dimension}} ; fn = sum, reduced = :Ti, kwargs...)
+    x,y,z = prephm(tmp,axs,fn;reduced)
+    h = heatmap!(ax, x, y, z; kwargs...)
+    return h
+end
 
-# function hm!(tmp::Array{Bool, 3},args...;kwargs...)
-#     tmp = convert(BitArray{3}, tmp)
-#     hm!(tmp,args...;kwargs...)
-# end
+function hm!(ax,tmp::Array{Bool, 3},args...;kwargs...)
+    tmp = convert(BitArray{3}, tmp)
+    h = hm!(ax,tmp,args...;kwargs...)
+    return h
+end
 
 # function hm!(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = :Ti, kwargs...)
 #     x,y,z = prephm(tmp,axs,fn;reduced)
 #     heatmap!(x, y, z;kwargs...)
 # end
 
-function hm(tmp::Any; axs = axes_rt, fn = sum, reduced = :Ti, kwargs...)
+function hm(tmp::Any, axs::Tuple{Vararg{DimensionalData.Dimensions.Dimension}} ; fn = sum, reduced = :Ti, kwargs...)
     x,y,z = prephm(tmp,axs,fn;reduced)
     f = Figure()
     ax = Axis(f[1, 1])

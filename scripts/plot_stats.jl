@@ -64,7 +64,7 @@ save(path * "/fig/events_1000_volume_$trial$landonly.png", f)
 
 # test hm
 ls = Cube("/Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.721.static.nc")
-f,ax = hm(ls.data[:,:,:]; axs = ls.axes);
+f,ax = hm(ls.data[:,:,:], ls.axes);
 f
 
 sublabels = labels[latitude = -90 .. 90];
@@ -73,8 +73,7 @@ period = Date("2018-07-01") .. Date("2018-09-30")
 sublabels = labels[time = period, latitude = -90 .. 90];
 ### 
 # plot where lsmask AND labels always == 0 (max(labels) == 0)
-f,ax = hm(labels.data[:,:,:];
-   axs = labels.axes, 
+f,ax = hm(labels.data[:,:,:], labels.axes;
    fn = x -> maximum(x) == 0, 
    reduced = :Ti, 
    colormap = :reds,
