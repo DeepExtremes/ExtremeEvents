@@ -90,7 +90,8 @@ function labobs(df0::DataFrame, lon, lat, period, obs_event)
     return df0
 end
 
-function labplot(ax, lon, lat, period; reduced = :Ti, kwargs...)
+function labplot!(ax, lon, lat, period; reduced = :Ti, kwargs...)
+    # sublabels = labels.layer[time=periodo[1]..periodo[2], latitude=lato[1]..lato[2], longitude=lono[1]..lono[2]]
     sublabels = labels.layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
     data = ( in(df.label).(sublabels.data))[:,:,:];
     if lon[1] >= 180
@@ -100,43 +101,14 @@ function labplot(ax, lon, lat, period; reduced = :Ti, kwargs...)
         axs = sublabels.axes
     end 
     if reduced == :longitude
-        axs = (axs[1], axs[2], Ti((nd - Dates.value(period[2]-periodl[1])) : nd - Dates.value(period[2]-periodl[2])))
+        axs = (axs[1], axs[2], Ti((nd - Dates.value(Date(obs[obs_event,:End])-periodo[1])) : nd - Dates.value(Date(obs[obs_event,:End])-periodo[2])))
     end
     h = hm!(ax, data, axs; reduced, kwargs...)  
     # but this approach doesn't show if labelled events span outside the observed event bbox
     return h
 end
 
-# function labplotTi(ax, period, lat, lon)
-#     sublabels = labels.layer[time=period[1]..period[2], latitude=lat[2]..lat[1], longitude=lon[1]..lon[2]]
-#     data = ( in(df.label).(sublabels.data))[:,:,:];
-#     if lon[1] >= 180
-#         # modify axes
-#         axs = modaxs(sublabels.axes)
-#     else
-#         axs = sublabels.axes
-#     end 
-#     h = hm!(ax, data, axs; colormap = Makie.Categorical(:inferno))  
-#     # but this approach doesn't show if labelled events span outside the observed event bbox
-#     return h
-# end
-
-# function  labplotLon(ax, periodl::Tuple{2}, latl::Tuple{2}, lonl::Tuple{2})
-#     sublabels = labels.layer[time=periodl[1]..periodl[2], latitude=latl[1]..latl[2], longitude=lonl[1]..lonl[2]]
-#     # load to memory and flag pixels equal to any of the labels
-#     data = (sublabels.data .∈ Ref(df[:, :label]))[:,:,:];
-#     if lonl[1] >= 180
-#         # modify axes
-#         axs = modaxs(sublabels.axes) 
-#     else
-#         axs = sublabels.axes 
-#     end
-#     h = hm!(ax, data, (axs[1], axs[2], Ti((nd - Dates.value(period[2]-periodl[1])) : nd - Dates.value(period[2]-periodl[2]))); 
-#         reduced = :longitude,
-#         colormap = cgrad(:inferno, categorical = true), colorrange = (1,length(sublabels.axes[1])))
-#     return h
-# end
-function labplot3(ax3, lon, lat, period; kwargs...)
+function labplot3!(ax3, lon, lat, period; kwargs...)
     # sublabels = labels.layer[time=timlim[1]..timlim[2], latitude=latlim[1]..latlim[2], longitude=lon1[1]..lon1[2]]
     if typeof(lon) <: Vector
         sublabels1 = labels.layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1][1]..lon[1][2]]
@@ -168,7 +140,8 @@ function labplot3(ax3, lon, lat, period; kwargs...)
     points3d = [Point3f(ix, iz, iy) for ix in x, iz in z, iy in y];
     data_vec = [data[ix, iy, iz] for (ix, i) in enumerate(x), (iz, k) in enumerate(tempo), (iy, j) in enumerate(y)];
 
-    y_ticks_pos = 1:5:length(tempo);
+    nt = length(tempo)
+    y_ticks_pos = nt > 5 ? (1:(nt÷5):nt) : (1:nt);
     ticks_time = string.(Date.(tempo[y_ticks_pos]));
 
     m = meshscatter!(ax3, points3d[:]; 
@@ -191,27 +164,13 @@ function getx(lon)
     x = lon[1] >= 180 ? x.-360 : x
 end
 
-function labplot!(pl, labels, period, lat, lon, ulbls, lblt, cols)
+function labelplot!(ax, labels, period, lat, lon, lblt; kwargs...)
     # subset labelcube
-    sublabels = Cube(subsetcube(labels, time=period, latitude=lat, longitude=lon))
-    # sublabels = Cube(subsetcube(labels, time=periodt, latitude=latt, longitude=lont))
+    sublabels = labels.layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
     # load to memory and set all other values to 0 (so that they will be set to NaN by prephm)
-    sublabels1 = (sublabels.data)[:,:,:];
-    # @time 
-    sublabels1 = map(x -> x in ulbls ? x : 0, sublabels1);
-    # cols = ("#28828F", "#6E6E6E", "#9E9E9E", "#C8C8C8", "#366570", "#8C8C8C", "#57A9BA", "#FFD966", "#EAF1F3")
-    if length(lblt) == 1
-        if length(ulbls) == 1
-            colst = palette(unique(vcat([RGBA{Float64}(.5,.5,.5,1)],cols)))
-        else
-            indc = map(x -> findfirst(y -> y == x, ulbls), lblt)
-            colst = palette(unique(vcat([RGBA{Float64}(.5,.5,.5,1)],cols[indc])))
-        end
-    else
-        indc = map(x -> findfirst(y -> y == x, ulbls), lblt)
-        tickval = (lblt.-minimum(lblt))./(maximum(lblt) +1 - (minimum(lblt)-1))
-        colst = cgrad(cols[indc], tickval, categorical = true)
-    end
+    # small events have been discarded from the plot
+    sublabels1 = map(x -> x in lblt ? x : 0, (sublabels.data)[:,:,:]);
+    
     if any(lon.>180)
         # modify axes
         axs = modaxs(sublabels.axes)
@@ -221,17 +180,12 @@ function labplot!(pl, labels, period, lat, lon, ulbls, lblt, cols)
     else
         axs = sublabels.axes
     end
-    # println(unique(sublabels1))
-
-    pl = hm!(sublabels1, axs = axs, fn = mode, reduced = "tim", 
-        c=colst, aspect_ratio=:equal, colorbar = :none)
-    # pl = cf!(sublabels1, axs = sublabels.axes, fn = mode, reduced = "tim", xlab="Longitude", ylab = "Latitude", colours=colst, colorbar_ticks = (lblt, lblt),aspect_ratio=:equal)
-    # pl = labelplot(sublabels1, axs = sublabels.axes, fn = mode, reduced = "tim", xlab="Longitude", ylab = "Latitude", 
-        # title = "from " * string(periodt[1]) * " to " * string(periodt[2]))
-    # ml = makielabel(sublabels1, axs = sublabels.axes, fn = mode, reduced = "tim", xlab="Longitude", ylab = "Latitude", 
-    #     title = "from " * string(periodt[1]) * " to " * string(periodt[2]))
+    h = hm!(ax, sublabels1, axs; fn = mode, kwargs...)
+    return ax, h
 end
-
+function expand(x::Tuple{Int, Int})
+    convert(Tuple{Float64, Float64}, x)
+end
 function expand(x::Tuple{Float64, Float64})
     x1 = round(x[1] - 1, RoundDown; digits = -1, base = 5)
     x2 = round(x[2] + 1, RoundUp; digits = -1, base = 5)
@@ -244,20 +198,19 @@ end
 trial = "ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022"
 landonly = "_landonly"
 # events_all = CSV.read(path * "EventStats_ranked_pot0.01_ne0.1_cmp_2016_2021.csv", DataFrame)
-    events = CSV.read("$(path)EventStats_$(trial)$(landonly).csv", DataFrame)
-    # look for intersection between spatial and temporal range of events from the table or directly in the labelcube
-    labelpath = path * "labelcube_$trial.zarr"
-    # labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_$trial.zarr"
-    labels = open_dataset(labelpath)# labels = Cube(labelpath)
-    # labels_all = open_dataset(path * "labelcube_ranked_pot0.01_ne0.1_cmp_2016_2021.zarr")
+events = CSV.read("$(path)EventStats_$(trial)$(landonly).csv", DataFrame)
+# look for intersection between spatial and temporal range of events from the table or directly in the labelcube
+labelpath = path * "labelcube_$trial.zarr"
+# labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_$trial.zarr"
+labels = open_dataset(labelpath)# labels = Cube(labelpath)
+# labels_all = open_dataset(path * "labelcube_ranked_pot0.01_ne0.1_cmp_2016_2021.zarr")
 
-    global df0 = DataFrame()
-    # df0 = CSV.read("/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/SanityCheck_$trial.csv", DataFrame, header=1)
-    # df0 = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/SanityCheck_$trial.csv", DataFrame, header=1)
+global df0 = DataFrame()
+ # df0 = CSV.read("$(path)SanityCheck_$trial.csv", DataFrame, header=1)
 
-    # loop over observed events
-    # for obs_event in 1 : nrow(obs)
-    obs_event=19
+# loop over observed events
+for obs_event in 1: nrow(obs)
+    # obs_event=10
     print(obs[obs_event,:])
     period =( Date(obs[obs_event,:Start]), Date(obs[obs_event,:End])+Day(1))
     lat = (obs[obs_event,:South], obs[obs_event,:North])
@@ -288,6 +241,34 @@ landonly = "_landonly"
         df1 = labobs(df0, lon, lat, period, obs_event);
     end
     global df0 = df1;
+end
+unique!(df0)
+# export to csv
+CSV.write(path * "SanityCheck_$trial.csv", df0)
+# df0 = CSV.read("$(path)SanityCheck_$trial.csv", DataFrame, header=1)
+
+for obs_event in 4:nrow(obs)
+    println(obs_event)
+    # subset df0 with obs_event and minimum volume
+    df = subset(df0, :obs_event => x -> x .== obs_event, :volume => x -> x .>= 10.0);
+    period =( Date(obs[obs_event,:Start]), Date(obs[obs_event,:End])) #+Day(1)?
+    lat = (obs[obs_event,:South], obs[obs_event,:North])
+    lon = (obs[obs_event,:West], obs[obs_event,:East])
+    # transform lon to match cube
+    if lon[1] < 0 
+        if lon[2] <= 0
+            # shift longitudes
+            lon0 = lon
+            lon = broadcast(x->x+360,lon)
+        else # lon[2] > 0
+            # split bbox into 2
+            lon1 = (lon[1]+360,360)
+            lon2 = (0,lon[2])
+            lon0 = lon
+            lon = [lon1,lon2]
+        end
+    else lon0 = lon
+    end
 
     # === lon-lat view ===
     figT = Figure();
@@ -319,8 +300,11 @@ landonly = "_landonly"
     tplot = [1, 1, nd, nd, 1];
     # plot bounding box
     bbL = lines!(axL, tplot, y , label = "");# 
-    axL.xticks = [1,nd], string.([period[1],period[2]]);
-    # ax.xticklabelrotation = π/4
+    ntticks = 4
+    x_ticks_pos = nd > ntticks ? (1:(nd÷ntticks):nd) : (1:nd);
+    ticks_time = string.(Date(period[1]): (nd > ntticks ? (Day(nd÷ntticks)) : Day(1)) : Date(period[2]));
+    axL.xticks = (x_ticks_pos, ticks_time);
+    axL.xticklabelrotation = π/4
 
     # ==== lat-lon-time 3D view
     # colormap
@@ -334,23 +318,25 @@ landonly = "_landonly"
         xlabel = "Longitude", ylabel = "Time", zlabel = "Latitude");
     # 
     # === get labelled events maximum bounding box ===
-    df = subset(df0, :obs_event => x -> x .== obs_event);
-    # if !isempty(df)
-        # subset label cube with maximum intersecting bounding box 
-        periodl = (minimum(df[: ,:start_time]), maximum(df[: ,:end_time]))
-        latl = (minimum(df[: ,:latitude_max]), maximum(df[: ,:latitude_min]))
-        lonl = (minimum(df[: ,:longitude_min]), maximum(df[: ,:longitude_max]))
+    
+    if !isempty(df)
+        # subset label cube with maximum intersecting bounding box of labelled events
+        lato = (minimum(df[: ,:latitude_min]), maximum(df[: ,:latitude_max]))
+        lono = (minimum(df[:, :longitude_min]), maximum(df[:, :longitude_max]))
+        periodo = (minimum(df[:, :start_time]), maximum(df[:,:end_time]) +Day(1))
         nl = step(labels.axes[:longitude])
+        nL = (diff(collect(lon0))/nl)[1];
 
-        latlim = (minimum([lat[1], latl[1]])-nl, maximum([lat[2], latl[2]])+nl)
-        lonlim = typeof(lon) <: Vector ? (lon0[1]-nl, lon0[2]+nl) : (minimum([lon[1], lonl[1]])-nl, maximum([lon[2], lonl[2]])+nl)
-        timlim = (minimum([period[1], periodl[1]])-Day(1), maximum([period[2], periodl[2]])+Day(1))
+        latlim = (minimum([lat[1], lato[1]])-nl, maximum([lat[2], lato[2]])+nl)
+        lonlim = typeof(lon) <: Vector ? (lon0[1]-nl, lon0[2]+nl) : (minimum([lon[1], lono[1]])-nl, maximum([lon[2], lono[2]])+nl)
+        timlim = (minimum([period[1], periodo[1]])-Day(1), maximum([period[2], periodo[2]])+Day(1))
         timlimplot = ((nd - Dates.value(period[2]-timlim[1])), nd - Dates.value(period[2]-timlim[2]))
 
         # 3d plot limits and bbox
         ax3.limits = (lonlim..., timlimplot..., latlim...)
-        cube = Rect3f(Vec3f(lon0[1], 1, lat[1]), Vec3f(lon0[2]-lon0[1], nd-1, lat[2]-lat[1]))
-        bb3 = wireframe!(ax3, cube, alpha = 0.5)
+        hyperrect = Rect3f(Vec3f(lon0[1], 1, lat[1]), Vec3f(lon0[2]-lon0[1], nd-1, lat[2]-lat[1]))
+        # ideally one should plot the back of the hyperrectangle first and then the front after plotting the events.
+        bb3 = wireframe!(ax3, hyperrect, alpha = 0.5)
         
         # plot labelled events flattened over :Ti and :longitude
         # handle neg longitude
@@ -359,145 +345,178 @@ landonly = "_landonly"
             # > 180 ( or <0)
             # not possible to plot over longitude outside bbox
 
-            hT = labplot(axT, lon[2], latl, periodl; reduced = :Ti, colormap = cgrad(:inferno, nd, categorical = true), colorrange = (1,nd))
-            hT1 = labplot(axT, lon[1], latl, periodl; reduced = :Ti, colormap = cgrad(:inferno, nd, categorical = true), colorrange = (1,nd))
-            hL = labplot(axL, lon[2], latl, periodl; reduced = :longitude, colormap = cgrad(:inferno, (diff(collect(lon0))/nl)[1], categorical = true), colorrange = (1,(diff(collect(lon0))/nl)[1]))
-            hL1 = labplot(axL, lon[1], latl, periodl; reduced = :longitude, colormap = cgrad(:inferno, (diff(collect(lon0))/nl)[1], categorical = true), colorrange = (1,(diff(collect(lon0))/nl)[1]))
-            m, ax3 = labplot3(ax3, lon, latlim, timlim; colormap)
+            hT = labplot!(axT, lon[2], lato, periodo; reduced = :Ti, colormap = cgrad(:inferno, nd, categorical = true), colorrange = (1,nd))
+            hT1 = labplot!(axT, lon[1], lato, periodo; reduced = :Ti, colormap = cgrad(:inferno, nd, categorical = true), colorrange = (1,nd))
+            hL = labplot!(axL, lon[2], lato, periodo; reduced = :longitude, colormap = cgrad(:inferno, Int(round(nL*nl)), categorical = true), colorrange = (1,Int(round(nL*nl))))
+            hL1 = labplot!(axL, lon[1], lato, periodo; reduced = :longitude, colormap = cgrad(:inferno, Int(round(nL*nl)), categorical = true), colorrange = (1,Int(round(nL*nl))))
+            m, ax3 = labplot3!(ax3, lon, latlim, timlim; colormap)
             # m1, ax3 = labplot3(ax3, lon2, latlim, timlim; colormap)
         else
             # do once
-            hT = labplot(axT, lonl, latl, periodl; reduced = :Ti, colormap = Makie.Categorical(:inferno))
-            hL = labplot(axL, lonl, latl, periodl; reduced = :longitude, colormap = Makie.Categorical(:inferno))#colormap = cgrad(:inferno, categorical = true), colorrange = (1,(diff(collect(lonl))/nl)[1]))
-            m, ax3 = labplot3(ax3, lonlim, latlim, timlim; colormap)
+            hT = labplot!(axT, lono, lato, periodo; reduced = :Ti, colormap = cgrad(:inferno, nd, categorical = true), colorrange = (1,nd)) # colormap = Makie.Categorical(:inferno))
+            hL = labplot!(axL, lono, lato, periodo; reduced = :longitude, colormap = cgrad(:inferno, Int(round(nL*nl)), categorical = true), colorrange = (1,Int(round(nL*nl)))) # colormap = Makie.Categorical(:inferno))#
+            m, ax3 = labplot3!(ax3, lonlim, latlim, timlim; colormap)
         end
     
-    axT.limits = (lonlim...,latlim...)
-    axL.limits = (timlimplot...,latlim...)
-    cbarT = Colorbar(figT[1,2], hT, label = "Number of days in labelled events")
-    cbarL = Colorbar(figL[1,2], hL, label = "Number of longitudinal increments in labelled events")
-    if typeof(lon) <: Vector
-        cbarT.ticks = ((1+(nd-1)/nd/2):((nd-1)/nd):(nd), string.(1:nd)) # not needed with Makie.Categorical
-        nL = (diff(collect(lon0))/nl)[1];
-        cbarL.ticks = ((1+(nL-1)/nL/2):((nL-1)/nL*5):(nL), string.(1:5:Int(nL))) # not needed with Makie.Categorical
+        axT.limits = (lonlim...,latlim...)
+        axL.limits = (timlimplot...,latlim...)
+        cbarT = Colorbar(figT[1,2], hT, label = "Number of days in labelled events")
+        cbarL = Colorbar(figL[1,2], hL, label = "Number of longitudinal increments in labelled events")
+        if nd > 5
+            cbarT.ticks = ((1+(nd-1)/nd/2):((nd÷5) * (nd-1)/nd):(nd), string.(1:(nd÷5):nd)) 
+        else
+            cbarT.ticks = ((1+(nd-1)/nd/2):((nd-1)/nd):(nd), string.(1:nd)) 
+        end
+        if nL*nl > 5
+            n = round(nL*nl)
+            cbarL.ticks = ((1+(n-1)/n/2) : ((n-1)/n * (n÷5)) : n, string.(1:Int(n÷5):Int(n))) # not needed with Makie.Categorical
+        else
+            cbarL.ticks = ((1+(n-1)/n/2) : ((n-1)/n) : n, string.(1:Int(n))) # not needed with Makie.Categorical
+        end
+    
     end
-    figT
-    figL
-    fig3
-
-    save(path * "fig/plot_" * trial * "_HistEvent_$obs_event" * "_LatLon.png", figT)
-    save(path * "fig/plot_" * trial * "_HistEvent_$obs_event" * "_LatTime.png", figL)
-    save("figs/plot_event_$(obs_event)_LatLonTime.png", fig3)
-
-# end
-    # end
+    save(path * "fig/plot_" * trial * "_HistEvent_$(obs_event)_LatLon.png", figT)
+    save(path * "fig/plot_" * trial * "_HistEvent_$(obs_event)_LatTime.png", figL)
+    save(path * "fig/plot_" * trial * "event_$(obs_event)_LatLonTime.png", fig3)
 
     # or 
     # plot them simultaneously in different colours and plot times separately
     
-    if typeof(lon) <: Vector
-        x = getx(lon0)
-    else
-        x = getx(lon)
-    end
-    y = [lat[1], lat[2], lat[2], lat[1], lat[1]];
-    
-    if any(df0.obs_event .== obs_event)
-    # bbox obs
-    lato = (minimum(df0.latitude_min[df0.obs_event .== obs_event]), maximum(df0.latitude_max[df0.obs_event .== obs_event]))
-    lono = (minimum(df0.longitude_min[df0.obs_event .== obs_event]), maximum(df0.longitude_max[df0.obs_event .== obs_event]))
-    periodo = (minimum(df0.start_time[df0.obs_event .== obs_event]), maximum(df0.end_time[df0.obs_event .== obs_event])+Day(1))
-    # selected labels
-    lbls = df0.label[df0.obs_event .== obs_event]
-    ulbls = sort(unique(lbls));
-    if length(ulbls) == 1
-        cols = cgrad(:viridis,2, categorical=true)[1]
-    else
-        cols = cgrad(:viridis, length(ulbls), categorical=true)
-    end
-
-    # maximum 10 graphs per obs_event
-    n = 14
-    # period
-    time_lapse = maximum(((period[2] - period[1] + Day(1)) ÷ n, Day(1)));
-    # l = @layout [a b c d e; f g h i j; k l m n o]
-    # global p = ()
-    fig = Figure();
-    # colorbar
-    pl = Plots.heatmap([1:length(ulbls)' 1:length(ulbls)'  ],
-         yticks = (1:length(ulbls),ulbls),
-         colorbar=:none,
-         xticks=:none,
-         title = "Events labels \n" * obs[obs_event,:Event] * " in " * obs[obs_event, :Area],
-         titlefontsize=10,
-         c=cols,
-         left_margin = 5mm,
-         )
-    xlims = typeof(lon) <: Vector ? expand(extrema(lon0)) : expand(extrema((lon..., lono...)))
-    xlims = xlims[1] >= 180 ? xlims.-360 : xlims
-    ylims = expand(extrema((lat...,lato...)))
-    p = (p..., pl)
-    for t in 1:n
-        # aggregate over time by mode
-        periodt = (period[1] + (t - 1) * time_lapse, period[1] + t * time_lapse)
-        # println(periodt)
-        # plot bounding box
-        pl = plot(x, y, 
-            xlabel = t in (8,9) ? "Longitude" : "", 
-            ylabel = t in (2,4,6,8) ? "Latitude" : "",
-            aspect_ratio=:equal, 
-            label = "", 
-            title ="from " * string(periodt[1]) * "\nto " * string(periodt[2]-Day(1)), 
-            titlefontsize=10 ,
-            xlims = xlims,
-            ylims = ylims,
-            );
-        # skip timestep if no data
-        ind = df0.obs_event .== obs_event .&& df0.start_time .< periodt[2] .&& df0.end_time .>= periodt[1];   
-        if !any(ind)
-            global p = (p..., pl);
-            continue
+    if !isempty(df) #any(df0.obs_event .== obs_event)
+        # bbox obs
+        xlims = typeof(lon) <: Vector ? expand(extrema(lon0)) : expand(extrema((lon..., lono...)))
+        xlims = xlims[1] >= 180 ? xlims.-360 : xlims
+        ylims = expand(extrema((lat...,lato...)))
+        
+        # selected labels
+        lbls = df.label
+        ulbls = (unique(lbls));# sort # if I do not sort, labels will be sorted by volume
+        nlb = length(ulbls)
+        if length(ulbls) == 1
+            cols = cgrad(:viridis,1, categorical=true)
         else
-            # pl = DataFrame(x=x,y=y, order=1:length(x)) |> @vlplot(:line, x=:x, y=:y, order=:order) # something wrong with the order in which data are plotted
-            latt = (
-                minimum(df0.latitude_min[ind]),
-                maximum(df0.latitude_max[ind])
-                )
-            lont = (minimum(df0.longitude_min[ind]), maximum(df0.longitude_max[ind])+.25)
-            # use lat, lon from obs_event to subset cube
-            
-            # labels in this time step
-            lblt = sort(unique(df0.label[ind]))
-            # println(lblt)
-
-            if typeof(lon) <: Vector
-                for L in lon
-                pl = labplot!(pl, labels, periodt, lato, L, ulbls, lblt, cols)
-                end
-            else 
-                pl = labplot!(pl, labels, periodt, lato, lono, ulbls, lblt, cols)
-            end
-            global p = (p..., pl)
-
+            cols = cgrad(:viridis, length(ulbls), categorical=true)
         end
-    end
-    p1 = plot(p..., layout=l, size = (1000,800));
-    # for pl in p
-    #     display(pl)
-    # end   
-    Plots.savefig(p1, path * "fig/plot" * "_" * trial * "_HistEvent_$obs_event" * "_labels.png")
-    # Plots.savefig(p1, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/plot" * "_" * trial * "_HistEvent_$obs_event" * "_labels.png")
- 
 
+        # maximum 14 graphs per obs_event (Fig 3x5, with Fig(1,1) = colorbar)
+        n = minimum([14, (periodo[2] - periodo[1]).value])
+        # period
+        time_lapse = maximum(((periodo[2] - periodo[1] + Day(1)) ÷ n, Day(1)));
+        # subfigures [1,2],[1,3],[1,4],[1,5],[2,1]
+        F = Vector{Union{Nothing, Vector}}(nothing, n)
+        i = 1; j = 2;
+        for t in 1:n
+            F[t]  = [i,j]
+            (i, j) = j == 5 ? ((i+1, 1)) : (i, j+1)
+        end
+        # Set up Figure size as a function of xlims, ylims and number of subplots
+        ratio = diff([xlims[1],xlims[2]]) ./ diff([ylims[1], ylims[2]])
+        fig = Figure(size = (round(1000 * ratio[1]),50+200*F[end][1]));
+        # colorbar
+        if length(ulbls) <= 9
+            cbar = Colorbar(fig[1,1], 
+                label = "Events labels \n" * obs[obs_event,:Event] * " in " * obs[obs_event, :Area],
+                colormap = cols,
+                # size = 40,
+                # limits = (1,nlb),
+            )
+            if length(ulbls) > 1 
+                cbar.limits = (1,nlb)
+                cbar.ticks = ((1+(nlb-1)/nlb/2):((nlb-1)/nlb):(nlb), string.(ulbls))
+            else
+                cbar.ticks = ([0.5], string.(ulbls))
+            end
+            # cbar axis and label to the left
+            cbar.flipaxis = false
+        else
+            # split cbar into 2
+            cbar1 = Colorbar(fig[1,1][1,1], 
+                label = "Events labels \n" * obs[obs_event,:Event] * " in " * obs[obs_event, :Area],
+                colormap = cgrad(cols[1:9], 9, categorical=true),
+            )
+            cbar1.limits = (1,9)
+            cbar1.ticks = ((1+(9-1)/9/2):((9-1)/9):(9), string.(ulbls[1:9]))
+            cbar1.flipaxis = false
+            cbar2 = Colorbar(fig[1,1][1,2], 
+                colormap = cgrad(cols[10:end], 9, categorical=true),
+            )
+            cbar2.limits = (1,nlb-9)
+            cbar2.ticks = ((1+(nlb-9-1)/(nlb-9)/2):((nlb-10)/(nlb-9)):(nlb-9), string.(ulbls[10:end]))
+            cbar2.flipaxis = false
+        end
+        # force column to be 1/5 of fig
+        colsize!(fig.layout, 1, Relative(1/5))
+        
+        for t in 1:n
+            # aggregate over time by mode
+            periodt = (periodo[1] + (t - 1) * time_lapse, periodo[1] + t * time_lapse)
+            # plot bounding box
+            axt = GeoAxis(fig[F[t][1], F[t][2]],
+                # xlabel = F[t][1] == F[end][1] ? "Longitude" : "", 
+                # ylabel = F[t][2] == 1 ? "Latitude" : "",
+                # aspect = AxisAspect(1), 
+                title ="from " * string(periodt[1]) * "\nto " * string(periodt[2]-Day(1)), 
+                titlesize=10 ,
+                );
+            limits!(axt, xlims, ylims,)
+            cl=lines!(axt, 
+                GeoMakie.coastlines(),
+                # x1,y1,
+                color = :grey80, linewidth=0.85)
+            translate!(cl, 0, 0, 1000)
+            # skip timestep if no data
+            ind = df.obs_event .== obs_event .&& df.start_time .< periodt[2] .&& df.end_time .>= periodt[1];  
+            if any(ind)
+                # print("$t : $(any(ind))")
+                # pl = DataFrame(x=x,y=y, order=1:length(x)) |> @vlplot(:line, x=:x, y=:y, order=:order) # something wrong with the order in which data are plotted
+                latt = (
+                    minimum(df.latitude_min[ind]),
+                    maximum(df.latitude_max[ind])
+                    )
+                lont = (minimum(df.longitude_min[ind]), maximum(df.longitude_max[ind])+.25)
+                # use lat, lon from obs_event to subset cube
+                
+                # labels in this time step
+                lblt = sort(unique(df.label[ind]))
+                # println(lblt)
+
+                if typeof(lon) <: Vector
+                    for L in lon
+                    axt, h = labelplot!(axt, labels, periodt, lato, L, lblt; colormap = Makie.Categorical(cols[indexin(lblt, ulbls)]))
+                    end
+                else 
+                    # if length(lblt) == 1
+                    #     axt, h = labelplot!(axt, labels, periodt, lato, lono, lblt; color = cols[indexin(lblt, ulbls)])
+                    # else
+                        axt, h = labelplot!(axt, labels, periodt, lato, lono, lblt; colormap = Makie.Categorical(cols[indexin(lblt, ulbls)]))
+                    # end
+                end
+            end
+            # remove ticks
+            if F[t][1] != F[end][1]
+                axt.xticklabelsvisible = false;
+            end
+            
+            # if F[t][2] > 1
+            #     if F[t][2] != 5
+            #         axt.yticklabelsvisible = false; 
+            #     else
+            #         axt.yaxisposition = :right;
+            #     end
+            # end
+            axt.xgridcolor[] = colorant"transparent";
+            axt.ygridcolor[] = colorant"transparent";
+            axt.xticklabelsvisible = false;
+            axt.yticklabelsvisible = false;  
+        end
+        
+        save(path * "fig/plot" * "_" * trial * "_Event_$obs_event" * "_labels.png", fig) 
     end
 end
 
 
-    unique!(df0)
-    # export to csv
-    CSV.write(path * "SanityCheck_$trial.csv", df0)
+    
 
-    # end
 # CSV.write(path * "RecentEvents.csv", obs)
 
 # 

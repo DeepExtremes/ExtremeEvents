@@ -196,10 +196,11 @@ function hm!(ax,tmp::Array{Bool, 3},args...;kwargs...)
     return h
 end
 
-# function hm!(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = :Ti, kwargs...)
-#     x,y,z = prephm(tmp,axs,fn;reduced)
-#     heatmap!(x, y, z;kwargs...)
-# end
+function hm!(ax, tmp::Array{Int64, 3}, axs; fn = sum, reduced = :Ti, kwargs...)
+    x,y,z = prephm(tmp, axs, fn; reduced)
+    h = heatmap!(ax, x, y, z;kwargs...)
+    return h
+end
 
 function hm(tmp::Any, axs::Tuple{Vararg{DimensionalData.Dimensions.Dimension}} ; fn = sum, reduced = :Ti, kwargs...)
     x,y,z = prephm(tmp,axs,fn;reduced)

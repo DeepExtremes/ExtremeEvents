@@ -104,6 +104,15 @@ sbatch stats_extremes.slurm
 - EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_2000_2012_landonly.csv
 - EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022_landonly.csv
 
+```julia
+plot_stats.jl
+```
+Where are the labelled events in the period 2010-2022?
+
+<img src="../v3/fig/nolabel_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022.png" alt="plot_event" width="800"/>
+
+![alt text](../v3/fig/nolabel_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022.png)
+
 ## Postprocessing
 
 ### Sanity check
