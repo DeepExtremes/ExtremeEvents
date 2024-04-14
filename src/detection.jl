@@ -2,12 +2,12 @@ using YAXArrays, EarthDataLab, DiskArrays
 """
     rescale(inputcube::YAXArray, outputpath::String; <keyword arguments>))
 
-Rescale time series between 0 and 1
+Rank-transform time series between 0 and 1
 ### Arguments
 * `inputcube`: Data cube with Time dimension
 * `outputpath`: Path to write result to disk
 ### Keyword arguments
-* `multiplier`: multiplies input before scaling. Typically -1 if data need to be reversed for extremes detection. Defaults to `nothing` for no multiplication.
+* `multiplier`: multiplies input before ranking. Typically -1 if data need to be reversed for extremes detection. Defaults to `nothing` for no multiplication.
 * `backend`: Backend for writing cube to disk. Defaults to :zarr
 * `overwrite`: If false, output will only be written to outputpath if no such file exists. Defaults to true.
 * `chunksize`: A Dict specifying the chunksizes for the output dimensions of the cube, or `:input` (default) to copy chunksizes from input cube axes or `:max` to not chunk the inner dimensions
