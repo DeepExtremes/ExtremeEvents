@@ -15,7 +15,7 @@ end
 # sleep(1)
 
 @everywhere begin
-    using Zarr, YAXArrays, EarthDataLab, Statistics, SphericalConvolutions
+    using Zarr, YAXArrays, EarthDataLab, Statistics#, SphericalConvolutions
     include("../src/detection.jl")
 end
 

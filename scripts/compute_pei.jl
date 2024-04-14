@@ -3,8 +3,6 @@
 # The moving wiindow is 30, 90 or 180 days.
 using SlurmClusterManager, Distributed
 
-using EarthDataLab, YAXArrays, Zarr, RollingFunctions, DiskArrays
-
 #Quick check if we are in a slurm job
 if haskey(ENV,"SLURM_CPUS_PER_TASK")
     addprocs(SlurmManager())
@@ -15,7 +13,9 @@ end
     Pkg.activate("$(@__DIR__)/..")
 end
 
-zg = zopen("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Data.zarr",consolidated=true, fill_as_missing = false)
+@everywhere using EarthDataLab, YAXArrays, Zarr, RollingFunctions, DiskArrays
+
+zg = zopen("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr",consolidated=true, fill_as_missing = false)
 ds = open_dataset(zg)
 # seems that missing are considered missing even if fill_as_missing = false
 
@@ -38,4 +38,4 @@ outdims = OutDims("Time",windowax,
     end
 end
 
-spei = mapCube(compute_pei,diffcube,windowsizes; indims, outdims, max_cache=1e9, showprog = true)
+pei = mapCube(compute_pei,diffcube,windowsizes; indims, outdims, max_cache=1e9, showprog = true)

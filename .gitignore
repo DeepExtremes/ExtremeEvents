@@ -1,4 +1,4 @@
-/Manifest.toml
 /.DS_Store
 *.zarr*
 *.out
+/SlurmScripts

@@ -1,7 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name pet
-#SBATCH -o ./output-%A.out
+#SBATCH --job-name pet_jl18
+#SBATCH -o ./pet-%A.out
 #SBATCH -p work
+#SBATCH --nodes=1
 #SBATCH --ntasks=8
 #SBATCH --cpus-per-task=1
 #SBATCH --mem-per-cpu=10GB
@@ -9,4 +10,4 @@
 
 export JULIA_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
-julia --project=../ --procs=${SLURM_NTASKS} --heap-size-hint=7GB ../compute_pet.jl
+julia --project=../  ../scripts/compute_pet.jl

@@ -1,46 +1,47 @@
-# Plot area by year by event type
-using Revise
-using YAXArrays, Zarr, WeightedOnlineStats, OnlineStats, DataFrames, Dates, NetCDF, Distributed
 
-addprocs(8)
-@everywhere begin
-    using Pkg
-    Pkg.activate("/Net/Groups/BGI/scratch/mweynants/ExtremeEvents/")
-end
-@everywhere using ParallelUtilities, YAXArrays, Zarr, WeightedOnlineStats, OnlineStats, DataFrames, Dates, NetCDF
-@everywhere mergefun(h1,h2) = Dict(k=>merge!(h1[k],h2[k]) for k in keys(h1))
-@everywhere function fit1(df)
-    df.y = year.(df.time)
-    dfg = groupby(df,:y)
-    allhists = Dict(i=>WeightedHist(-0.5:1.0:32.5) for i in 1950:2021)
-    for k in keys(dfg)
-        dfs = dfg[k]
-        fit!(allhists[k[1]], dfs.event, cosd.(dfs.latitude) .* (dfs.lsm .> 0.5))
-    end
-    allhists
-end
+using JLD, DataFrames
+import CSV
+using WeightedOnlineStats
+using LatexStrings
 
-ds = open_dataset("/Net/Groups/BGI/work_1/scratch/s3/xaida/v2/EventCube_ranked_pot0.01_ne0.1.zarr/")
-lsm = open_dataset("/Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.721.static.nc")
-lsm_notime = subsetcube(lsm, time = DateTime("2019-01-01T13:00:00"))
+path2v = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3"
+pot = 0.01
+ne = 0.1
 
-# sds = subsetcube(ds, time = (1998:1998), longitude = (325.0,326.0), latitude = (45.0,46.0))
-# slsm = subsetcube(lsm_notime, longitude = (325.0,326.0), latitude = (45.0,46.0))
-
-t = CubeTable(event = ds.layer,
-            lsm = lsm_notime.lsm)
-
-annualstats = pmapreduce(mergefun,t) do tab
-    fit1(DataFrame(tab))
-end
-rmprocs(workers())
+annualstats = load("$path2v/YearlyEventType_ranked_pot" * string(pot) * "_ne" * string(ne) * "_land.jld")
+allx = vec(["$i.$yr.$k" for i in 0:16, yr in 1950:2022, k in range(1,8)]);
+allres = vec([value(annualstats["$(yr).$k"]).y[i] for i in 1:17, yr in 1950:2022, k in range(1,8)]);
 
 
-allx = [value(annualstats[yr]).x[i] for i in 1:17, yr in 1950:2021]
-allres = [value(annualstats[yr]).y[i] for i in 1:17, yr in 1950:2021]
+# not sure about this one
+df = DataFrame(x = allx, Area = allres) |>
+    (df -> DataFrames.transform(df, :x => ByRow(x -> split(x, ".")) => [:Type, :Year, :cont])) |>
+    (df -> subset(df, :cont => x -> x .> "0"))
+df.Type = parse.(Int8, df.Type);
+df.Year = parse.(Int, df.Year);
+continents = Dict(
+        # "0" => "Null",
+        "1" => "Africa", 
+        "2" => "Asia", 
+        "3" => "Australia", 
+        "4" => "North America",
+        "5" => "Oceania", 
+        "6" => "South America", 
+        "7" => "Antarctica",  
+        "8" => "Europe",
+        )
+df.Continent = map(x -> continents[x], df.cont)
+outname = "$path2v/YearlyEventType_ranked_pot$(pot)_ne$(ne)_land.csv"
+CSV.write(outname, df)
+df = CSV.read(outname, DataFrame)
+
+cadf = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/land_wstats_continents.csv", DataFrame)
+sum(cadf.value)
+# 1.9e5 NOT e7!!! e7 comes from the time dimension: 365
+
 using Plots
 allres_norm = allres./sum(allres,dims=1)
-labels = map([UInt8(i) for _ in 1:1, i in 1:16]) do i
+labels = map([UInt8(i) for _ in 1:1, i in 0:16]) do i
     n = ""
     ((i & 0x01) > 0) && (n = join((n,"HW"),"_"))
     ((i & 0x02) > 0) && (n = join((n,"D30"),"_"))
@@ -48,25 +49,75 @@ labels = map([UInt8(i) for _ in 1:1, i in 1:16]) do i
     ((i & 0x08) > 0) && (n = join((n,"D180"),"_"))
     lstrip(n,'_')
 end
-p = plot(1950:2021,allres_norm[1:end-1,:]',
-    labels=labels, legend = :outerbottom, lw=1, 
+p = plot(1950:2022, permutedims(reshape(allres, (17,:,9))[2:end-1,:,9], (2,1)),
+    labels=labels, legend = :outerright, lw=1, 
     xlabel = "Year",
     ylabel = "Annual fraction of land area and days affected",
-    size=(800,400), dpi=300)
+    size=(1000,400), dpi=300)
 
-savefig(p,"n_extremes_land.png")
-
-# save to csv
-import CSV
-# not sure about this one
-df = DataFrame(allres)
-pot = 0.01
-ne = 0.1
-outname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/YearlyEventType_ranked_pot" * string(pot) * "_ne" * string(ne) * "_fabian_land.csv"
-CSV.write(outname, df)
-df = CSV.read(outname, DataFrame)
+# savefig(p,"n_extremes_land.png")
 
 using StatsPlots
+include("mytheme.jl")
+theme(:mytheme)
+# data check: every year, the total (land area) x (days in the year) should be the same, except for leap years
+# Hence, all bars should have the same height!!!
+bar(df.Year, df.Area)
+# this is not the case AND there are 2 outliers: 1959 and 1979?
+sum(value(annualstats["1959.2"]).y)
+sum(value(annualstats["1960.2"]).y)
+sum(value(annualstats["1961.2"]).y)
+filter([:Year, :cont] => (x,y) -> x in range(1959, 1962) &&  y in range(2,3), df)
+
+df |> (df -> groupby(df, :Year)) |> (gdf -> combine(gdf, :Area => sum))
+@df df |> (df -> groupby(df, :Year)) |> (gdf -> combine(gdf, :Area => sum)) plot(:Year, :Area_sum)
+# small variations on top of leap years. probably due to precision errors. 
+# at least no outliers. maybe bar chart has some bug?!
+
+# if we group by event Type:
+groupedbar(df.Year, df.Area, group = df.Type, bar_position = :stack, legend = :outerright)
+# this one looks fine, but actually, the values are wrong. Should get to around 6.9e7
+
+# if we group by continent
+groupedbar(df.Year, df.Area, group = df.Continent, bar_position = :stack, legend = :outerright)
+# doesn't look right either...
+df |> (df -> groupby(df, [:Year, :Continent])) |> (gdf -> combine(gdf, :Area => sum)) 
+@df df |> (df -> groupby(df, [:Year, :Continent])) |> (gdf -> combine(gdf, :Area => sum)) plot(:Year, :Area_sum, group=:Continent)
+# looks OK. So I guess something's wrong with groupedbar
+
+# group by Continent and Type
+groupedbar(df.Year, df.Area, group = (df.Continent, df.Type), bar_position = :stack, legend = :outerright)
+# looks OK, but too many levels
+
+# so if I split by continent, type and year, it should be fine
+
+# value check
+df |> 
+    # group by continent
+    (df -> groupby(df, :cont)) |>
+    # relative area over all types and years
+    (gdf -> DataFrames.transform(gdf, :Area => (x -> x./sum(x) .*100) => :Area_pc)) |>
+    # select only heatwaves
+    (df -> subset(df, :Type => X -> map(x -> !iseven(x), X))) |>
+    # combine over years
+    (df -> groupby(df, :cont)) |>
+    (df -> combine(df, :Area_pc => sum))
+# I have 0.997637 % Area over all years. So that is correct!
+# pei_30
+df |> 
+    # group by continent
+    (df -> groupby(df, :cont)) |>
+    # relative area over all types and years
+    (gdf -> DataFrames.transform(gdf, :Area => (x -> x./sum(x) .*100) => :Area_pc)) |>
+    # select only pei_30
+    (df -> subset(df, :Type => X -> map(x -> ((x & 0x02) > 0), X))) |>
+    # combine over years
+    (df -> groupby(df, :cont)) |>
+    (df -> combine(df, :Area_pc => sum))
+# exact same results. 
+# Isn't it suspicious that all continents and all extremes have the exact same percentage to the sixth decimal?
+# no: it is expected, given that for each pixel, over the full time series, there is always the exact same number of extremes.
+
 # land Area x Days by Int8
 v = [
         RGBA(1,1,1,0), # 0x00 # 0
@@ -111,24 +162,61 @@ cols = [:white,
     colorant"#65498C", # 13 Medium Purple (Dark)
     colorant"#002D5A", # 14 Dark Blue
     colorant"#65498C", # 15 Medium Purple (Dark)
-    colorant"#65498C", # 16
+    colorant"#BBBBBB", # 16
     ] 
-@df df |> 
-    (df -> stack(df, Not(:ev), variable_name = :Year, value_name = :Area)) |>
-    (df -> groupby(df, :Year)) |>
-    (df -> DataFrames.transform(df, :Area => (x -> x./sum(x) .*100) => :Area_pc) |>
-    (df -> subset(df, :ev => x-> x.>0 .&& x.<16)) 
-    ) groupedbar(:Year, :Area_pc,
-     group = :ev, legend = :outerright, lw = 1,
+# colours from https://personal.sron.nl/~pault/
+cont_cols = [colorant"#77aadd", # light Blue
+             colorant"#99ddff", # light cyan]
+             colorant"#44bb99", # mint
+             colorant"#bbcc33", # pear
+             colorant"#aaaa00", # olive
+             colorant"#eedd88", # light yellow
+             colorant"#ee8866", # orange
+             colorant"#ffaabb", # pink
+             colorant"#dddddd", #light gray
+            ]
+
+
+function mygroupedbar(dfp, grouping, colours; startyear = 1950, endyear = 2022) # for whatever reason I don't understand, I can't pass kwargs...
+    p = groupedbar(dfp[!,:Year], dfp[!,:Area_pc_sum], group = dfp[!,grouping], 
+    legend = :outerright, lw = 0,
     xlabel = "Year", 
     ylabel = "Percentage of annual days and land area affected",
-    size=(900,500), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),
-    colour = cols[2:end]',
+    size=(800,460), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),
+    colour = colours,
     bar_position = :stack,
-    xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021)))
+    xrotation = 45.0, xtickfontsize = 6, 
+    xticks=(startyear:5:endyear, string.(startyear:5:endyear)),
+    xlim = (startyear-1, endyear+1),
+    # kwargs...
+    )
+end
+            
+df1=  df |> 
+    # (df -> stack(df, Not(:ev), variable_name = :Year, value_name = :Area)) |>
+    (df -> groupby(df, [:Year])) |> 
+    # total extremes of 1 type =1% over 73 years, divided by n years (73) ~= 0.0137 %
+    # but on average should be 1 % per year
+    (df -> DataFrames.transform(df, :Area => (x -> x./sum(x) .*100) => :Area_pc)) |>
+    (df -> subset(df, :Type => x-> x.>0 .&& x.<16))
+# aggregate area by continent
+df2 = df1  |>
+    (df -> groupby(df, [:Year, :Continent])) |>
+    (df -> combine(df, :Area_pc => sum)) 
+p = mygroupedbar(df2, :Continent, cont_cols')
+savefig(p, "$path2v/fig/landArea_by_Cont.png")
+p = mygroupedbar(df2 |> (df -> subset(df, :Year => x -> x .>= 1970)), :Continent, cont_cols', startyear = 1970)
+savefig(p,"$path2v/fig/landArea_by_Cont_1970_2022.png")
 
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_Int8.png")
-
+# aggregate area by continent
+df3 = df1  |>
+    (df -> groupby(df, [:Year, :Type])) |>
+    (df -> combine(df, :Area_pc => sum)) 
+p = mygroupedbar(df3, :Type, cols[2:end]')
+savefig(p, "$path2v/fig/landArea_by_Int8.png")
+# limit to 1970 onwards
+p = mygroupedbar(df3 |> (df -> subset(df, :Year => x -> x .>= 1970)), :Type, cols[2:end]'; startyear = 1970)
+savefig("$path2v/fig/landArea_by_Int8_1970_2022.png")
 
 function macrotype(x)
     if x == 1
@@ -142,94 +230,108 @@ function macrotype(x)
 end
 
 # prepare data for plotting
-dfp = df |> 
-    # pivot_longer
-    (df -> stack(df, Not(:ev), variable_name = :Year, value_name = :Area)) |>
-    # relative land area
-    (df -> groupby(df, :Year)) |>
-    (df -> DataFrames.transform(df, :Area => (x -> x./sum(x) .*100 ) => :Area_pc)) |>
-    # filter
-    (df -> subset(df, :ev => x-> x.>0 .&& x.<16)) |>
+dfp = df1 |> 
     # :ev to UInt8
-    (df -> DataFrames.transform(df, :ev => ByRow(x -> map(UInt8, x)) => :EventType)) |>
+    # (df -> DataFrames.transform(df, :ev => ByRow(x -> map(UInt8, x)) => :EventType)) |>
     # macro type
-    (df -> DataFrames.transform(df, :EventType => ByRow(x -> map(macrotype,x)) => :MacroType)) |>
+    (df -> DataFrames.transform(df, :Type => ByRow(x -> map(macrotype,x)) => :MacroType)) |>
     # group by year and MacroType
     (df -> groupby(df, [:Year, :MacroType])) |>
     # sum area
     (gdf -> combine(gdf, :Area_pc => sum))
 
     # plot
-colours = [colorant"#65498C" colorant"#002D5A" colorant"#FFB86F" ]
+colours = [colorant"#65498C" colorant"#4C7FB8" colorant"#FFB86F" ]
+p = mygroupedbar(dfp, :MacroType, colours)
+savefig(p, "$path2v/fig/landArea_by_macroType.png")
+
+p = mygroupedbar(dfp|> (df -> subset(df, :Year => x -> x .>= 1970)), :MacroType, colours; startyear = 1970)
+savefig(p, "$path2v/fig/landArea_by_macroType_1970_2022.png")
+
+
 p = @df dfp groupedbar(:Year, :Area_pc_sum, group = :MacroType, 
-    legend = :top, lw = 1,
-    xlabel = "Year", 
-    ylabel = "Percentage of annual days and land area affected",
-    size=(800,460), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),
-    colour = colours,
-    bar_position = :stack,
-    xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021)))
-savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_macroType.png")
-p = @df dfp groupedbar(:Year, :Area_pc_sum, group = :MacroType, 
-    legend = :top, lw = 1,
+    legend = :top, lw = 0,
     xlabel = "Year", 
     ylabel = "Percentage of annual days and land area affected",
     size=(800,460), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),
     colour = colours,
     bar_position = :dodge,
-    xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021)))
+    xrotation = 45.0, xtickfontsize = 6,
+    xlims = (1949,2023),xticks=(1950.5:5:2022+1,string.(1950:5:2022))
+    )
 for (type,i) in zip(levels(dfp.MacroType), 1:3)
     tops = sort(subset(dfp,:MacroType => x -> x .== type), :Area_pc_sum, rev = true)[1:20,:]
     println(tops)
     hline!(p,[tops[20,:Area_pc_sum]], color = colours[i], label = "top 20 years")
 end
 p
-savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_macroType_top20.png")
+savefig(p, "$path2v/fig/landArea_by_macroType_top20.png")
 
 # compound
 p = @df dfp|> 
     (df -> filter(:MacroType => ==("Hot and dry"), df)) bar(:Year, :Area_pc_sum, 
-    legend = :top, lw = 1,
+    legend = :top, lw = 0,
     xlabel = "Year", 
     ylabel = "Percentage of annual days and land area affected",
     size=(800,460), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),
     colour = colours,
     bar_position = :stack,
     label = "Hot and dry",
-    xrotation = 45.0, xtickfontsize = 6,xlims = (0,(2021-1950+1)),xticks=(.5:5:(2021-1950+1),string.(1950:5:2021)))
+    xrotation = 45.0, xtickfontsize = 6,
+    xlims = (1950-1,2022+1),xticks=(1950.5:5:(2022+1),string.(1950:5:2022)));
 
 tops = sort(subset(dfp,:MacroType => x -> x .==("Hot and dry")), :Area_pc_sum, rev = true)[1:20,:]
 hline!(p,[tops[20,:Area_pc_sum]], color = colours, label = "top 20 years")
-savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_hotndry_top20.png")
+savefig(p, "$path2v/fig/landArea_by_hotndry_top20.png")
 
 p = @df dfp|> 
     (df -> filter(:MacroType => ==("Hot and dry"), df)
-    ) scatter(1950:2021, :Area_pc_sum, 
-    legend = :top, lw = 1,
+    ) scatter(:Year, :Area_pc_sum, 
+    legend = :top,
     xlabel = "Year", 
     ylabel = "Percentage of annual days and land area affected",
     size=(800,460), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),
     colour = colours,
-    smooth = true,
+    # smooth = true,
     label = "Hot and dry",
-    xrotation = 45.0, xtickfontsize = 6,)
-savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_hotndry_scatter.png")
+    xrotation = 45.0, xtickfontsize = 6,);
+hline!(p,[tops[20,:Area_pc_sum]], color = colours, label = "top 20 years")
+savefig(p, "$path2v/fig/landArea_by_hotndry_scatter.png")
 
-p = @df dfp|> 
+# since 1970
+dfpp = dfp|> 
     (df -> filter(:MacroType => ==("Hot and dry"), df)) |>
-    (df -> transform(df, :Year => ByRow(x -> parse(Int, x)) => :yr)) |>
-    (df -> subset(df, :yr => x -> x .>=1970)
-    ) scatter(:yr, :Area_pc_sum, 
+    (df -> subset(df, :Year => x -> x .>=1970)
+    ) ;
+
+# Theil-Sen
+include("../src/stats.jl")
+m, b = theilsen(dfpp[!, :Year], dfpp[!,:Area_pc_sum])
+
+p = @df dfpp scatter(:Year, :Area_pc_sum, 
     legend = :top, lw = 1,
     xlabel = "Year", 
     ylabel = "Percentage of annual days and land area affected",
     size=(800,460), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),
     colour = colours,
-    smooth = true,
+    # smooth = true,
     label = "Hot and dry",
-    xrotation = 45.0, xtickfontsize = 6,)
-savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_hotndry_scatter_1970.png")
+    xrotation = 45.0, xtickfontsize = 6,);
+plot!(p, dfpp[!, :Year],  m .* dfpp[!, :Year] .+ b, colour = :grey, label = "Theil-Sen estimator: $(round(m; sigdigits = 2)) * Year + $(round(b; sigdigits = 2))")
+savefig(p, "$path2v/fig/landArea_by_hotndry_scatter_1970.png")
 
+p = @df dfpp bar(:Year, :Area_pc_sum, 
+    legend = :top, lw = 0,
+    xlabel = "Year", 
+    ylabel = "Percentage of annual days and land area affected",
+    size=(800,460), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),
+    colour = colours,
+    bar_position = :stack,
+    label = "Hot and dry",
+    xrotation = 45.0, xtickfontsize = 6,
+    xlims = (1970-1,2022+1),xticks=(1970.5:5:(2022+1),string.(1970:5:2022)));
+plot!(p, dfpp[!, :Year],  m .* dfpp[!, :Year] .+ b, colour = :grey, label = "Theil-Sen estimator: ``$(round(m; sigdigits = 2)) * Year + ($(round(b; sigdigits = 2)))``")
+savefig(p, "$path2v/fig/landArea_by_hotndry_1970.png")
 
 
 # group by indicator
@@ -280,7 +382,7 @@ for (var, color) in zip([:heat, :d30, :d90, :d180], color_palette)
     single_event_plot!(p, dfp1, var, color)
 end
 p
-savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_EventType.png")
+savefig(p, "$path2v/fig/landArea_by_EventType.png")
 # sum area over time is correctly always the same
 # is there something wrong with the ERA5 extension (1950-1978)? Too many droughts?
 
@@ -304,7 +406,7 @@ for (var, color) in zip([:heat, :d30, :d90, :d180], color_palette)
 end
 plot(p... , layout = l)
 
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/landArea_by_EventTypeSubplot.png")
+savefig("$path2v/fig/landArea_by_EventTypeSubplot.png")
 
 
 # trend on last 50 years (1972 to 2021)
@@ -327,7 +429,7 @@ for (var, color) in zip([:heat, :d30, :d90, :d180], color_palette)
     single_event_smooth_plot!(p, dfp1, var, color)
 end
 p
-savefig(p, "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/RM10_LandAreaDays_by_EventType.png")
+savefig(p, "$path2v/fig/RM10_LandAreaDays_by_EventType.png")
 
 # map plots of extreme years
 
@@ -341,27 +443,27 @@ lsmmask = lsm_notime.lsm[:,:];
 hwyear = ds.layer[time=1952:1952][:,:,:];
 m = sum(==(0x01),hwyear,dims=1);
 mapplot(m[1,:,:] .* lsmmask, title = "Hot days on land in 1952", dpi = 300)
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/HotDays1952.png")
+savefig("$path2v/fig/HotDays1952.png")
 
 hwyear2 = ds.layer[time=2020:2020][:,:,:];
 m2 = sum(==(0x01),hwyear2,dims=1);
 mapplot(m2[1,:,:].* lsmmask, title = "Hot days on land in 2020", dpi = 300)
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/HotDays2020.png")
+savefig("$path2v/fig/HotDays2020.png")
 
 dyear = ds.layer[time=1951:1951][:,:,:];
 md = sum(x-> x >=(0x01) && x < (0x10),dyear,dims=1);
 mapplot(md[1,:,:] .* lsmmask, title = "Dry days in 1951", dpi = 300)
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/DryDays1951.png")
+savefig("$path2v/fig/DryDays1951.png")
 
 dyear1 = ds.layer[time=2020:2020][:,:,:];
 md1 = sum(x-> x >=(0x01) && x < (0x10),dyear1,dims=1);
 mapplot(md1[1,:,:] .* lsmmask, title = "Dry days in 2020", dpi = 300)
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/DryDays2020.png")
+savefig("$path2v/fig/DryDays2020.png")
 
 dyear2 = ds.layer[time=2021:2021][:,:,:];
 md2 = sum(x-> x >=(0x01) && x < (0x10),dyear2,dims=1);
 mapplot(md2[1,:,:] .* lsmmask, title = "Dry days in 2021", dpi = 300)
-savefig("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/fig/DryDays2021.png")
+savefig("$path2v/fig/DryDays2021.png")
 
 
 ii = CartesianIndex(1035,399)

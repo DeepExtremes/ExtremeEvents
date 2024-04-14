@@ -2,12 +2,12 @@ using YAXArrays, EarthDataLab, DiskArrays
 """
     rescale(inputcube::YAXArray, outputpath::String; <keyword arguments>))
 
-Rescale time series between 0 and 1
+Rank-transform time series between 0 and 1
 ### Arguments
 * `inputcube`: Data cube with Time dimension
 * `outputpath`: Path to write result to disk
 ### Keyword arguments
-* `multiplier`: multiplies input before scaling. Typically -1 if data need to be reversed for extremes detection. Defaults to `nothing` for no multiplication.
+* `multiplier`: multiplies input before ranking. Typically -1 if data need to be reversed for extremes detection. Defaults to `nothing` for no multiplication.
 * `backend`: Backend for writing cube to disk. Defaults to :zarr
 * `overwrite`: If false, output will only be written to outputpath if no such file exists. Defaults to true.
 * `chunksize`: A Dict specifying the chunksizes for the output dimensions of the cube, or `:input` (default) to copy chunksizes from input cube axes or `:max` to not chunk the inner dimensions
@@ -262,7 +262,16 @@ function get_diamond_indices(window)
 end
 
 myfilter = function(img)
-    # img has size (3,3,7)
+    # img has size = window
+    # window = size(img)
+    # @show window
+    # # central get_diamond_indices
+    # Nh = map(x->Int((x+1)/2), window)
+    # # @show Nh
+    # # indices of 2D diamond
+    # diamondindices = get_diamond_indices(window[1])
+    # t = length(diamondindices); # 0.6 * length(diamondindices);
+    # # @show t
     # central value
     v = img[Nh[1],Nh[2],Nh[3]]
     # @show v
@@ -275,7 +284,7 @@ myfilter = function(img)
     timewindow = function()
         d = false;
         for i in 0:(Nh[3]-1)
-            ind=(Nh[3]-i):((Nh[3]*2)-i-1)
+            ind = (Nh[3]-i):((Nh[3]*2)-i-1)
             d = d || all(view(img,Nh[1],Nh[2],ind))
             d ? break : d
         end
@@ -283,6 +292,23 @@ myfilter = function(img)
     end
     d = timewindow()
     # @show d
-    return v && s >= t && d
+    return v && d && s >= t
 end
 
+mytimefilter = function(img)
+    # # central get_diamond_indices
+    # Nh = map(x->Int((x+1)/2), window)
+    # Nh = Int((size(img,3) + 1) /2 )
+    # # time (3rd) dimension
+    timewindow = function()
+        d = false;
+        Nh2 = (Nh*2)-1
+        for i in 0:(Nh-1)
+            ind = (Nh-i):(Nh2-i)
+            d = d || all(view(img,1,1,ind))
+            d ? break : d
+        end
+        return d
+    end
+    return timewindow()
+end
