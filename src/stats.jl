@@ -1,6 +1,6 @@
 using OnlineStats, WeightedOnlineStats
 using DataFrames
-import Dates
+using Dates
 
 # create function to define the basic stats we want to run on the events as pairs of variable => statistic()
 function defineallstats()
@@ -490,7 +490,7 @@ function definecountyear()
     )
 end
 
-function countyear(eventcube::Dataset)
+function countyear(eventcube)
     @show cube_table = CubeTable(
         event = eventcube.layer,
         )
@@ -519,3 +519,40 @@ function countyear(eventcube::Dataset)
     return df    
 end
 
+# Theil-Sen estimator
+# median m of the slopes (yj − yi)/(xj − xi) 
+# b to be the median of the values yi − mxi
+function theilsen(x::AbstractVector, y::AbstractVector)
+    n = length(x)
+    if n != length(y)
+        error("x and y should have the same length")
+    end
+    S = convert(Matrix{Union{AbstractFloat, Missing}}, fill(missing, n, n))
+    for i in 1:n
+        for j in 1:n
+            if x[i] == x[j]
+                S[i,j] = missing
+            else
+                S[i,j] = (y[j] − y[i])/(x[j] − x[i])
+            end
+        end
+    end
+    # Calculate Theil-Sen slope
+    sk = collect(skipmissing(vec(S)))
+    nk = length(sk)
+    ssk = sort(sk)
+    # @show ssk[(nk ÷ 2) : (nk ÷ 2 +1)]
+    theil_sen_slope = iseven(nk) ? (ssk[nk ÷ 2 + 1] + ssk[nk ÷ 2])/2 : ssk[nk ÷ 2]
+    # Calculate Theil-Sen intercept
+    intercepts = y - (theil_sen_slope * x)
+    si = sort(intercepts)
+    theil_sen_intercept = iseven(n) ? (si[n ÷ 2 + 2] + si[n ÷ 2])/2 : si[n ÷ 2]
+    return theil_sen_slope, theil_sen_intercept 
+end
+
+## test
+using Test, UnicodePlots
+@test x = 1:10; y = collect(range(1.0, 10.0)) .+ rand(10); y[3] = 8;
+@test @time m, b = theilsen(x,y)
+@test plt = scatterplot(x,y, smooth = true);
+@test lineplot!(plt,[0,10],[b, m*10+b])

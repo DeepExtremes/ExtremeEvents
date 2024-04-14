@@ -2,18 +2,21 @@
 # t2mmax
 # PEI_30, _90, _180
 
-using Pkg
-Pkg.instantiate()
-using Distributed
+using SlurmClusterManager, Distributed
 
-# addprocs(10) # workers called from slurm script.
+#Quick check if we are in a slurm job
+if haskey(ENV,"SLURM_CPUS_PER_TASK")
+    addprocs(SlurmManager())
+end
+
 @everywhere begin
     using Pkg
-    Pkg.activate("/Net/Groups/BGI/scratch/mweynants/ExtremeEvents/")
-    Pkg.instantiate()
+    Pkg.activate("$(@__DIR__)/..")
 end
+
 @everywhere using ParallelUtilities, YAXArrays, Zarr, WeightedOnlineStats, OnlineStats, DataFrames, Dates, NetCDF
-@everywhere include("/Net/Groups/BGI/scratch/mweynants/ExtremeEvents/src/MyWeightedVar.jl")
+@everywhere include("../src/MyWeightedVar.jl")
+
 @everywhere mergefun!(h1,h2) = Dict(k=>merge!(h1[k],h2[k]) for k in keys(h1))
 @everywhere function fit1(df)
     df.y = year.(df.time)
