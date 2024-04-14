@@ -2,3 +2,5 @@
 *.zarr*
 *.out
 /SlurmScripts
+/.vscode
+/.github
