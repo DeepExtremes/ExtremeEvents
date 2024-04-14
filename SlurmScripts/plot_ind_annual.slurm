@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name julia_ind
+#SBATCH --job-name jl_18_ind
 #SBATCH -o ./ind18-%A.out
 #SBATCH -p work
 #SBATCH --ntasks=5
@@ -10,4 +10,5 @@
 
 export JULIA_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
-julia --project=../ --procs=${SLURM_NTASKS} ../scripts/plot_ind_annual.jl
+julia --project=../  ../scripts/plot_ind_annual.jl
+# # julia --project=../ --procs=${SLURM_NTASKS} ../scripts/plot_ind_annual.jl
