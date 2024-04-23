@@ -2,7 +2,6 @@
 using JLD, DataFrames
 import CSV
 using WeightedOnlineStats
-using LatexStrings
 
 path2v = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3"
 pot = 0.01
@@ -318,7 +317,7 @@ p = @df dfpp scatter(:Year, :Area_pc_sum,
     label = "Hot and dry",
     xrotation = 45.0, xtickfontsize = 6,);
 plot!(p, dfpp[!, :Year],  m .* dfpp[!, :Year] .+ b, colour = :grey, label = "Theil-Sen estimator: $(round(m; sigdigits = 2)) * Year + $(round(b; sigdigits = 2))")
-savefig(p, "$path2v/fig/landArea_by_hotndry_scatter_1970.png")
+png(p, "$path2v/fig/landArea_by_hotndry_scatter_1970.png")
 
 p = @df dfpp bar(:Year, :Area_pc_sum, 
     legend = :top, lw = 0,
@@ -330,27 +329,27 @@ p = @df dfpp bar(:Year, :Area_pc_sum,
     label = "Hot and dry",
     xrotation = 45.0, xtickfontsize = 6,
     xlims = (1970-1,2022+1),xticks=(1970.5:5:(2022+1),string.(1970:5:2022)));
-plot!(p, dfpp[!, :Year],  m .* dfpp[!, :Year] .+ b, colour = :grey, label = "Theil-Sen estimator: ``$(round(m; sigdigits = 2)) * Year + ($(round(b; sigdigits = 2)))``")
-savefig(p, "$path2v/fig/landArea_by_hotndry_1970.png")
+plot!(p, dfpp[!, :Year],  m .* dfpp[!, :Year] .+ b, colour = :grey, label = "Theil-Sen estimator: $(round(m; sigdigits = 2)) * Year + ($(round(b; sigdigits = 2)))")
+png(p, "$path2v/fig/landArea_by_hotndry_1970.png")
 
 
 # group by indicator
 dfp1 = df |>
-    # pivot_longer
-    (df -> stack(df, Not(:ev), variable_name = :Year, value_name = :Area)) |>
     # relative land area
     (df -> groupby(df, :Year)) |>
     (df -> DataFrames.transform(df, :Area => (x -> x./sum(x) .*100) => :Area_pc)) |>
     # filter
-    (df -> subset(df, :ev => x-> x.>0 .&& x.<16)) |>
-    # :ev to UInt8
-    (df -> DataFrames.transform(df, :ev => ByRow(x -> map(UInt8, x)) => :EventType)) |>
+    (df -> subset(df, :Type => x-> x.>0 .&& x.<16)) |>
+    # :Type to UInt8
+    (df -> DataFrames.transform(df, :Type => ByRow(x -> map(UInt8, x)) => :EventType)) |>
     # add variables
     (df -> DataFrames.transform(df, :EventType => ByRow(x -> ((x & 0x01) > 0)) => :heat)) |>
     (df -> DataFrames.transform(df, :EventType => ByRow(x -> ((x & 0x02) > 0)) => :d30)) |>
     (df -> DataFrames.transform(df, :EventType => ByRow(x -> ((x & 0x04) > 0)) => :d90)) |>
     (df -> DataFrames.transform(df, :EventType => ByRow(x -> ((x & 0x08) > 0)) => :d180))
 
+dfp2 = dfp1 |> 
+    (df -> subset(df, :Year => x -> x .>= 1970))
 # function single_event_plot(df::DataFrame, var::Symbol)
 #     df = df |> 
 #         (df -> subset(df, var)) |>
@@ -386,17 +385,35 @@ savefig(p, "$path2v/fig/landArea_by_EventType.png")
 # sum area over time is correctly always the same
 # is there something wrong with the ERA5 extension (1950-1978)? Too many droughts?
 
+# since 1970
+p = plot(xlabel = "Year", ylabel = "Percentage of annual days and land area affected",
+    size=(800,450), dpi=300, left_margin = (5, :mm),
+    );
+for (var, color) in zip([:heat, :d30, :d90, :d180], color_palette)
+    single_event_plot!(p, dfp2, var, color)
+end
+p
+
+
 # try with layout with 3 subplots 
-function single_event_bar(p::Tuple, df::DataFrame, var::Symbol, color::Color)
+function single_event_bar(p::Tuple, df::DataFrame, var::Symbol, color::Color; slope=false)
     df = df |> 
         (df -> subset(df, var)) |>
         (df -> groupby(df, :Year)) |> 
         (gdf -> combine(gdf, :Area_pc => sum))
     b = @df df bar(:Year, :Area_pc_sum, 
         label = String(var), 
-        legend=:top,
-        color = color
+        legend=:outerright,
+        color = color,
+        ylim = (0.0,3.1),
+        lw=0,
+        size=(1000,400), dpi=300, 
+        # left_margin = (5, :mm), bottom_margin = (5, :mm),
         )
+    if slope
+        m, b1 = theilsen(df[!, :Year], df[!,:Area_pc_sum])
+        plot!(b, df[!, :Year],  m .* df[!, :Year] .+ b1, colour = :grey, label = "Theil-Sen estimator: $(round(m; sigdigits = 2)) * Year + $(round(b1; sigdigits = 2))")
+    end
     return p = (p..., b)
 end
 l = @layout [a;b;c;d]
@@ -408,77 +425,96 @@ plot(p... , layout = l)
 
 savefig("$path2v/fig/landArea_by_EventTypeSubplot.png")
 
-
-# trend on last 50 years (1972 to 2021)
-using RollingFunctions
-function single_event_smooth_plot!(p::Plots.Plot, df::DataFrame, var::Symbol, color::Color)
-    df = df |> 
-        (df -> subset(df, var)) |>
-        (df -> subset(df, :Year => x -> x .> "1991")) |>
-        # (df -> groupby(df, :Year)) |> 
-        (gdf -> combine(gdf, :Area_pc => sum)) |>
-        (df -> DataFrames.transform(df, :Area_pc_sum => x -> runmean(x, 10)))
-    # print(df)
-    @df df plot!(p, :Year, :Area_pc_sum_function, label = String(var), legend=:top, color=color)
-    return p
-end
-p = plot(title = "Running Mean (10)", xlabel = "Year", 
-    ylabel = "Percentage of annual days and land area affected",
-    left_margin = (5, :mm), dpi = 300);
+# since 1970 # add Theil-Sen
+l = @layout [
+        # a{0.1w} [
+            grid(4,1);
+            # b{0.1h}]
+        ]
+# yl = plot(0,0);Plots.annotate!(yl,(0.5,0,text("Percentage of annual days and land area affected", 10, halign=:left, valign=:bottom, rotation=90.0)));
+# p = tuple(yl);
+p=();
 for (var, color) in zip([:heat, :d30, :d90, :d180], color_palette)
-    single_event_smooth_plot!(p, dfp1, var, color)
+    p = single_event_bar(p, dfp2, var, color; slope=true)
 end
-p
-savefig(p, "$path2v/fig/RM10_LandAreaDays_by_EventType.png")
+# xl = plot(0,0);Plots.annotate!(xl, (0.3,0.5, text("Year", 10)));
+# p = (p..., xl)
+plot(p... , layout = l)
+png("$path2v/fig/landArea_by_EventTypeSubplot_1970.png")
+
+
+
+
+# # trend on last 50 years (1972 to 2021)
+# using RollingFunctions
+# function single_event_smooth_plot!(p::Plots.Plot, df::DataFrame, var::Symbol, color::Color)
+#     df = df |> 
+#         (df -> subset(df, var)) |>
+#         (df -> subset(df, :Year => x -> x .> "1991")) |>
+#         # (df -> groupby(df, :Year)) |> 
+#         (gdf -> combine(gdf, :Area_pc => sum)) |>
+#         (df -> DataFrames.transform(df, :Area_pc_sum => x -> runmean(x, 10)))
+#     # print(df)
+#     @df df plot!(p, :Year, :Area_pc_sum_function, label = String(var), legend=:top, color=color)
+#     return p
+# end
+# p = plot(title = "Running Mean (10)", xlabel = "Year", 
+#     ylabel = "Percentage of annual days and land area affected",
+#     left_margin = (5, :mm), dpi = 300);
+# for (var, color) in zip([:heat, :d30, :d90, :d180], color_palette)
+#     single_event_smooth_plot!(p, dfp1, var, color)
+# end
+# p
+# savefig(p, "$path2v/fig/RM10_LandAreaDays_by_EventType.png")
 
 # map plots of extreme years
 
-function mapplot(data;kwargs...)
-    data = data[[721:1440;1:720],end:-1:1]
-    heatmap(data';kwargs...)
-end
+# function mapplot(data;kwargs...)
+#     data = data[[721:1440;1:720],end:-1:1]
+#     heatmap(data';kwargs...)
+# end
 
-lsmmask = lsm_notime.lsm[:,:];
+# lsmmask = lsm_notime.lsm[:,:];
 
-hwyear = ds.layer[time=1952:1952][:,:,:];
-m = sum(==(0x01),hwyear,dims=1);
-mapplot(m[1,:,:] .* lsmmask, title = "Hot days on land in 1952", dpi = 300)
-savefig("$path2v/fig/HotDays1952.png")
+# hwyear = ds.layer[time=1952:1952][:,:,:];
+# m = sum(==(0x01),hwyear,dims=1);
+# mapplot(m[1,:,:] .* lsmmask, title = "Hot days on land in 1952", dpi = 300)
+# savefig("$path2v/fig/HotDays1952.png")
 
-hwyear2 = ds.layer[time=2020:2020][:,:,:];
-m2 = sum(==(0x01),hwyear2,dims=1);
-mapplot(m2[1,:,:].* lsmmask, title = "Hot days on land in 2020", dpi = 300)
-savefig("$path2v/fig/HotDays2020.png")
+# hwyear2 = ds.layer[time=2020:2020][:,:,:];
+# m2 = sum(==(0x01),hwyear2,dims=1);
+# mapplot(m2[1,:,:].* lsmmask, title = "Hot days on land in 2020", dpi = 300)
+# savefig("$path2v/fig/HotDays2020.png")
 
-dyear = ds.layer[time=1951:1951][:,:,:];
-md = sum(x-> x >=(0x01) && x < (0x10),dyear,dims=1);
-mapplot(md[1,:,:] .* lsmmask, title = "Dry days in 1951", dpi = 300)
-savefig("$path2v/fig/DryDays1951.png")
+# dyear = ds.layer[time=1951:1951][:,:,:];
+# md = sum(x-> x >=(0x01) && x < (0x10),dyear,dims=1);
+# mapplot(md[1,:,:] .* lsmmask, title = "Dry days in 1951", dpi = 300)
+# savefig("$path2v/fig/DryDays1951.png")
 
-dyear1 = ds.layer[time=2020:2020][:,:,:];
-md1 = sum(x-> x >=(0x01) && x < (0x10),dyear1,dims=1);
-mapplot(md1[1,:,:] .* lsmmask, title = "Dry days in 2020", dpi = 300)
-savefig("$path2v/fig/DryDays2020.png")
+# dyear1 = ds.layer[time=2020:2020][:,:,:];
+# md1 = sum(x-> x >=(0x01) && x < (0x10),dyear1,dims=1);
+# mapplot(md1[1,:,:] .* lsmmask, title = "Dry days in 2020", dpi = 300)
+# savefig("$path2v/fig/DryDays2020.png")
 
-dyear2 = ds.layer[time=2021:2021][:,:,:];
-md2 = sum(x-> x >=(0x01) && x < (0x10),dyear2,dims=1);
-mapplot(md2[1,:,:] .* lsmmask, title = "Dry days in 2021", dpi = 300)
-savefig("$path2v/fig/DryDays2021.png")
+# dyear2 = ds.layer[time=2021:2021][:,:,:];
+# md2 = sum(x-> x >=(0x01) && x < (0x10),dyear2,dims=1);
+# mapplot(md2[1,:,:] .* lsmmask, title = "Dry days in 2021", dpi = 300)
+# savefig("$path2v/fig/DryDays2021.png")
 
 
-ii = CartesianIndex(1035,399)
-zg = zopen("/Net/Groups/BGI/work_1/scratch/s3/xaida/v2/ERA5Data.zarr",consolidated=true, fill_as_missing = false)
-era = open_dataset(zg)
-era.t2mmax
-ts1952 = era.t2mmax.data[1035,399,:]
-q1 = quantile(ts1952,0.99)
+# ii = CartesianIndex(1035,399)
+# zg = zopen("/Net/Groups/BGI/work_1/scratch/s3/xaida/v2/ERA5Data.zarr",consolidated=true, fill_as_missing = false)
+# era = open_dataset(zg)
+# era.t2mmax
+# ts1952 = era.t2mmax.data[1035,399,:]
+# q1 = quantile(ts1952,0.99)
 
-n = size(ts1952)[1]
-sub = 1:3000;
-p = plot(era.time[sub],ts1952[sub], labels=false)
-hline!(p,[q1],labels=false)
+# n = size(ts1952)[1]
+# sub = 1:3000;
+# p = plot(era.time[sub],ts1952[sub], labels=false)
+# hline!(p,[q1],labels=false)
 
-#savefig(p,"n_extremes.png")
+# #savefig(p,"n_extremes.png")
 
 
 

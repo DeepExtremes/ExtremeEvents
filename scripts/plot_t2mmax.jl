@@ -65,16 +65,20 @@ plot!(p1,srt[ind], x[ind], seriestype = :scatter,
     label = "Extremes")
 savefig(p,"$(path2fig)/tmax_extremes.png")
 
-# plot pet and tp for 2 years
-stp = tp[lon = Jenalon, lat = Jenalat, time = (2016,2023)]
-spet = pet[lon = Jenalon, lat = Jenalat, time = (2016,2023)]
-stmx = era.t2mmax[lon = Jenalon, lat = Jenalat, time = (2016,2023)]
-spei = pei[lon = Jenalon, lat = Jenalat, time = (2016,2023)]
-qt = Statistics.quantile(stp[:], 0.99)
-ind = x .>= q;
+# plot pet and tp for 7 years
+startyear = 2012; stopyear = 2023
+stp = tp[lon = Jenalon, lat = Jenalat, time = (startyear,stopyear)]
+spet = pet[lon = Jenalon, lat = Jenalat, time = (startyear,stopyear)]
+stmx = era.t2mmax[lon = Jenalon, lat = Jenalat, time = (startyear,stopyear)]
+spei = pei[lon = Jenalon, lat = Jenalat, time = (startyear,stopyear)]
+qt = Statistics.quantile(era.t2mmax[lon = Jenalon, lat = Jenalat][:], 0.99)
+qt - 273.15
+qpei = mapslices(x -> Statistics.quantile(skipmissing(x), 0.01), pei[lon = Jenalon, lat = Jenalat][:,:], dims = 1)
+# ind = x .>= q;
 
-include("mytheme.jl")
+include("mytheme.jl");
 theme(:mytheme)
+function tspl(stp, spet, stmx, spei)
 p2 = bar(stp.time, stp[:].*1e3, 
     label = "Total precipitation", 
     linewidth=0, 
@@ -83,7 +87,7 @@ p2 = bar(stp.time, stp[:].*1e3,
 bar!(spet.time, spet[:], label = "Ref. evapotranspiration",
     xlabel = "Time [day]",
     ylabel = "Water flux [mm/day] \n Temperature [°C]",
-     linewidth=0,
+    linewidth=0,
     linealpha = 1.0,
     );
 scatter!(
@@ -91,7 +95,7 @@ scatter!(
     stmx.time, stmx[:] .- 273.15, #yguideposition = :right, 
     # yaxis = "Temperature [Kelvin]", 
     label = "Max. temperature at 2m",
-    markersize = 2, markeralpha = 0.5);
+    markersize = 2, markeralpha = 0.3);
 plot!(spei.time, spei.data[:,3], label = "pei_30",);
 plot!(spei.time, spei.data[:,2], label = "pei_90",);
 plot!(spei.time, spei.data[:,1], label = "pei_180",);
@@ -100,7 +104,21 @@ plot!(
     size = (800, 600),
     legend = :outerbottom,
     legend_column = 3,
-    # xlims = (spei.time[1], spei.time[end]),
+    xlims = (spei.time[1], spei.time[end]),
     );
-p2
-savefig(p2,"$(path2fig)/timeseries_$(Jenalon)_$(Jenalat)_2016_2022.png", )
+return p2
+end
+p2 = tspl(stp, spet, stmx, spei)
+savefig(p2,"$(path2fig)/timeseries_$(Jenalon)_$(Jenalat)_$(startyear)_$(stopyear).png", )
+
+# Niamey 13.5116° N, 2.1254° E
+Niameylon = 2.1254; Niameylat = 13.5116
+qtN = Statistics.quantile(era.t2mmax[lon = Niameylon, lat = Niameylat][:], 0.99)
+qtN - 273.15
+qpeiN = mapslices(x -> Statistics.quantile(skipmissing(x), 0.01), pei[lon = Niameylon, lat = Niameylat][:,:], dims = 1)
+stp = tp[lon = Niameylon, lat = Niameylat, time = (startyear,stopyear)]
+spet = pet[lon = Niameylon, lat = Niameylat, time = (startyear,stopyear)]
+stmx = era.t2mmax[lon = Niameylon, lat = Niameylat, time = (startyear,stopyear)]
+spei = pei[lon = Niameylon, lat = Niameylat, time = (startyear,stopyear)]
+p3 = tspl(stp, spet, stmx, spei)
+savefig(p3,"$(path2fig)/timeseries_$(Niameylon)_$(Niameylat)_$(startyear)_$(stopyear).png", )
