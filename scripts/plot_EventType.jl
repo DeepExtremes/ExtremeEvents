@@ -2,6 +2,8 @@
 using JLD, DataFrames
 import CSV
 using WeightedOnlineStats
+# using Plots
+using StatsPlots
 
 path2v = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3"
 pot = 0.01
@@ -38,7 +40,7 @@ cadf = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/land_wstats_c
 sum(cadf.value)
 # 1.9e5 NOT e7!!! e7 comes from the time dimension: 365
 
-using Plots
+
 allres_norm = allres./sum(allres,dims=1)
 labels = map([UInt8(i) for _ in 1:1, i in 0:16]) do i
     n = ""
@@ -56,7 +58,6 @@ p = plot(1950:2022, permutedims(reshape(allres, (17,:,9))[2:end-1,:,9], (2,1)),
 
 # savefig(p,"n_extremes_land.png")
 
-using StatsPlots
 include("mytheme.jl")
 theme(:mytheme)
 # data check: every year, the total (land area) x (days in the year) should be the same, except for leap years
