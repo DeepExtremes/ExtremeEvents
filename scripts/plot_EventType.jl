@@ -5,7 +5,12 @@ using WeightedOnlineStats
 # using Plots
 using StatsPlots
 
-path2v = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3"
+if occursin("/Users", pwd())
+    path2v = "/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/v3"
+else
+    path2v = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3"
+end
+# path2v = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3"
 pot = 0.01
 ne = 0.1
 
@@ -36,7 +41,7 @@ outname = "$path2v/YearlyEventType_ranked_pot$(pot)_ne$(ne)_land.csv"
 CSV.write(outname, df)
 df = CSV.read(outname, DataFrame)
 
-cadf = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/land_wstats_continents.csv", DataFrame)
+cadf = CSV.read("$path2v/land_wstats_continents.csv", DataFrame)
 sum(cadf.value)
 # 1.9e5 NOT e7!!! e7 comes from the time dimension: 365
 
@@ -208,7 +213,7 @@ savefig(p, "$path2v/fig/landArea_by_Cont.png")
 p = mygroupedbar(df2 |> (df -> subset(df, :Year => x -> x .>= 1970)), :Continent, cont_cols', startyear = 1970)
 savefig(p,"$path2v/fig/landArea_by_Cont_1970_2022.png")
 
-# aggregate area by continent
+# aggregate area by Event type
 df3 = df1  |>
     (df -> groupby(df, [:Year, :Type])) |>
     (df -> combine(df, :Area_pc => sum)) 
