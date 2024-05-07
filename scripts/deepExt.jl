@@ -1,5 +1,6 @@
 using YAXArrays, Zarr, EarthDataLab
 include("../src/plots.jl")
+
 # make plots for DeepExtremes review meeting
 # Pass over Threshold
 x = sub_tmax[lon=10,lat=51][:];
@@ -28,15 +29,15 @@ savefig(p,"../tmax_extremes.png")
 
 
 ## connected components
-eec = Cube(open_dataset(zopen("https://s3.bgc-jena.mpg.de:9000/deepextremes/v2/EventCube_ranked_pot0.01_ne0.1.zarr/", consolidated = true)))
+# eec = Cube(open_dataset(zopen("https://s3.bgc-jena.mpg.de:9000/deepextremes/v2/EventCube_ranked_pot0.01_ne0.1.zarr/", consolidated = true)))
 eec = Cube(open_dataset("/Net/Groups/BGI/work_1/scratch/s3/xaida/v2/EventCube_ranked_pot0.01_ne0.1.zarr"))
 
-eec_bin = subsetcube(eec, time = 2019:2019, region="Germany").data[:,:,:] .> 0;
-Plots.heatmap(eec_bin[182,:,:]'[end:-1:1,:], c = cgrad(:thermal, categorical = true), title = "Boolean layer")
-r = label_components(eec_bin);
- # should be 70 labels
-findmax(r)
-Plots.heatmap(r[197,:,:]'[end:-1:1,:], c = cgrad(:thermal, categorical = true), zlims = [1, maximum(r)], title = "Connected components")
+# eec_bin = subsetcube(eec, time = 2019:2019, region="Germany").data[:,:,:] .> 0;
+# Plots.heatmap(eec_bin[182,:,:]'[end:-1:1,:], c = cgrad(:thermal, categorical = true), title = "Boolean layer")
+# r = label_components(eec_bin);
+#  # should be 70 labels
+# findmax(r)
+# Plots.heatmap(r[197,:,:]'[end:-1:1,:], c = cgrad(:thermal, categorical = true), zlims = [1, maximum(r)], title = "Connected components")
 # all same event over 1 year...
 
 # plot events
@@ -59,16 +60,20 @@ cols = [:white,
     colorant"#BBBBBB", # 16
     ] 
 year = 2019; d = 180;
-eec_1 = subsetcube(eec, time = year:year, region="Europe");
-p0 = Plots.heatmap(eec_1.axes[2], eec_1.axes[3][end:-1:1], eec_1.data[d,:,:]'[end:-1:1,:],
-     c = cgrad(cols, categorical = true), 
+eec_1 = subsetcube(eec, time = year:year, lon = (0,25), lat = (35, 60));#region="Europe");
+eec_data = eec_1.data[d,:,:]'[end:-1:1,:];
+p0 = Plots.heatmap(eec_1.axes[2], eec_1.axes[3][end:-1:1], eec_data,
+     colour = cgrad(cols, categorical = true), 
      title = "Subset of Event Cube on " * string(Date("$year") + Day(d)), 
-     ylabel="latitude", xlabel="longitude")
+     ylabel="latitude", xlabel="longitude",
+     zlims = (0,16),
+    #  colorbar_ticks = (0:16, ["no event - ", "only hot", "only dry (30d)", "dry and hot", "only dry (90d)", "dry and hot", "dry", "dry and hot", "only dry (180d)", "dry and hot", "dry", "dry and hot", "dry", "dry and hot", "dry", "dry and hot", "no event - "])
+     )
 # p0 = simpleplot(subsetcube(eec, time = 2019:2019, region="Germany"), 182, 2019, 4)
-savefig(p0, "../Europe_events_" * string(Date("$year") + Day(d)) * ".png")
+savefig(p0, "../v2/fig/Europe_events_" * string(Date("$year") + Day(d)) * ".png")
 # if selection on 1 day
-eec_bin = eec_1 .> 0;
-p1 = Plots.heatmap(eec_bin'[end:-1:1,:], c = cgrad(:gist_gray, categorical = true), title = "Boolean layer")
+eec_bin = eec_1.data[d,:,:]'[end:-1:1,:] .> 0 & ;
+p1 = Plots.heatmap(eec_1.axes[2], eec_1.axes[3][end:-1:1], eec_bin, c = cgrad(:gist_gray, categorical = true), title = "Boolean layer")
 savefig(p1,"../boolean_layer.png")
 r = label_components(eec_bin);
 p2 = Plots.heatmap(r'[end:-1:1,:], c = cgrad(:gist_earth, categorical = true), title = "Connected components")
