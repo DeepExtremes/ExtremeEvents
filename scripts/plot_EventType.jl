@@ -2,8 +2,15 @@
 using JLD, DataFrames
 import CSV
 using WeightedOnlineStats
+# using Plots
+using StatsPlots
 
-path2v = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3"
+if occursin("/Users", pwd())
+    path2v = "/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/v3"
+else
+    path2v = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3"
+end
+# path2v = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3"
 pot = 0.01
 ne = 0.1
 
@@ -34,11 +41,11 @@ outname = "$path2v/YearlyEventType_ranked_pot$(pot)_ne$(ne)_land.csv"
 CSV.write(outname, df)
 df = CSV.read(outname, DataFrame)
 
-cadf = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/land_wstats_continents.csv", DataFrame)
+cadf = CSV.read("$path2v/land_wstats_continents.csv", DataFrame)
 sum(cadf.value)
 # 1.9e5 NOT e7!!! e7 comes from the time dimension: 365
 
-using Plots
+
 allres_norm = allres./sum(allres,dims=1)
 labels = map([UInt8(i) for _ in 1:1, i in 0:16]) do i
     n = ""
@@ -56,7 +63,6 @@ p = plot(1950:2022, permutedims(reshape(allres, (17,:,9))[2:end-1,:,9], (2,1)),
 
 # savefig(p,"n_extremes_land.png")
 
-using StatsPlots
 include("mytheme.jl")
 theme(:mytheme)
 # data check: every year, the total (land area) x (days in the year) should be the same, except for leap years
@@ -207,7 +213,7 @@ savefig(p, "$path2v/fig/landArea_by_Cont.png")
 p = mygroupedbar(df2 |> (df -> subset(df, :Year => x -> x .>= 1970)), :Continent, cont_cols', startyear = 1970)
 savefig(p,"$path2v/fig/landArea_by_Cont_1970_2022.png")
 
-# aggregate area by continent
+# aggregate area by Event type
 df3 = df1  |>
     (df -> groupby(df, [:Year, :Type])) |>
     (df -> combine(df, :Area_pc => sum)) 

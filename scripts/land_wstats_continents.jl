@@ -53,9 +53,11 @@ t = ct(lon = lonbound, lat = latbound, )
 end
 
 using JLD
+path2v = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3"
 save("$path2v/land_wstats_continents.jld",stats)
 rmprocs(workers())
 
+stats = load("$path2v/land_wstats_continents.jld")
 allres = vec([value(stats["$k"]) for k = range(0,8)])
 
 import CSV
@@ -63,5 +65,5 @@ df = DataFrame(
     x = range(0,8), 
     cont = ["Null", "Africa", "Asia", "Australia", "North America", "Oceania", "South America", "Antarctica", "Europe"],
      value = allres) 
-outname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/land_wstats_continents.csv"
+outname = "$path2v/land_wstats_continents.csv"
 CSV.write(outname, df)
