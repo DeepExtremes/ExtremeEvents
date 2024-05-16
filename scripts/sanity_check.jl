@@ -2,7 +2,7 @@
 using YAXArrays, EarthDataLab, OnlineStats, WeightedOnlineStats, Zarr
 using DimensionalData
 using DimensionalData.LookupArrays
-using DataFrames, Dates
+using DataFrames, Dates, DateFormats
 import CSV
 import StatsBase
 using Measures
@@ -198,7 +198,7 @@ end
 trial = "ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022"
 landonly = "_landonly"
 # events_all = CSV.read(path * "EventStats_ranked_pot0.01_ne0.1_cmp_2016_2021.csv", DataFrame)
-events = CSV.read("$(path)EventStats_$(trial)$(landonly).csv", DataFrame)
+events = CSV.read("$(path)/EventStats_$(trial)$(landonly).csv", DataFrame)
 # look for intersection between spatial and temporal range of events from the table or directly in the labelcube
 labelpath = path * "labelcube_$trial.zarr"
 # labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_$trial.zarr"
