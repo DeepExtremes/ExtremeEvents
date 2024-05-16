@@ -112,7 +112,7 @@ function getshifts(axs::Tuple{Vararg{DimensionalData.Dimensions.Dimension}};lon 
     axs_nms = DimensionalData.Dimensions.dim2key(axs)
     lon_dim =  dimnum(axs, lon) #lon_dim =  findfirst(axs_nms .== lon[1:3])
     # lon, lat time shifts
-    shifts = [sum(axs[lon_dim] .< 0), 1, 1]
+    shifts = [sum(axs[lon_dim] .< 0), 0, 0]
     dims = ["lo", "la", "ti"];
     i = map(x -> findfirst(dims .== lowercase(string(x))[1:2]), [i for i in axs_nms])
     return shifts[i]
