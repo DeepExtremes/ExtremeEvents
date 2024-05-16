@@ -38,7 +38,7 @@ continents = Dict(
         )
 df.Continent = map(x -> continents[x], df.cont)
 outname = "$path2v/YearlyEventType_ranked_pot$(pot)_ne$(ne)_land.csv"
-CSV.write(outname, df)
+# CSV.write(outname, df)
 df = CSV.read(outname, DataFrame)
 
 cadf = CSV.read("$path2v/land_wstats_continents.csv", DataFrame)
@@ -178,21 +178,22 @@ cont_cols = [colorant"#77aadd", # light Blue
              colorant"#eedd88", # light yellow
              colorant"#ee8866", # orange
              colorant"#ffaabb", # pink
-             colorant"#dddddd", #light gray
+            #  colorant"#dddddd", #light gray
             ]
 
 
-function mygroupedbar(dfp, grouping, colours; startyear = 1950, endyear = 2022) # for whatever reason I don't understand, I can't pass kwargs...
+function mygroupedbar(dfp, grouping, colours; startyear = 1950, endyear = 2022, bar_position = :stack) # for whatever reason I don't understand, I can't pass kwargs...
     p = groupedbar(dfp[!,:Year], dfp[!,:Area_pc_sum], group = dfp[!,grouping], 
     legend = :outerright, lw = 0,
     xlabel = "Year", 
     ylabel = "Percentage of annual days and land area affected",
     size=(800,460), dpi=300, left_margin = (5, :mm), bottom_margin = (5, :mm),
-    colour = colours,
-    bar_position = :stack,
+    colour = colours, 
     xrotation = 45.0, xtickfontsize = 6, 
     xticks=(startyear:5:endyear, string.(startyear:5:endyear)),
     xlim = (startyear-1, endyear+1),
+    bar_position = bar_position,
+    # bar_position = :stack,
     # kwargs...
     )
 end
@@ -212,6 +213,21 @@ p = mygroupedbar(df2, :Continent, cont_cols')
 savefig(p, "$path2v/fig/landArea_by_Cont.png")
 p = mygroupedbar(df2 |> (df -> subset(df, :Year => x -> x .>= 1970)), :Continent, cont_cols', startyear = 1970)
 savefig(p,"$path2v/fig/landArea_by_Cont_1970_2022.png")
+
+# relative area by continent
+df22 = df |> 
+    # (df -> stack(df, Not(:ev), variable_name = :Year, value_name = :Area)) |>
+    (df -> groupby(df, [:Year, :Continent])) |> 
+    # total extremes of 1 type =1% over 73 years, divided by n years (73) ~= 0.0137 %
+    # but on average should be 1 % per year
+    (df -> DataFrames.transform(df, :Area => (x -> x./sum(x) .*100) => :Area_pc)) |>
+    (df -> subset(df, :Type => x-> x.>0 .&& x.<16)) |>
+    (df -> groupby(df, [:Year, :Continent])) |>
+    (df -> combine(df, :Area_pc => sum)) 
+p = mygroupedbar(df22 |> (df -> subset(df, :Year => x -> x .>= 1970)), :Continent, cont_cols', startyear = 1970, bar_position = :dodge)
+savefig(p,"$path2v/fig/landArea_by_ContDodge_1970_2022.png")
+
+
 
 # aggregate area by Event type
 df3 = df1  |>
@@ -308,6 +324,12 @@ dfpp = dfp|>
     (df -> filter(:MacroType => ==("Hot and dry"), df)) |>
     (df -> subset(df, :Year => x -> x .>=1970)
     ) ;
+# data check
+dfpp |>
+    (df -> combine(df, :Area_pc_sum => mean))
+dfpp |>
+    (df -> filter(:Year => x -> x .> 2000, df)) |>
+    (df -> combine(df, :Area_pc_sum => mean))
 
 # Theil-Sen
 include("../src/stats.jl")
@@ -448,6 +470,74 @@ end
 plot(p... , layout = l)
 png("$path2v/fig/landArea_by_EventTypeSubplot_1970.png")
 
+
+# single continent
+function single_cont_bar(p::Tuple, df::DataFrame, var::String, color::Color; slope=false)
+    # df = df |> 
+    #     # (df -> subset(df, var)) |>
+    #     (df -> groupby(df, :Year)) |> 
+    #     (gdf -> combine(gdf, :Area_pc => sum))
+    b = @df df bar(:Year, :Area_pc_sum, 
+        label = var, 
+        legend=:outerright,
+        color = color,
+        alpha = 0.8,
+        ylim = (0.0,1.51),
+        lw=0,
+        size=(1000,800), dpi=300, 
+        # left_margin = (5, :mm), bottom_margin = (5, :mm),
+        )
+    if slope
+        m, b1 = theilsen(df[!, :Year], df[!,:Area_pc_sum])
+        plot!(b, df[!, :Year],  m .* df[!, :Year] .+ b1, colour = color, label = "Theil-Sen estimator: $(round(m; sigdigits = 2)) * Year + $(round(b1; sigdigits = 2))")
+    end
+    return p = (p..., b)
+end
+l = @layout [a;b;c;d;e;f;g;h]
+p = ();
+for (var, color) in zip(continents, cont_cols)
+    p = single_cont_bar(p, df22 |> (df -> subset(df, [:Year, :Continent] => (x,y) -> (x .>= 1970) .& (y .== var[2]))),
+        var[2], color; slope = true)
+end
+
+plot(p... , layout = l)
+png("$path2v/fig/landArea_by_ContSubplot_1970.png")
+
+# by continent and event type
+sorted_cont = stack(DataFrame(continents), [:1, :2, :3, :4, :5, :6, :7, :8]) |>
+    (df -> select(df, :value)) |>
+    (df -> sort(df))
+dfpc = df |> 
+    (df -> groupby(df, [:Year, :Continent])) |> 
+    (df -> DataFrames.transform(df, :Area => (x -> x./sum(x) .*100) => :Area_pc)) |>
+    (df -> subset(df, :Type => x-> x.>0 .&& x.<16)) |>
+    # macro type
+    (df -> DataFrames.transform(df, :Type => ByRow(x -> map(macrotype,x)) => :MacroType)) |>
+    # group by year, continent and MacroType
+    (df -> groupby(df, [:Year, :Continent, :MacroType])) |>
+    # sum area
+    (gdf -> combine(gdf, :Area_pc => sum)) |>
+    # subset only dry
+    (df -> filter(:MacroType => ==("Hot and dry"), df)) |>
+    (df -> subset(df, :Year => x -> x .>=1970)) 
+# data check
+dfpc |> 
+    (df -> groupby(df, :Continent)) |> 
+    (df -> combine(df, :Area_pc_sum => mean))
+dfpc |> 
+    (df -> filter(:Year => x -> x .> 2000, df)) |>
+    (df -> groupby(df, :Continent)) |> 
+    (df -> combine(df, :Area_pc_sum => mean))
+
+l = @layout [a;b;c;d;e;f;g;h]
+p = ();
+for (var, color) in zip(sorted_cont[!, :value], cont_cols)
+    p = single_cont_bar(p, dfpc |> (df -> subset(df, [:Year, :Continent] => (x,y) -> (x .>= 1970) .& (y .== var))),
+        var, color; slope = true)
+end
+
+plot(p... , layout = l)
+png("$path2v/fig/landArea_hotndry_by_ContSubplot_1970.png")
 
 
 

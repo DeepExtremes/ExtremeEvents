@@ -552,7 +552,8 @@ end
 
 ## test
 using Test, UnicodePlots
-@test x = 1:10; y = collect(range(1.0, 10.0)) .+ rand(10); y[3] = 8;
-@test @time m, b = theilsen(x,y)
-@test plt = scatterplot(x,y, smooth = true);
-@test lineplot!(plt,[0,10],[b, m*10+b])
+x = 1:10; y = collect(range(1.0, 10.0)) .+ rand(10); y[3] = 8;
+m, b = theilsen(x,y);
+@test m ≈ 1.0 atol=0.1
+# plt = scatterplot(x,y, smooth = true);
+# lineplot!(plt,[0,10],[b, m*10+b])
