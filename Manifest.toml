@@ -2,7 +2,7 @@
 
 julia_version = "1.10.1"
 manifest_format = "2.0"
-project_hash = "860338ac77fe878205befb2461be91a7c09895a8"
+project_hash = "e9f9f0eff5b00120abdf395148337b18b7fdf097"
 
 [[deps.AWS]]
 deps = ["Base64", "Compat", "Dates", "Downloads", "GitHub", "HTTP", "IniFile", "JSON", "MbedTLS", "Mocking", "OrderedCollections", "Random", "SHA", "Sockets", "URIs", "UUIDs", "XMLDict"]
@@ -425,6 +425,20 @@ version = "0.18.17"
 git-tree-sha1 = "bfc1187b79289637fa0ef6d4436ebdfe6905cbd6"
 uuid = "e2d170a0-9d28-54be-80f0-106bbe20a464"
 version = "1.0.0"
+
+[[deps.DateFormats]]
+deps = ["Dates"]
+git-tree-sha1 = "15bccd41785cffab1ea047786b0ec22fbf16c653"
+uuid = "44557152-fe0a-4de1-8405-416d90313ce6"
+version = "0.1.18"
+
+    [deps.DateFormats.extensions]
+    InverseFunctionsExt = "InverseFunctions"
+    TimeZonesExt = "TimeZones"
+
+    [deps.DateFormats.weakdeps]
+    InverseFunctions = "3587e190-3f89-42d0-90ee-14403ec27112"
+    TimeZones = "f269a46b-ccf7-5d73-abea-4c690281aa53"
 
 [[deps.Dates]]
 deps = ["Printf"]
