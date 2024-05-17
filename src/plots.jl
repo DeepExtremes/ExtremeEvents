@@ -118,25 +118,6 @@ function getshifts(axs::Tuple{Vararg{DimensionalData.Dimensions.Dimension}};lon 
     return shifts[i]
 end
 
-
-# function prephm(tmp,axs,fn)
-#     axs_nms = axnms(axs)
-#     time_dim = findfirst(axs_nms .== "tim")
-#     lon_dim =  findfirst(axs_nms .== "lon")
-#     lat_dim =  findfirst(axs_nms .== "lat")
-#     rtmp = dropdims(reduce(fn, tmp, dims=time_dim),dims=time_dim);
-#     # @show size(rtmp)
-#     # convert to Float to discard 0 in plot
-#     rtmp = convert(Matrix{Float64},rtmp);
-#     replace!(rtmp, 0 => NaN)
-#     # replace!(rtmp, missing => NaN)
-#     x = axs[lon_dim][:];
-#     y = axs[lat_dim][end:-1:1];
-#     # @show x, y
-#     z = permutedims(rtmp, (time_dim < lat_dim ? lat_dim-time_dim : lat_dim, time_dim < lon_dim ? lon_dim - time_dim : lon_dim))[end:-1:1,:];   
-#     return x,y,z
-# end
-
 function prephm(tmp,axs,fn;reduced = :Ti)
     # axs_nms = axnms(axs)
     red_dim = dimnum(axs, reduced)
@@ -240,68 +221,6 @@ function myfig!(fig, lon, lat, data, q, units)
     return(fig)
 end
 
-
-# function cf!(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = :Ti, kwargs...)
-#     x,y,z = prephm(tmp,axs,fn;reduced)
-#     contourf!(x, y, z; kwargs...)
-# end
-
-# # import PlotUtils
-# function getColours(colours::Union{Nothing, PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient};n=10)
-#     if isnothing(colours)
-#         colours = palette(:darkterrain, n)
-#     else
-#         if typeof(colours) in [PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient]
-#             ErrorException("colours should be of type ColorGradient")
-#         end
-#     end
-# end
-# # cols = Tuple((Light1 = "#28828F",
-# # Dark2 = "#6E6E6E",
-# # Light2 = "#9E9E9E",
-# # Accent1 = "#C8C8C8", 
-# # Accent2 = "#366570",
-# # Accent3 = "#8C8C8C",
-# # Accent4 = "#57A9BA",
-# # Accent5 = "#FFD966",
-# # Accent6 = "#EAF1F3"))
-
-# DeepAIcols = map(x -> Base.parse(Colorant, x)),
-#               cols
-# )
-
-# using DataFrames, VegaLite
-# function labelplot(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = "tim", xlab = "longitude", ylab = "latitude", title= "", colours = nothing)
-#     x,y,z = prephm(tmp,axs,fn;reduced)
-#     df = DataFrame(x=repeat(x,inner=size(z)[1]), y=repeat(y, size(z)[2]), z=z[:]);
-#     df |> @vlplot(
-#         :rect, 
-#         x={"x:o", title=xlab}, 
-#         y={"y:o", title=ylab}, 
-#         color={
-#             "z:n",
-#             legend={title="Event label"}, 
-#             # scale={domain=[], range=[]},
-#             },
-#         title=title,
-#         )
-# end
-
-# using GeoMakie, CairoMakie
-# function makielabel(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = "tim", xlab = "longitude", ylab = "latitude", title= "", colours = nothing)
-#     x,y,z = prephm(tmp,axs,fn;reduced)
-#     fig = Figure()
-#     ax = GeoAxis(fig[1,1],
-#         source = "+proj=longlat +datum=WGS84", 
-#         dest = "+proj=eqearth",
-#         lonlims=(x[1],x[end]),
-#         latlims=(y[1],y[end]),
-#         coastlines=true)
-#     GeoMakie.surface!(ax, x, y, z; shading = false)
-#     # GeoMakie.heatmap!(ax, x, y, z; shading = false)
-#     fig
-# end
-
 function num2col(i, lbls, cols)
     j = findfirst(x -> x == i, lbls)
     return Base.parse(Colorant, cols[j])
@@ -315,15 +234,6 @@ function num2col(i, lbls, cols)
     #     return colorant"black"
     # end
 end
-#
-# map(x -> num2col(x, ulbls, cols), ulbls)
-# m = rand(ulbls, (10,10));
-# colours = map(x -> num2col(x, ulbls, cols),m)
-# Plots.heatmap(1:10,1:10,m,c=colours,yflip=true)
-# colGRAD = cgrad(collect(cols), categorical=true)
-# Plots.heatmap(1:10,1:10,m,c=colGRAD,yflip=true)
-# plot(colours)
-
 
 function plotEvent(df, labelcube, label_row)
     periodl =( df[label_row,:start_time], df[label_row,:end_time]+Day(1))
@@ -362,4 +272,43 @@ function plotEvent(df, labelcube, label_row)
         c = cgrad(:inferno, categorical = true),
         title = "Event $label \n from " * string(Date(df[label_row,:start_time])) * " to " * string(Date(df[label_row,:end_time]))
         )  
+end
+
+# function to extract cube subset
+function getsubcube(cube, periodt, lato, lon)
+    subcube = cube[time=periodt[1]..periodt[2], latitude=lato[1]..lato[2], longitude=lon[1]..lon[2]]
+    subcubedata = subcube.data[:,:,:]
+    if any(lon.>180)
+        # modify axes
+        axs = modaxs(subcube.axes)
+        # modify subcube shift lon
+        shifts = getshifts(axs)
+        subcubedata = circshift(subcubedata, shifts)
+    else
+        axs = subcube.axes
+    end
+    return subcubedata, axs
+end
+
+# function to plot a heatmap (default) or other function of a cube subset reduced over time with mode (default) or other function, on existsing Makie Axis
+function cubeplot!(ax, cube, periodt, lato, lon; plotfn = heatmap!, reducefn = mode, kwargs...)
+    # subset cube
+    if typeof(lon) <: Vector
+        # load 2 parts and join them
+        subp1, axsp1 = getsubcube(cube, periodt, lato, lon[1]);
+        # subp1, axsp1 = getsubcube(tmax, periodt, lato, lon[1]);
+        subp2, axsp2 = getsubcube(cube, periodt, lato, lon[2]);
+        # subp2, axsp2 = getsubcube(tmax, periodt, lato, lon[2]);
+        dimlon = dimnum(axsp1, :longitude)
+        subcube = cat(subp1, subp2, dims = dimlon);
+        axs = (dimlon == 1 ? Dim{:longitude}(vcat(axsp1[1].val, axsp2[1][1]:0.25:axsp2[1][end])) : axsp1[1], 
+            dimlon == 2 ? Dim{:longitude}(vcat(axsp1[2].val, axsp2[2][1]:0.25:axsp2[2][end])) : axsp1[2],
+            dimlon == 3 ? Dim{:longitude}(vcat(axsp1[3].val, axsp2[3][1]:0.25:axsp2[3][end])) : axsp1[3]
+            )
+    else
+        subcube, axs = getsubcube(cube, period, lato, lon)
+    end
+    x,y,z = prephm(subcube, axs, reducefn)
+    h = plotfn(ax, x, y, z; kwargs...)
+    return ax, h
 end
