@@ -60,6 +60,7 @@ obs.Start .= replace.(obs.Start, r"\." => "-");
 obs.End .= replace.(obs.End, r"\." => "-");
 # export to latex table
 show(stdout, MIME("text/latex"),obs)
+show(stdout, MIME("text/csv"),obs)
 
 #### start helper fns
 function labobs(df0::DataFrame, lon, lat, period, obs_event)
@@ -246,6 +247,9 @@ unique!(df0)
 # export to csv
 CSV.write(path * "SanityCheck_$trial.csv", df0)
 # df0 = CSV.read("$(path)SanityCheck_$trial.csv", DataFrame, header=1)
+
+# df0 crashed for 
+# 3 (2018.05.12,2018.05.22,61,89,7,34)
 
 for obs_event in 4:nrow(obs)
     println(obs_event)
@@ -522,3 +526,36 @@ end
 # 
 # df0 = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/SanityCheck_$trial.csv", DataFrame, header=1)
 
+# 3, 8, 13, 14, 20 crashed.
+# validation results
+tmp = df0 |> 
+    (df -> groupby(df, :obs_event)) |>
+    (gdf -> combine(gdf, AsTable(:) => t -> nrow(t)))
+# show boxplot/vagina of volume of events
+f = with_theme(theme_latexfonts()) do
+    f = Figure(size = (1000,400));
+    ax,v = boxplot(f[1,1],df0.obs_event, log10.(df0.volume));
+    ax.xticks = (tmp.obs_event, ["$x\n($y)" for (x,y) in zip(tmp.obs_event,tmp.label_start_time_etc_function)])
+    ax.xticklabelsvisible = false;
+    ax.ylabel = L"\log_{10}\text{Volume}"
+    ax1,v1 = boxplot(f[2,1], df0.obs_event, Dates.value.(df0.end_time .- df0.start_time) .+ 1);
+    ax1.xticks = (tmp.obs_event, ["$x\n($y)" for (x,y) in zip(tmp.obs_event,tmp.label_start_time_etc_function)])
+    ax1.xticklabelsvisible = false;
+    ax1.ylabel = L"\text{Duration (days)}"
+    ax2,v2 = boxplot(f[3,1], df0.obs_event, log10.(df0.area));
+    ax2.xticks = (tmp.obs_event, ["$x\n($y)" for (x,y) in zip(tmp.obs_event,tmp.label_start_time_etc_function)])
+    ax2.ylabel = L"\log_{10}\text{Area}"
+    f
+end
+save(path2 * "v2/fig/plot" * "_" * trial * "_validation.png", f) 
+
+
+# ax2, v2 = violin(f[3,1], df0.obs_event, df0.t2mmax_mean)
+# ax2.ylabel = "Mean Tmax"
+# ax3, v3 = violin(f[4,1], df0.obs_event, df0.pei_30_mean)
+# ax3.ylabel = "Mean PE30"
+# ax4, v4 = violin(f[5,1], df0.obs_event, df0.pei_90_mean)
+# ax4.ylabel = "Mean PE90"
+# ax5, v5 = violin(f[6,1], df0.obs_event, df0.pei_180_mean)
+# ax5.ylabel = "Mean PE180"
+# f
