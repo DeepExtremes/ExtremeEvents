@@ -13,10 +13,12 @@ import Random
 if occursin("/Users", pwd())
     path = "/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/"
     path2 = "$path" 
+    path3 = ""
 else
     # path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/"
     path = "/Net/Groups/BGI/work_1/scratch/s3/deepextremes/v2/"
     path2 = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/"
+    path3 = "$path"
 end
 
 
@@ -58,7 +60,7 @@ include("../src/stats.jl")
 ### EventPart2
 # obs = CSV.read("$(path)./EventPart2.csv", DataFrame; header=3)
 # obs = CSV.read("$(path)RecentEvents.csv", DataFrame; header=3)
-obs = CSV.read("$(path2)v3/EventPart2.csv", DataFrame; header=3)
+obs = CSV.read("$(path2)/EventPart2.csv", DataFrame; header=3)
 include("../src/plots.jl")
 # clean obs
 obs = dropmissing!(obs)
@@ -213,54 +215,6 @@ function labelplot!(ax, labels, period, lat, lon, lblt; kwargs...)
     return ax, h
 end
 
-function getsubcube(cube, periodt, lato, lon)
-    subcube = cube[time=periodt[1]..periodt[2], latitude=lato[1]..lato[2], longitude=lon[1]..lon[2]]
-    subcubedata = subcube.data[:,:,:]
-    if any(lon.>180)
-        # modify axes
-        axs = modaxs(subcube.axes)
-        # modify subcube shift lon
-        shifts = getshifts(axs)
-        subcubedata = circshift(subcubedata, shifts)
-    else
-        axs = subcube.axes
-    end
-    return subcubedata, axs
-end
-
-function cubeplot!(ax, cube, periodt, lat, lon; plotfn = heatmap!, kwargs...)
-    # subset cube
-    if typeof(lon) <: Vector
-        # load 2 parts and join them
-        subp1, axsp1 = getsubcube(cube, periodt, lato, lon[1]);
-        # subp1, axsp1 = getsubcube(tmax, periodt, lato, lon[1]);
-        subp2, axsp2 = getsubcube(cube, periodt, lato, lon[2]);
-        # subp2, axsp2 = getsubcube(tmax, periodt, lato, lon[2]);
-        dimlon = dimnum(axsp1, :longitude)
-        subcube = cat(subp1, subp2, dims = dimlon);
-        axs = (dimlon == 1 ? Dim{:longitude}(vcat(axsp1[1].val, axsp2[1][1]:0.25:axsp2[1][end])) : axsp1[1], 
-            dimlon == 2 ? Dim{:longitude}(vcat(axsp1[2].val, axsp2[2][1]:0.25:axsp2[2][end])) : axsp1[2],
-            dimlon == 3 ? Dim{:longitude}(vcat(axsp1[3].val, axsp2[3][1]:0.25:axsp2[3][end])) : axsp1[3]
-            )
-    else
-        subcube, axs = getsubcube(cube, period, lat, lon)
-    end
-    # plot
-    # h = heatmap!(ax, lookup(axs, :longitude), lookup(axs, :latitude), dropdims(subcube; dims = 1),
-    #     colormap = Makie.Categorical(etcols), 
-    #     zlims = (0,16),
-    #     #  colorbar_ticks = (0:16, ["no event - ", "only hot", "only dry (30d)", "dry and hot", "only dry (90d)", "dry and hot", "dry", "dry and hot", "only dry (180d)", "dry and hot", "dry", "dry and hot", "dry", "dry and hot", "dry", "dry and hot", "no event - "])
-    #     )
-    x,y,z = prephm(subcube, axs, mode)
-    # res = Dict()
-    # foreach((x, y) -> push!(res, x => Float64(y)), lblt, eachindex(lblt))
-    # # res
-    # replace!(z, Tuple(res)...);
-    h = plotfn(ax, x, y, z; kwargs...)
-    # h = hm!(ax, subcube, axs; fn = mode, kwargs...)
-    return ax, h
-end
-
 function expand(x::Tuple{Int, Int})
     convert(Tuple{Float64, Float64}, x)
 end
@@ -325,8 +279,8 @@ for obs_event in 1 : nrow(obs)
 end
 unique!(df0)
 # export to csv
-CSV.write(path2*"SanityCheck_v2_$trial.csv", df0)
-# df0 = CSV.read("$(path2)SanityCheck_$trial.csv", DataFrame, header=1)
+CSV.write(path2*"v2/SanityCheck_v2_$trial.csv", df0)
+# df0 = CSV.read("$(path)v2/SanityCheck_$trial.csv", DataFrame, header=1)
 
 for obs_event in 1:nrow(obs)
     println(obs_event)
@@ -599,8 +553,36 @@ for obs_event in 1:nrow(obs)
     end
 end
 
+# validation results
+tmp = df0 |> 
+    (df -> groupby(df, :obs_event)) |>
+    (gdf -> combine(gdf, AsTable(:) => t -> nrow(t)))
+# show boxplot/vagina of volume of events
+f = Figure(size = (1000,400));
+ax,v = boxplot(f[1,1],df0.obs_event, log10.(df0.volume));
+ax.xticks = (tmp.obs_event, ["$x\n($y)" for (x,y) in zip(tmp.obs_event,tmp.label_start_time_etc_function)])
+ax.xticklabelsvisible = false;
+ax.ylabel = L"\log_{10}\text{Volume}"
+ax1,v1 = boxplot(f[2,1], df0.obs_event, Dates.value.(df0.end_time .- df0.start_time) .+ 1);
+ax1.xticks = (tmp.obs_event, ["$x\n($y)" for (x,y) in zip(tmp.obs_event,tmp.label_start_time_etc_function)])
+ax1.xticklabelsvisible = false;
+ax1.ylabel = L"\text{Duration (days)}"
+ax2,v2 = boxplot(f[3,1], df0.obs_event, log10.(df0.area));
+ax2.xticks = (tmp.obs_event, ["$x\n($y)" for (x,y) in zip(tmp.obs_event,tmp.label_start_time_etc_function)])
+ax2.ylabel = L"\log_{10}\text{Area}"
+f
+save(path2 * "v2/fig/plot" * "_" * trial * "_validation.png", f) 
 
-    
+
+# ax2, v2 = violin(f[3,1], df0.obs_event, df0.t2mmax_mean)
+# ax2.ylabel = "Mean Tmax"
+# ax3, v3 = violin(f[4,1], df0.obs_event, df0.pei_30_mean)
+# ax3.ylabel = "Mean PE30"
+# ax4, v4 = violin(f[5,1], df0.obs_event, df0.pei_90_mean)
+# ax4.ylabel = "Mean PE90"
+# ax5, v5 = violin(f[6,1], df0.obs_event, df0.pei_180_mean)
+# ax5.ylabel = "Mean PE180"
+# f
 
 # CSV.write(path * "RecentEvents.csv", obs)
 
@@ -626,24 +608,27 @@ events = CSV.read("$(path)EventStats_$(trial)$(landonly).csv", DataFrame)
 labelpath = path * "labelcube_$trial.zarr"
 labels = open_dataset(labelpath)
 
-zg = zopen("https://s3.bgc-jena.mpg.de:9000/deepextremes/v2/ERA5Data.zarr",consolidated=true, fill_as_missing = false)
+zg = zopen("$(path3)ERA5Data.zarr",consolidated=true, fill_as_missing = false)
 era = open_dataset(zg)
 tmax = era.t2mmax
-rt = Cube("https://s3.bgc-jena.mpg.de:9000/deepextremes/v2/tmax_ranked.zarr")
+rt = Cube("$(path3)tmax_ranked.zarr")
 
-peis = open_dataset(zopen("https://s3.bgc-jena.mpg.de:9000/deepextremes/v2/PEICube.zarr",consolidated=true, fill_as_missing = false))
-rp = open_dataset(zopen("https://s3.bgc-jena.mpg.de:9000/deepextremes/v2/pei_ranks.zarr",consolidated=true, fill_as_missing = false))
+peis = open_dataset(zopen("$(path3)PEICube.zarr",consolidated=true, fill_as_missing = false))
+rp = open_dataset(zopen("$(path3)pei_ranks.zarr",consolidated=true, fill_as_missing = false))
 
-eec = open_dataset(zopen("https://s3.bgc-jena.mpg.de:9000/deepextremes/v2/EventCube_$(etrial).zarr",consolidated=true, fill_as_missing = false))
+eec = open_dataset(zopen("$(path3)EventCube_$(etrial).zarr",consolidated=true, fill_as_missing = false))
 
-df0 = CSV.read("$(path2)SanityCheck_$trial.csv", DataFrame, header=1)
+df0 = CSV.read("$(path2)v2/SanityCheck_v2_$trial.csv", DataFrame, header=1)
 
-obs_event = 22
+obs_event = 22 #6 #22
 
 df = subset(df0, :obs_event => x -> x .== obs_event, :volume => x -> x .>= 10.0, :duration => x -> x .>= "2 days", :area => x -> x .>= 5.0)
 period =( Date(obs[obs_event,:Start]), Date(obs[obs_event,:End]) ) #+Day(1)?
-lat = (obs[obs_event,:South], obs[obs_event,:North])
-lon = (obs[obs_event,:West], obs[obs_event,:East])
+# lat = (obs[obs_event,:South], obs[obs_event,:North])
+# lon = (obs[obs_event,:West], obs[obs_event,:East])
+lat = (34.0, 60);
+lon = (-10,25);
+# period = (Date("2019-06-24"), Date("2019-07-01"))
 # transform lon to match cube
 if lon[1] < 0 
     if lon[2] <= 0
@@ -707,7 +692,7 @@ pthcols = cgrad([colorant"#A6C5E8", colorant"#BBBBBB", colorant"#FFFFFF",], [0.0
 # ratio = diff([xlims[1],xlims[2]]) ./ diff([ylims[1], ylims[2]])
 # fig = Figure(size = (round(1000 * ratio[1]), 50+250*F[end][1]));
 function myfig()
-fig = Figure(size = (1600,800));
+fig = Figure(size = (2400,1050));
 for t in 1:n
     periodt = (periodo[1] + (t - 1) * time_lapse, periodo[1] + t * time_lapse - Day(1))
     Label(fig[1, t, Top()], string(periodt[1]); fontsize=18, padding=(2, 2, 2, 2))
@@ -743,7 +728,7 @@ for t in 1:n
         # PEICube
         if i == 2
             # plot pei_30
-            cubeplot!(axt, peis.pei_30, periodt, ylims, lon; colormap = :bilbao, colorrange = (-5,5)) # :bilbao # :managua
+            cubeplot!(axt, peis.pei_30, periodt, ylims, lon; colormap = Reverse(:berlin), colorrange = (-5,5)) # :bilbao # :managua
             # contour rp 0.01
             cubeplot!(axt, rp.pei_30, periodt, ylims, lon; plotfn = contour!, levels = lvls, colormap = pthcols, colorrange = (0.0, 1.0))
 
@@ -793,28 +778,36 @@ for t in 1:n
 end
 # colorbar
 # t2mmax
-cbar1 = Colorbar(fig[1,n+1][1,1],
-        label = L"\text{Tmax} (\degree \text{C})",
+Label(fig[1, 1, Left()], L"\text{Tmax} (\degree \text{C})", rotation = π/ 2, padding=(2, 2, 2, 2), fontsize=18)
+fg = fig[1,n+1] = GridLayout()
+cbar1 = Colorbar(fg[1,1],
+        # label = L"\text{Tmax} (\degree \text{C})",
         colormap = Reverse(:lajolla), 
         colorrange = (288.15, 318.15),
         ticks = ([293.15, 303.15, 313.15], ["20", "30", "40"])
     )
 
-lt = Legend(fig[1,n+1][1,4],
+lt = Legend(fg[1,2],
     [LineElement(color = tthcols[1], linestyle = nothing), 
     LineElement(color = tthcols[2], linestyle = nothing), 
     LineElement(color = tthcols[3], linestyle = nothing), ],
     ["0.01", "0.1", "0.9"],
-    "Rank",
+    L"\text{Tmax Rank}",
     patchsize = (25, 25),
-    #  rowgap = 5
+    #  rowgap = 5,
+    backgroundcolor = RGB(1, 0.9978, 0.79425),
+    framecolor = colorant"#FFFFFF",
+    # framevisible = false,
     )
     
 # pei
+Label(fig[2, 1, Left()], L"\text{PE30 (mm day}^{-1})", rotation = π/ 2, padding = (2, 2, 2, 2), fontsize = 18)
+
 pcbar1 = Colorbar(fig[2,n+1][1,1],
-        label = L"\text{PE30 (mm day}^{-1})",
-        colormap = :bilbao, 
-        colorrange = (-5, 5)
+        # label = L"\text{PE30 (mm day}^{-1})",
+        colormap = Reverse(:berlin), #:bilbao, # :managua
+        colorrange = (-5, 5),
+        halign = :left,
     )
 
 lp = Legend(fig[2,n+1][1,2],
@@ -822,15 +815,24 @@ lp = Legend(fig[2,n+1][1,2],
     LineElement(color = pthcols[2], linestyle = nothing), 
     LineElement(color = pthcols[3], linestyle = nothing), ],
     ["0.01", "0.1", "0.9"],
-    "Rank",
-    patchsize = (25, 25), rowgap = 10)
+    L"\text{PEI30 Rank}",
+    patchsize = (25, 25), rowgap = 10,
+    backgroundcolor = RGB(0.99987, 0.68007, 0.67995),
+    framecolor = colorant"#FFFFFF",
+    # framevisible = false,
+    )
 
 # EventCube
+Label(fig[3, 1, Left()], L"\text{Event-Cube}", rotation = π/ 2, padding=(2, 2, 2, 2), fontsize=18)
+
 ecbar = Colorbar(fig[3,n+1], 
-            label = L"\text{Event type}",
+            # label = L"\text{Event type}",
             colormap = cgrad(etcols, categorical=true),
-            # size = 14,
+            # size = 12,
             limits = (-0.5,16.5),
+            halign = :left,
+            # ticklabelrotation = - π / 3,
+            # vertical = false,
         )
 ecbar.ticks = (0:16, [
         "no event : rank > 0.1 and rank < 0.9",
@@ -852,11 +854,16 @@ ecbar.ticks = (0:16, [
         "no event : rank < 0.1 and rank > 0.9"])
 
 # labels
+Label(fig[4, 1, Left()], L"\text{Label-Cube}", rotation = π/ 2, padding=(2, 2, 2, 2), fontsize=18)
+
 lcbar = Colorbar(fig[4,n+1], 
-        label = L"\text{Events labels}",
-        colormap = cgrad(labcols[1:nlb], nlb, categorical=true)
+        label = L"Labelled CHD events lasting $> 2$ days)",
+        colormap = cgrad(labcols[1:nlb], nlb, categorical=true),
         # size = 40,
         # limits = (1,nlb),
+        halign = :left,
+        labelrotation = 0,
+        # flip_vertical_label = true
     )
 if length(ulbls) > 1 
     lcbar.limits = (1,nlb)
@@ -871,5 +878,7 @@ colgap!(fig.layout, 0)
 rowgap!(fig.layout, 0)
 fig
 end
-fig = myfig()
+fig = with_theme(theme_latexfonts()) do
+    fig = myfig()
+end
 save(path2 * "v2/fig/plot" * "_" * trial * "_Event_$obs_event" * "_full.pdf", fig) 
