@@ -521,13 +521,35 @@ dfpc = df |>
     (df -> filter(:MacroType => ==("Hot and dry"), df)) |>
     (df -> subset(df, :Year => x -> x .>=1970)) 
 # data check
-dfpc |> 
+d0 = dfpc |> 
     (df -> groupby(df, :Continent)) |> 
-    (df -> combine(df, :Area_pc_sum => mean))
-dfpc |> 
-    (df -> filter(:Year => x -> x .> 2000, df)) |>
+    (df -> combine(df, :Area_pc_sum => mean)) |>
+    (df -> rename(df, :Area_pc_sum_mean => :Years_1970_2022))
+d1 = dfpc |> 
+    (df -> filter(:Year => x -> x .< 2000, df)) |>
     (df -> groupby(df, :Continent)) |> 
-    (df -> combine(df, :Area_pc_sum => mean))
+    (df -> combine(df, :Area_pc_sum => mean))|>
+    (df -> rename(df, :Area_pc_sum_mean => :Years_1970_1999))
+d2 = dfpc |> 
+    (df -> filter(:Year => x -> x .>= 2000, df)) |>
+    (df -> groupby(df, :Continent)) |> 
+    (df -> combine(df, :Area_pc_sum => mean))|>
+    (df -> rename(df, :Area_pc_sum_mean => :Years_2000_2022))
+d = leftjoin(d0,leftjoin(d1,d2, on = :Continent), on = :Continent)
+# global
+d0 = dfpp |> 
+    (df -> combine(df, :Area_pc_sum => mean)) |>
+    (df -> rename(df, :Area_pc_sum_mean => :Years_1970_2022))
+d1 = dfpp |> 
+    (df -> filter(:Year => x -> x .< 2000, df)) |>
+    (df -> combine(df, :Area_pc_sum => mean))|>
+    (df -> rename(df, :Area_pc_sum_mean => :Years_1970_1999))
+d2 = dfpp |> 
+    (df -> filter(:Year => x -> x .>= 2000, df)) |>
+    (df -> combine(df, :Area_pc_sum => mean))|>
+    (df -> rename(df, :Area_pc_sum_mean => :Years_2000_2022))
+
+show(stdout, MIME("text/latex"),vcat(d, hcat(DataFrame(Continent = "Global"), d0, d1, d2)))
 
 l = @layout [a;b;c;d;e;f;g;h]
 p = ();
