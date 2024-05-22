@@ -99,10 +99,10 @@ function labobs(df0::DataFrame, lon, lat, period, obs_event)
     end
 end
 
-function labplot!(ax, lon, lat, period; reduced = :Ti, kwargs...)
+function labplot!(ax, lon, lat, period, dflabels; reduced = :Ti, nd = 1, kwargs...)
     # sublabels = labels.layer[time=periodo[1]..periodo[2], latitude=lato[1]..lato[2], longitude=lono[1]..lono[2]]
     sublabels = labels.layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
-    data = ( in(df.label).(sublabels.data))[:,:,:];
+    data = ( in(dflabels).(sublabels.data))[:,:,:];
     if lon[1] >= 180
         # modify axes
         axs = modaxs(sublabels.axes)
@@ -110,7 +110,7 @@ function labplot!(ax, lon, lat, period; reduced = :Ti, kwargs...)
         axs = sublabels.axes
     end 
     if reduced == :longitude
-        axs = (Ti((nd - Dates.value(Date(obs[obs_event,:End])-periodo[1])) : nd - Dates.value(Date(obs[obs_event,:End])-periodo[2])), axs[2], axs[3])
+        axs = (Ti((nd - Dates.value(Date(obs[obs_event,:End])-period[1])) : nd - Dates.value(Date(obs[obs_event,:End])-period[2])), axs[2], axs[3])
     end
     h = hm!(ax, data, axs; reduced, kwargs...)  
     # but this approach doesn't show if labelled events span outside the observed event bbox
@@ -380,16 +380,16 @@ for obs_event in 1:nrow(obs)
             # > 180 ( or <0)
             # not possible to plot over longitude outside bbox
 
-            hT = labplot!(axT, lon[2], lato, periodo; reduced = :Ti, colormap = cgrad(:inferno, nd, categorical = true), colorrange = (1,nd))
-            hT1 = labplot!(axT, lon[1], lato, periodo; reduced = :Ti, colormap = cgrad(:inferno, nd, categorical = true), colorrange = (1,nd))
-            hL = labplot!(axL, lon[2], lato, periodo; reduced = :longitude, colormap = cgrad(:inferno, Int(round(nL*nl)), categorical = true), colorrange = (1,Int(round(nL*nl))))
-            hL1 = labplot!(axL, lon[1], lato, periodo; reduced = :longitude, colormap = cgrad(:inferno, Int(round(nL*nl)), categorical = true), colorrange = (1,Int(round(nL*nl))))
+            hT = labplot!(axT, lon[2], lato, periodo, df.label; reduced = :Ti, colormap = cgrad(:inferno, nd, categorical = true), colorrange = (1,nd))
+            hT1 = labplot!(axT, lon[1], lato, periodo, df.label; reduced = :Ti, colormap = cgrad(:inferno, nd, categorical = true), colorrange = (1,nd))
+            hL = labplot!(axL, lon[2], lato, periodo, df.label; reduced = :longitude, nd = nd, colormap = cgrad(:inferno, Int(round(nL*nl)), categorical = true), colorrange = (1,Int(round(nL*nl))))
+            hL1 = labplot!(axL, lon[1], lato, periodo, df.label; reduced = :longitude, nd = nd, colormap = cgrad(:inferno, Int(round(nL*nl)), categorical = true), colorrange = (1,Int(round(nL*nl))))
             # m, ax3 = labplot3!(ax3, lon, latlim, timlim; colormap)
             # m1, ax3 = labplot3(ax3, lon2, latlim, timlim; colormap)
         else
             # do once
-            hT = labplot!(axT, lono, lato, periodo; reduced = :Ti, colormap = cgrad(:inferno, nd, categorical = true), colorrange = (1,nd)) # colormap = Makie.Categorical(:inferno))
-            hL = labplot!(axL, lono, lato, periodo; reduced = :longitude, colormap = cgrad(:inferno, Int(round(nL*nl)), categorical = true), colorrange = (1,Int(round(nL*nl)))) # colormap = Makie.Categorical(:inferno))#
+            hT = labplot!(axT, lono, lato, periodo, df.label; reduced = :Ti, colormap = cgrad(:inferno, nd, categorical = true), colorrange = (1,nd)) # colormap = Makie.Categorical(:inferno))
+            hL = labplot!(axL, lono, lato, periodo, df.label; reduced = :longitude, nd = nd, colormap = cgrad(:inferno, Int(round(nL*nl)), categorical = true), colorrange = (1,Int(round(nL*nl)))) # colormap = Makie.Categorical(:inferno))#
             # m, ax3 = labplot3!(ax3, lonlim, latlim, timlim; colormap)
         end
     
