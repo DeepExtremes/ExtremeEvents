@@ -173,56 +173,6 @@ function getx(lon)
     x = lon[1] >= 180 ? x.-360 : x
 end
 
-function getsublabels(labels, period, lat, lon, lblt)
-    sublabels = labels.layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
-        # load to memory and set all other values to 0 (so that they will be set to NaN by prephm)
-        # small events have been discarded from the plot
-        sublabels1 = map(x -> x in lblt ? x : 0, (sublabels.data)[:,:,:]);
-    
-        if any(lon.>180)
-            # modify axes
-            axs = modaxs(sublabels.axes)
-            # modify sublabels1: shift lon
-            shifts = getshifts(axs)
-            sublabels1 = circshift(sublabels1, shifts)
-        else
-            axs = sublabels.axes
-        end
-        return sublabels1, axs
-    end
-
-function labelplot!(ax, labels, period, lat, lon, lblt; kwargs...)
-    # subset labelcube
-    if typeof(lon) <: Vector
-        # load 2 parts and join them
-        sublabelsp1, axsp1 = getsublabels(labels, periodt, lato, lon[1], lblt)
-        sublabelsp2, axsp2 = getsublabels(labels, periodt, lato, lon[2], lblt)
-        sublabels1 = cat(sublabelsp1, sublabelsp2, dims = 2)
-        axs = (axsp1[1], Dim{:longitude}(vcat(axsp1[2].val, axsp2[2][1]:0.25:axsp2[2][end])), axsp1[3])
-    else
-        sublabels1, axs = getsublabels(labels, period, lat, lon, lblt)
-    end
-    # cols = Makie.Categorical(:tab20)
-    # fg = Figure(); ax1 = Axis(fg)
-    x,y,z = prephm(sublabels1, axs, mode)
-    res = Dict()
-    foreach((x, y) -> push!(res, x => Float64(y)), lblt, eachindex(lblt))
-    # res
-    replace!(z, Tuple(res)...);
-    # heatmap(x, y, z; colormap = cols[1:length(lblt)])
-    h = heatmap!(ax, x, y, z; kwargs...)
-    # h = hm!(ax, sublabels1, axs; fn = mode, kwargs...)
-    return ax, h
-end
-
-function expand(x::Tuple{Int, Int})
-    convert(Tuple{Float64, Float64}, x)
-end
-function expand(x::Tuple{Float64, Float64})
-    x1 = round(x[1] - 1, RoundDown; digits = -1, base = 5)
-    x2 = round(x[2] + 1, RoundUp; digits = -1, base = 5)
-    return (x1, x2)
-end
 ##### end helper fns
 
 # for trial in ("ranked_pot0.01_ne0.1_cmp_2016_2021")#,"ranked_pot0.01_ne0.1_tcmp_2016_2021"# "ranked_pot0.01_ne0.1_tcmp_2016_2021","ranked_pot0.01_ne0.1_cmp_Sdiam3_T5_new_2016_2021")

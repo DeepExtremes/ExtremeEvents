@@ -519,3 +519,12 @@ function countyear(eventcube::Dataset)
     return df    
 end
 
+# sanity check helper functions
+function expand(x::Tuple{Int, Int})
+    convert(Tuple{Float64, Float64}, x)
+end
+function expand(x::Tuple{Float64, Float64})
+    x1 = round(x[1] - 1, RoundDown; digits = -1, base = 5)
+    x2 = round(x[2] + 1, RoundUp; digits = -1, base = 5)
+    return (x1, x2)
+end

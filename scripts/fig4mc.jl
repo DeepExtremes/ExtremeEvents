@@ -9,6 +9,7 @@
 
 # using ExtremeEvents
 using YAXArrays, EarthDataLab, OnlineStats, WeightedOnlineStats, Zarr
+using HTTP
 using DimensionalData
 using DimensionalData.LookupArrays
 using DataFrames, Dates
@@ -19,19 +20,17 @@ using CairoMakie, GeoMakie
 import Random
 # using PerceptualColourMaps
 
+obs_event = 19
+trial = "ranked_pot0.01_ne0.1"
+etrial = "$(trial)_cmp_2016_2021"
+
 if haskey(ENV, "https_proxy") && occursin( "bgc-jena", ENV["https_proxy"])
     path = "/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/"
 else
     path = "https://s3.bgc-jena.mpg.de:9000/deepextremes/v2/"
 end
 
-
-etrial = "ranked_pot0.01_ne0.1"
-trial = "$(etrial)_cmp_2016_2021" 
-landonly = "" #"_landonly"
-events = CSV.read("$(path)EventStats_$(trial)$(landonly).csv", DataFrame)
-
-labelpath = path * "labelcube_$trial.zarr"
+labelpath = path * "labelcube_$etrial.zarr"
 lzg = zopen(labelpath,consolidated=true, fill_as_missing = false)
 labels = open_dataset(labelpath)
 
@@ -43,19 +42,19 @@ rt = Cube("$(path)tmax_ranked.zarr")
 peis = open_dataset(zopen("$(path)PEICube.zarr",consolidated=true, fill_as_missing = false))
 rp = open_dataset(zopen("$(path)pei_ranks.zarr",consolidated=true, fill_as_missing = false))
 
-eec = open_dataset(zopen("$(path)EventCube_$(etrial).zarr",consolidated=true, fill_as_missing = false))
+eec = open_dataset(zopen("$(path)EventCube_$(trial).zarr",consolidated=true, fill_as_missing = false))
 
-df0 = CSV.read("$(path)/SanityCheck_v2_$trial.csv", DataFrame, header=1)
-
-obs_event = 22 #6 #22
-
+df0_http = HTTP.get("$(path)SanityCheck_$trial.csv")
+df0 = CSV.read(df0_http.body, DataFrame, header=1)
 df = subset(df0, :obs_event => x -> x .== obs_event, :volume => x -> x .>= 10.0, :duration => x -> x .>= "2 days", :area => x -> x .>= 5.0)
-period =( Date(obs[obs_event,:Start]), Date(obs[obs_event,:End]) ) #+Day(1)?
-# lat = (obs[obs_event,:South], obs[obs_event,:North])
-# lon = (obs[obs_event,:West], obs[obs_event,:East])
+
+# helper functions
+include("../src/stats.jl")
+include("../src/plots.jl")
+
 lat = (34.0, 60);
 lon = (-10,25);
-# period = (Date("2019-06-24"), Date("2019-07-01"))
+period = (Date("2019-06-24"), Date("2019-07-01"))
 # transform lon to match cube
 if lon[1] < 0 
     if lon[2] <= 0
@@ -139,7 +138,7 @@ for t in 1:n
             color = :grey20, linewidth=0.5)
         translate!(cl, 0, 0, 1000)
 
-        @show periodt
+        # @show periodt
 
         # indicators
         # Tmax
@@ -163,16 +162,6 @@ for t in 1:n
 
         # EventCube
         if i == 3
-            # subcube1, axsp1 = getsubcube(eec.layer, periodt, lato, lon[1]);
-            # subcube2, axsp2 = getsubcube(eec.layer, periodt, lato, lon[2]);
-            # subcube = cat(subcube1, subcube2, dims = 2);
-            # axs = (axsp1[1], Dim{:longitude}(vcat(axsp1[2].val, axsp2[2][1]:0.25:axsp2[2][end])), axsp1[3])    
-            # # plot
-            # h = heatmap!(axt, lookup(axs, :longitude), lookup(axs, :latitude), dropdims(subcube; dims = 1),
-            #     colormap = Makie.Categorical(etcols), 
-            #     zlims = (0,16),
-            #     #  colorbar_ticks = (0:16, ["no event - ", "only hot", "only dry (30d)", "dry and hot", "only dry (90d)", "dry and hot", "dry", "dry and hot", "only dry (180d)", "dry and hot", "dry", "dry and hot", "dry", "dry and hot", "dry", "dry and hot", "no event - "])
-            #     )
             cubeplot!(axt,eec.layer, periodt, ylims, lon;
                 colormap = Makie.Categorical(etcols), 
                 zlims = (0,16),
@@ -308,4 +297,4 @@ end
 fig = with_theme(theme_latexfonts()) do
     fig = myfig()
 end
-save(path2 * "v2/fig/plot" * "_" * trial * "_Event_$obs_event" * "_full.pdf", fig) 
+save("plot" * "_" * trial * "_Event_$obs_event" * "_full.pdf", fig) 
