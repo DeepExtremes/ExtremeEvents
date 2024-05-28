@@ -44,7 +44,7 @@ rp = open_dataset(zopen("$(path)pei_ranks.zarr",consolidated=true, fill_as_missi
 
 eec = open_dataset(zopen("$(path)EventCube_$(trial).zarr",consolidated=true, fill_as_missing = false))
 
-df0_http = HTTP.get("$(path)SanityCheck_$trial.csv")
+df0_http = HTTP.get("$(path)SanityCheck_$etrial.csv")
 df0 = CSV.read(df0_http.body, DataFrame, header=1)
 df = subset(df0, :obs_event => x -> x .== obs_event, :volume => x -> x .>= 10.0, :duration => x -> x .>= "2 days", :area => x -> x .>= 5.0)
 
@@ -94,20 +94,30 @@ labcols = cgrad(:tab20, 20, categorical=true)[1:nlb]
 # EventCube colorscale
 etcols = [colorant"#FFFFFF",  
     colorant"#FFB86F", # 1 Light Orange
-    colorant"#A6C5E8", # 2 Light Blue
-    colorant"#A386BB", # 3 Medium Purple (Light)
+    # colorant"#A6C5E8", # 2 Light Blue
+    colorant"#4C7FB8", # 2 Medium Blue
+    colorant"#8464A5", # 3 Medium Purple (Medium)
+    # colorant"#A386BB", # 3 Medium Purple (Light)
     colorant"#4C7FB8", # 4 Medium Blue
     colorant"#8464A5", # 5 Medium Purple (Medium)
     colorant"#4C7FB8", # 6 Medium Blue
     colorant"#8464A5", # 7 Medium Purple (Medium)
-    colorant"#002D5A", # 8 Dark Blue
-    colorant"#65498C", # 9 Medium Purple (Dark)
-    colorant"#002D5A", # 10 Dark Blue
-    colorant"#65498C", # 11 Medium Purple (Dark)
-    colorant"#002D5A", # 12 Dark Blue
-    colorant"#65498C", # 13 Medium Purple (Dark)
-    colorant"#002D5A", # 14 Dark Blue
-    colorant"#65498C", # 15 Medium Purple (Dark)
+    # colorant"#002D5A", # 8 Dark Blue
+    colorant"#4C7FB8", # 8 Medium Blue
+    colorant"#8464A5", # 9 Medium Purple (Medium)
+    # colorant"#65498C", # 9 Medium Purple (Dark)
+    # colorant"#002D5A", # 10 Dark Blue
+    colorant"#4C7FB8", # 10 Medium Blue
+    colorant"#8464A5", # 11 Medium Purple (Medium)
+    # colorant"#65498C", # 11 Medium Purple (Dark)
+    # colorant"#002D5A", # 12 Dark Blue
+    colorant"#4C7FB8", # 12 Medium Blue
+    colorant"#8464A5", # 13 Medium Purple (Medium)
+    # colorant"#65498C", # 13 Medium Purple (Dark)
+    colorant"#4C7FB8", # 14 Medium Blue
+    # colorant"#002D5A", # 14 Dark Blue
+    colorant"#8464A5", # 15 Medium Purple (Medium)
+    # colorant"#65498C", # 15 Medium Purple (Dark)
     colorant"#BBBBBB", # 16
     ] 
 
@@ -118,9 +128,9 @@ pthcols = cgrad([colorant"#A6C5E8", colorant"#BBBBBB", colorant"#FFFFFF",], [0.0
 # ratio = diff([xlims[1],xlims[2]]) ./ diff([ylims[1], ylims[2]])
 # fig = Figure(size = (round(1000 * ratio[1]), 50+250*F[end][1]));
 n = nd
-function myfig(;size = (2400, 1500), fontsize = 12)
+function myfig(;size = (2400, 1500), kwargs...)
 # fig = Figure(size = (2400,1050));
-fig = Figure(size = size, font = "DejaVu Sans", fontsize = fontsize);
+fig = Figure(size = size, font = "DejaVu Sans", kwargs...);
 for t in 1:n
     # periodt = (periodo[1] + (t - 1) * time_lapse, periodo[1] + t * time_lapse - Day(1))
     periodt = (period[1] + (t - 1) * time_lapse, period[1] + t * time_lapse - Day(1))
@@ -209,7 +219,10 @@ for t in 1:n
 end
 # colorbar
 # t2mmax
-Label(fig[1, n, Right()], L"\text{Tmax} (\degree \text{C})", rotation = π/ 2, padding=(2, 2, 2, 2), fontsize=18)
+Label(fig[1, n, Right()], 
+    # L"\text{Tmax} (\degree \text{C})",
+    "Tmax (°C)",
+    rotation = π/ 2, padding=(2, 2, 2, 2), fontsize=18)
 fg = fig[1,n+1] = GridLayout()
 cbar1 = Colorbar(fg[1,1],
         # label = L"\text{Tmax} (\degree \text{C})",
@@ -223,7 +236,7 @@ lt = Legend(fg[1,2],
     LineElement(color = tthcols[2], linestyle = nothing), 
     LineElement(color = tthcols[3], linestyle = nothing), ],
     ["0.01", "0.1", "0.9"],
-    L"\text{Tmax Rank}",
+    "Tmax Rank",
     patchsize = (25, 25),
     #  rowgap = 5,
     backgroundcolor = RGB(1, 0.9978, 0.79425),
@@ -232,7 +245,10 @@ lt = Legend(fg[1,2],
     )
     
 # pei
-Label(fig[2, n, Right()], L"\text{PE30 (mm day}^{-1})", rotation = π/ 2, padding = (2, 2, 2, 2), fontsize = 18)
+Label(fig[2, n, Right()], 
+    # L"\text{PE30 (mm day}^{-1})",
+    "PE30 (mm day⁻¹)",
+    rotation = π/ 2, padding = (2, 2, 2, 2), fontsize = 18)
 
 pcbar1 = Colorbar(fig[2,n+1][1,1],
         # label = L"\text{PE30 (mm day}^{-1})",
@@ -246,7 +262,7 @@ lp = Legend(fig[2,n+1][1,2],
     LineElement(color = pthcols[2], linestyle = nothing), 
     LineElement(color = pthcols[3], linestyle = nothing), ],
     ["0.01", "0.1", "0.9"],
-    L"\text{PEI30 Rank}",
+    "PEI30 Rank",
     patchsize = (25, 25), rowgap = 10,
     backgroundcolor = RGB(0.99987, 0.68007, 0.67995),
     framecolor = colorant"#FFFFFF",
@@ -254,7 +270,7 @@ lp = Legend(fig[2,n+1][1,2],
     )
 
 # EventCube
-Label(fig[3, n, Right()], L"\text{Event-Cube}", rotation = π/ 2, padding=(2, 2, 2, 2), fontsize=18)
+Label(fig[3, n, Right()], "Event-Cube", rotation = π/ 2, padding=(2, 2, 2, 2), fontsize=18)
 
 ecbar = Colorbar(fig[3,n+1], 
             # label = L"\text{Event type}",
@@ -269,11 +285,11 @@ ecbar.ticks = (
     # 0:16,
     0:4, 
     [
-        "no extreme",
+        "10th percentile",
         "only hot",
         "only dry",
         "dry and hot",
-        "10th percentile"
+        "no extreme",
     ],
     # [
     #     "no event : rank > 0.1 and rank < 0.9",
@@ -296,7 +312,7 @@ ecbar.ticks = (
     )
 
 # labels
-Label(fig[4, n, Right()], L"\text{Label-Cube}", rotation = π/ 2, padding=(2, 2, 2, 2), fontsize=18)
+Label(fig[4, n, Right()], "Label-Cube", rotation = π/ 2, padding=(2, 2, 2, 2), fontsize=18)
 
 lcbar = Colorbar(fig[4,n+1], 
         # label = L"Labelled CHD events lasting $> 2$ days)",
@@ -320,11 +336,12 @@ colgap!(fig.layout, 1)
 rowgap!(fig.layout, 1)
 fig
 end
-fig = with_theme(theme_latexfonts()) do
-    fig = myfig(fontsize =  2)
+fontsize_theme = Theme(fontsize = 24)
+fig = with_theme(fontsize_theme) do
+    fig = myfig(size = (2000, 1500))
 end
 
-save("plot" * "_" * trial * "_Event_$obs_event" * "_horizontal.pdf", fig, dpi = 300) 
+save("plot" * "_" * trial * "_Event_$obs_event" * "_horizontal.png", fig, dpi = 300) 
 
 # function myfigv(;size = (1000,1600))
 # # fig = Figure(size = (2400,1050));
