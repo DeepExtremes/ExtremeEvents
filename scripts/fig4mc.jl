@@ -141,7 +141,7 @@ for t in 1:n
         axt = GeoAxis(fig[i,t],
             dest = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs",
         );
-        limits!(axt, (xlims[1],xlims[2]+5), ylims,)
+        limits!(axt, (xlims[1],xlims[2]+15), ylims,)
         cl=lines!(axt, 
             GeoMakie.coastlines(),
             color = :grey20, linewidth=0.5)
