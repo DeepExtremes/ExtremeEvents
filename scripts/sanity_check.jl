@@ -1,11 +1,11 @@
 # check that documented events get detected by analyse_events
-using YAXArrays, EarthDataLab, OnlineStats, WeightedOnlineStats, Zarr
+using YAXArrays, OnlineStats, WeightedOnlineStats, Zarr
 using DimensionalData
 using DimensionalData.LookupArrays
-using DataFrames, Dates, DateFormats
+using DataFrames, Dates #DateFormats
 import CSV
-import StatsBase
-using Measures
+# import StatsBase
+# using Measures
 using CairoMakie, GeoMakie
 # using PerceptualColourMaps
 
@@ -16,13 +16,26 @@ else
 end
 
 # load list of events
-# obs = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventPart1_csv_Ltime.csv", DataFrame)
+obs0 = CSV.read("$path/../EventPart1_csv_Ltime.csv", DataFrame)
+rename!(obs0, Dict("Name" => :Area, 
+    "Event type" => :Event, 
+    "when_from" => :Start, 
+    "when_until" => :End, 
+    "where_SW" => :West, 
+    "where_SE" => :East,
+    "where_NW" => :South,
+    "where_NE" => :North,)
+)
+obs0.Start .= replace.(obs0.Start, r"\." => "-");
+obs0.End .= replace.(obs0.End, r"\." => "-");
 # remove spaces in columns names. DataConvenience.cleannames! from DataConvenience.jl
 # import DataConvenience
 # DataConvenience.cleannames!(obs)
-# sort!(obs, :when_from, rev=true)
-# # select drought and heatwave (drop floods)
-# filter!(:Event_type=>!=("flood"), obs)
+sort!(obs0, :Start, rev=true)
+# select drought and heatwave (drop floods)
+filter!(:Event=>!=("flood"), obs0)
+# drop Continent
+select!(obs0, Not(:Continent, :Year))
 
 # for each event documented in the literature, subset eventcube according to time and spatial extent, 
 # mask > 
@@ -53,12 +66,22 @@ include("../src/stats.jl")
 include("../src/plots.jl")
 
 ### EventPart2
-obs = CSV.read("$(path)../EventPart2.csv", DataFrame; header=3)
+obs = CSV.read("$(path)../EventPart3.csv", DataFrame; header=3)
 # obs = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventPart2.csv", DataFrame; header=3)
 # clean obs
 obs = dropmissing!(obs)
 obs.Start .= replace.(obs.Start, r"\." => "-");
 obs.End .= replace.(obs.End, r"\." => "-");
+
+# add obs_event
+obs0.obs_event .= nrow(obs) .+ (1:nrow(obs0))
+# reorder columns
+select!(obs0, :obs_event, :)
+
+
+# merge 2 tables:
+obs = vcat(obs, obs0)
+
 # export to latex table
 show(stdout, MIME("text/latex"),obs)
 show(stdout, MIME("text/csv"),obs)
@@ -66,11 +89,13 @@ show(stdout, MIME("text/csv"),obs)
 #### start helper fns
 function labobs(df0::DataFrame, lon, lat, period, obs_event)
     #
-    # plot labelled events flattened over time
+    # retrieve relevant labelcube
+    i = findlast((period[1] .>= Date.(startyears)) .& (period[2] .< Date.(startyears .+ 13)))
     
     # retrive labels and count them
+    tmp = labels[i].layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
     tab = CubeTable(
-        label    = labels.layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
+        label    = labels[i].layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
     )
     labcount = fitalllabelcount(tab);
     sort!(labcount, by=i->i[end].c, rev=true);
@@ -79,7 +104,7 @@ function labobs(df0::DataFrame, lon, lat, period, obs_event)
     # remove event with few voxels (arbitrarily I had 99, but maybe lower to 14) and empty lines
     labcountdf = labcountdf[map(>(0), labcountdf.count), :]
     # extract stats from events
-    df = filter(:label => in(labcountdf.label), events)
+    df = filter([:label, :interval] => (label, interval) -> in(label,labcountdf.label) && interval == i, statevents)
     if isempty(df)
         return df0
     end
@@ -88,13 +113,15 @@ function labobs(df0::DataFrame, lon, lat, period, obs_event)
     # add column obs_event
     df.obs_event .= obs_event;
     # vcat df
-    df0 = vcat(df0, df)
+    append!(df0, df)
     return df0
 end
 
-function labplot!(ax, lon, lat, period, dflabels; reduced = :Ti, nd = 1, kwargs...)
+function labplot!(ax, lon, lat, period, dflabels; reduced = :Ti, obs_event = nothing, nd = 1, kwargs...)
+    # retrieve relevant labelcube
+    i = findlast((period[1] .>= Date.(startyears)) .& (period[2] .< Date.(startyears .+ 13)))
     # sublabels = labels.layer[time=periodo[1]..periodo[2], latitude=lato[1]..lato[2], longitude=lono[1]..lono[2]]
-    sublabels = labels.layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
+    sublabels = labels[i].layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
     data = ( in(dflabels).(sublabels.data))[:,:,:];
     if lon[1] >= 180
         # modify axes
@@ -111,11 +138,13 @@ function labplot!(ax, lon, lat, period, dflabels; reduced = :Ti, nd = 1, kwargs.
 end
 
 function labplot3!(ax3, lon, lat, period, dflabel; kwargs...)
+    # retrieve relevant labelcube
+    i = findlast((period[1] .>= Date.(startyears)) .& (period[2] .< Date.(startyears .+ 13)))
     # sublabels = labels.layer[time=timlim[1]..timlim[2], latitude=latlim[1]..latlim[2], longitude=lon1[1]..lon1[2]]
     if typeof(lon) <: Vector
-        sublabels1 = labels.layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1][1]..lon[1][2]]
+        sublabels1 = labels[i].layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1][1]..lon[1][2]]
         data1 = ( in(dflabel).(sublabels1.data))[:,:,:];
-        sublabels2 = labels.layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[2][1]..lon[2][2]]
+        sublabels2 = labels[i].layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[2][1]..lon[2][2]]
         data2 = ( in(dflabel).(sublabels2.data))[:,:,:];
         # concatenate over :longitude
         data = cat(data1, data2; dims = 1);
@@ -126,7 +155,7 @@ function labplot3!(ax3, lon, lat, period, dflabel; kwargs...)
         y = lookup(sublabels1, :latitude)
         tempo = lookup(sublabels1, :Ti)
     else
-        sublabels = labels.layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
+        sublabels = labels[i].layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
         data = ( in(dflabel).(sublabels.data))[:,:,:];
 
         x = lookup(sublabels, :longitude)
@@ -167,8 +196,10 @@ function getx(lon)
 end
 
 function labelplot!(ax, labels, period, lat, lon, lblt; kwargs...)
+    # retrieve relevant labelcube
+    i = findlast((period[1] .>= Date.(startyears)) .& (period[2] .< Date.(startyears .+ 13)))
     # subset labelcube
-    sublabels = labels.layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
+    sublabels = labels[i].layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
     # load to memory and set all other values to 0 (so that they will be set to NaN by prephm)
     # small events have been discarded from the plot
     sublabels1 = map(x -> x in lblt ? x : 0, (sublabels.data)[:,:,:]);
@@ -197,21 +228,32 @@ end
 
 # for trial in ("ranked_pot0.01_ne0.1_cmp_2016_2021")#,"ranked_pot0.01_ne0.1_tcmp_2016_2021"# "ranked_pot0.01_ne0.1_tcmp_2016_2021","ranked_pot0.01_ne0.1_cmp_Sdiam3_T5_new_2016_2021")
 # trial = "ranked_pot0.01_ne0.1_cmp_2016_2021" # "ranked_pot0.01_ne0.1_cmp_2016_2021_land"#"ranked_pot0.01_ne0.1_tcmp_Sdiam3_T5_2016_2021" # "ranked_pot0.01_ne0.1_cmp_2016_2021" # 
-trial = "ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022"
-landonly = "_landonly"
+trial = "ranked_pot0.01_ne0.1_cmp_S1_T3"
+startyears = 1970:10:2010 
+intervals = map( y -> (y, y+12), startyears)
+landonly = "landonly"
 # events_all = CSV.read(path * "EventStats_ranked_pot0.01_ne0.1_cmp_2016_2021.csv", DataFrame)
-events = CSV.read("$(path)/EventStats_$(trial)$(landonly).csv", DataFrame)
-# look for intersection between spatial and temporal range of events from the table or directly in the labelcube
-labelpath = path * "labelcube_$trial.zarr"
-# labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_$trial.zarr"
-labels = open_dataset(labelpath)# labels = Cube(labelpath)
+statevents = DataFrame()
+labels = ()
+for i in 1:length(intervals)
+    # EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1970_1982_landonly.csv
+    eventsi = CSV.read("$(path)EventStats_$(trial)_$(intervals[i][1])_$(intervals[i][2])_$(landonly).csv", DataFrame)
+    eventsi.interval .= i
+    append!(statevents, eventsi)
+    # look for intersection between spatial and temporal range of events from the table or directly in the labelcube
+    labelpathi = "$(path)labelcube_$(trial)_$(intervals[i][1])_$(intervals[i][2]).zarr"
+    # labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_$trial.zarr"
+    labelsi = open_dataset(labelpathi)# labels = Cube(labelpath)
+    labels = (labels..., labelsi)
+end
 # labels_all = open_dataset(path * "labelcube_ranked_pot0.01_ne0.1_cmp_2016_2021.zarr")
 
 global df0 = DataFrame()
  # df0 = CSV.read("$(path)SanityCheck_$trial.csv", DataFrame, header=1)
 
 # loop over observed events
-for obs_event in 1: nrow(obs)
+# tmp = deepcopy(findall(!in(unique(df0.obs_event)),1:36))
+for obs_event in 1 : nrow(obs)
     # obs_event=10
     print(obs[obs_event,:])
     period =( Date(obs[obs_event,:Start]), Date(obs[obs_event,:End])+Day(1))
@@ -234,20 +276,26 @@ for obs_event in 1: nrow(obs)
     end
     
     # get labels intersecting obs_event
-    if typeof(lon) <: Vector{}
-        # do everything twice...
-        df1 = labobs(df0, lon[1], lat, period, obs_event);
-        df1 = labobs(df1, lon[2], lat, period, obs_event);
-    else
-        # do only once
-        df1 = labobs(df0, lon, lat, period, obs_event);
-    end
-    global df0 = df1;
+    # try
+        if typeof(lon) <: Vector{}
+            # do everything twice...
+            df1 = labobs(df0, lon[1], lat, period, obs_event);
+            df1 = labobs(df1, lon[2], lat, period, obs_event);
+        else
+            # do only once
+            df1 = labobs(df0, lon, lat, period, obs_event);
+        end
+        global df0 = df1;
+    # catch
+    #     @warn "Something went wrong..."
+    # end
 end
 unique!(df0)
 # export to csv
-CSV.write(path * "SanityCheck_$trial.csv", df0)
+CSV.write(path * "SanityCheck_$(trial)_all.csv", df0)
 # df0 = CSV.read("$(path)SanityCheck_$trial.csv", DataFrame, header=1)
+
+## 20240525 need to do the rest with labels[i] (+solve CubeTable)
 
 # df0 crashed for 
 # 3 (2018.05.12,2018.05.22,61,89,7,34) => Offsets must be positive and smaller than the chunk size
@@ -318,12 +366,12 @@ for obs_event in 1:nrow(obs)
     # colormap
     colormap = [(:white, 0.0), (:orange, 0.5)] 
 
-    fig3 = Figure();
-    ax3 = Axis3(fig3[1, 1], 
-        perspectiveness = 0.5,
-        azimuth = 6.64,
-        elevation = 0.57, aspect = (1, 1, 1), #(1,2,1)
-        xlabel = "Longitude", ylabel = "Time", zlabel = "Latitude");
+    # fig3 = Figure();
+    # ax3 = Axis3(fig3[1, 1], 
+    #     perspectiveness = 0.5,
+    #     azimuth = 6.64,
+    #     elevation = 0.57, aspect = (1, 1, 1), #(1,2,1)
+    #     xlabel = "Longitude", ylabel = "Time", zlabel = "Latitude");
     # 
     # === get labelled events maximum bounding box ===
     
@@ -332,7 +380,11 @@ for obs_event in 1:nrow(obs)
         lato = (minimum(df[: ,:latitude_min]), maximum(df[: ,:latitude_max]))
         lono = (minimum(df[:, :longitude_min]), maximum(df[:, :longitude_max]))
         periodo = (minimum(df[:, :start_time]), maximum(df[:,:end_time]) +Day(1))
-        nl = step(labels.axes[:longitude])
+
+        # which labelcube?
+        i = findlast((period[1] .>= Date.(startyears)) .& (period[2] .< Date.(startyears .+ 13)))
+
+        nl = step(labels[i].axes[:longitude])
         nL = (diff(collect(lon0))/nl)[1];
 
         latlim = (minimum([lat[1], lato[1]])-nl, maximum([lat[2], lato[2]])+nl)
@@ -340,11 +392,11 @@ for obs_event in 1:nrow(obs)
         timlim = (minimum([period[1], periodo[1]])-Day(1), maximum([period[2], periodo[2]])+Day(1))
         timlimplot = ((nd - Dates.value(period[2]-timlim[1])), nd - Dates.value(period[2]-timlim[2]))
 
-        # 3d plot limits and bbox
-        ax3.limits = (lonlim..., timlimplot..., latlim...)
-        hyperrect = Rect3f(Vec3f(lon0[1], 1, lat[1]), Vec3f(lon0[2]-lon0[1], nd-1, lat[2]-lat[1]))
-        # ideally one should plot the back of the hyperrectangle first and then the front after plotting the events.
-        bb3 = wireframe!(ax3, hyperrect, alpha = 0.5)
+        # # 3d plot limits and bbox
+        # ax3.limits = (lonlim..., timlimplot..., latlim...)
+        # hyperrect = Rect3f(Vec3f(lon0[1], 1, lat[1]), Vec3f(lon0[2]-lon0[1], nd-1, lat[2]-lat[1]))
+        # # ideally one should plot the back of the hyperrectangle first and then the front after plotting the events.
+        # bb3 = wireframe!(ax3, hyperrect, alpha = 0.5)
         
         # plot labelled events flattened over :Ti and :longitude
         # handle neg longitude
@@ -355,15 +407,15 @@ for obs_event in 1:nrow(obs)
 
             hT = labplot!(axT, lon[2], lato, periodo, df.label; reduced = :Ti, colormap = cgrad(:inferno, nd, categorical = true), colorrange = (1,nd))
             hT1 = labplot!(axT, lon[1], lato, periodo, df.label; reduced = :Ti, colormap = cgrad(:inferno, nd, categorical = true), colorrange = (1,nd))
-            hL = labplot!(axL, lon[2], lato, periodo, df.label; reduced = :longitude, nd, colormap = cgrad(:inferno, Int(round(nL*nl)), categorical = true), colorrange = (1,Int(round(nL*nl))))
-            hL1 = labplot!(axL, lon[1], lato, periodo, df.label; reduced = :longitude, nd, colormap = cgrad(:inferno, Int(round(nL*nl)), categorical = true), colorrange = (1,Int(round(nL*nl))))
-            m, ax3 = labplot3!(ax3, lon, latlim, timlim, df.label; colormap)
+            hL = labplot!(axL, lon[2], lato, periodo, df.label; reduced = :longitude, obs_event = obs_event, nd, colormap = cgrad(:inferno, Int(round(nL*nl)), categorical = true), colorrange = (1,Int(round(nL*nl))))
+            hL1 = labplot!(axL, lon[1], lato, periodo, df.label; reduced = :longitude, obs_event = obs_event, nd, colormap = cgrad(:inferno, Int(round(nL*nl)), categorical = true), colorrange = (1,Int(round(nL*nl))))
+            # m, ax3 = labplot3!(ax3, lon, latlim, timlim, df.label; colormap)
             # m1, ax3 = labplot3(ax3, lon2, latlim, timlim; colormap)
         else
             # do once
             hT = labplot!(axT, lono, lato, periodo, df.label; reduced = :Ti, colormap = cgrad(:inferno, nd, categorical = true), colorrange = (1,nd)) # colormap = Makie.Categorical(:inferno))
-            hL = labplot!(axL, lono, lato, periodo, df.label; reduced = :longitude, colormap = cgrad(:inferno, Int(round(nL*nl)), categorical = true), colorrange = (1,Int(round(nL*nl)))) # colormap = Makie.Categorical(:inferno))#
-            m, ax3 = labplot3!(ax3, lonlim, latlim, timlim, df.label; colormap)
+            hL = labplot!(axL, lono, lato, periodo, df.label; reduced = :longitude, obs_event = obs_event, colormap = cgrad(:inferno, Int(round(nL*nl)), categorical = true), colorrange = (1,Int(round(nL*nl)))) # colormap = Makie.Categorical(:inferno))#
+            # m, ax3 = labplot3!(ax3, lonlim, latlim, timlim, df.label; colormap)
         end
     
         axT.limits = (lonlim...,latlim...)
@@ -385,7 +437,7 @@ for obs_event in 1:nrow(obs)
     end
     save(path * "fig/plot_" * trial * "_HistEvent_$(obs_event)_LatLon.png", figT)
     save(path * "fig/plot_" * trial * "_HistEvent_$(obs_event)_LatTime.png", figL)
-    save(path * "fig/plot_" * trial * "event_$(obs_event)_LatLonTime.png", fig3)
+    # save(path * "fig/plot_" * trial * "event_$(obs_event)_LatLonTime.png", fig3)
 
     # or 
     # plot them simultaneously in different colours and plot times separately
@@ -530,10 +582,10 @@ end
 # 
 # df0 = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/SanityCheck_$trial.csv", DataFrame, header=1)
 
-# no lables found for 8 and 13.
+# no lables found for 3, 8 and 14; 25, 31, 36.
 # validation results
 tmp = df0 |> 
-    (df -> groupby(df, :obs_event)) |>
+    (df -> DataFrames.groupby(df, :obs_event)) |>
     (gdf -> combine(gdf, AsTable(:) => t -> nrow(t)))
 # show boxplot/vagina of volume of events
 f = with_theme(theme_latexfonts()) do
