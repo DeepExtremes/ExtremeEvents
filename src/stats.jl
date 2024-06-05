@@ -28,6 +28,13 @@ function defineallstats()
     )
 end
 
+function defineintensitystats()
+    (EventLabel(),
+    Intensity(),
+    Volume(),
+    )
+end
+
 function definetairstats()
     (EventLabel(),
     :time => MinMaxTime(),
@@ -101,6 +108,23 @@ Volume() = Volume(0.0)
 # Update volume by adding grid cells' area (approximated by cosine of latitude)
 function computestat(v::Volume,row)
     v.v = v.v + cosd(row.latitude)
+end
+
+# Intensity of event is cumulative anomalies for all 4 indicators
+mutable struct Intensity{F1<:Float64, F2<:Float64, F3<:Float64, F4<:Float64}
+    h::F1
+    d30::F2
+    d90::F3
+    d180::F4
+end
+Intensity() = Intensity(0.0, 0.0, 0.0, 0.0)
+# Define function computestat for objects of type Intensity:
+# Update Intensity by adding 1-rank weighted by grid cells' area (approximated by cosine of latitude)
+function computestat(in::Intensity, row)
+    in.h = in.h .+ (1 .- row.rt) .* cosd.(row.latitude)
+    in.d30 = in.d30 .+ (1 .- row.rd30) .* cosd.(row.latitude)
+    in.d90 = in.d90 .+ (1 .- row.rd90) .* cosd.(row.latitude)
+    in.d180 = in.d180 .+ (1 .- row.rd180) .* cosd.(row.latitude)
 end
 
 # Define function computestat for objects of type Pair 
@@ -223,6 +247,9 @@ end
 
 appendresult(x::EventYear,t) = (;t...,year=x.ey)
 
+function appendresult(x::Intensity, t)
+    (;t..., inth = x.h, intd30 = x.d30, intd90 = x.d90, intd180 = x.d180,  )
+end
 
 """
     This function is used to create a named tuple from a tuple, appending the elements in a loop
@@ -263,6 +290,31 @@ function fitalldata(tab)
     allstats
 end
 
+function fitalldata1(tab)
+    allstats = [defineintensitystats() for i in 1:1e6];
+    # iterate over CubeTable
+    for t in tab
+        # loop on rows
+        for row in Tables.rows(t)
+            # compute stats for labels > 0 and over land only
+            if row.label > 0 && row.landmask > 0.5
+                # compute stats for current label
+                stat = allstats[row.label]
+                map(stat) do st
+                    # @show st
+                    # skip computestat if stat can't be executed on row (e.g. :gpp => Extrema, for time>2021)
+                    # try
+                        computestat(st,row)
+                    # catch
+                        # do nothing
+                    # end
+                end
+            end
+        end
+    end
+    # return allstats
+    allstats
+end
 
 # apply collect results (convert to DataFrame) and add derived stats
 function toDF(results)
