@@ -11,7 +11,7 @@ end
     Pkg.activate("$(@__DIR__)/..")
 end
 
-@everywhere using Zarr, YAXArrays, EarthDataLab, OnlineStats, WeightedOnlineStats
+@everywhere using Zarr, YAXArrays, EarthDataLab, OnlineStats, WeightedOnlineStats, NetCDF
 @everywhere using DataFrames
 import Tables
 import CSV
