@@ -314,7 +314,7 @@ function cubeplot!(ax, cube, periodt, lato, lon; plotfn = heatmap!, reducefn = m
 end
 
 # plot labels on existing Makie Axis
-function labelplot!(ax, labels, period, lat, lon, lblt; kwargs...)
+function labelplot!(ax, labels::Dataset, period, lat, lon, lblt; kwargs...)
     # subset labelcube
     if typeof(lon) <: Vector
         # load 2 parts and join them
@@ -355,3 +355,29 @@ function getsublabels(labels, period, lat, lon, lblt)
         end
         return sublabels1, axs
     end
+
+    function labelplot!(ax, labels::Tuple, period, lat, lon, lblt; kwargs...)
+    # retrieve relevant labelcube
+    i = findlast((period[1] .>= Date.(startyears)) .& (period[2] .< Date.(startyears .+ 13)))
+    # subset labelcube
+    if typeof(lon) <: Vector
+        # load 2 parts and join them
+        sublabelsp1, axsp1 = getsublabels(labels[i], periodt, lato, lon[1], lblt)
+        sublabelsp2, axsp2 = getsublabels(labels[i], periodt, lato, lon[2], lblt)
+        sublabels1 = cat(sublabelsp1, sublabelsp2, dims = 2)
+        axs = (axsp1[1], Dim{:longitude}(vcat(axsp1[2].val, axsp2[2][1]:0.25:axsp2[2][end])), axsp1[3])
+    else
+        sublabels1, axs = getsublabels(labels[i], period, lat, lon, lblt)
+    end
+    # cols = Makie.Categorical(:tab20)
+    # fg = Figure(); ax1 = Axis(fg)
+    x,y,z = prephm(sublabels1, axs, mode)
+    res = Dict()
+    foreach((x, y) -> push!(res, x => Float64(y)), lblt, eachindex(lblt))
+    # res
+    replace!(z, Tuple(res)...);
+    # heatmap(x, y, z; colormap = cols[1:length(lblt)])
+    h = heatmap!(ax, x, y, z; kwargs...)
+    # h = hm!(ax, sublabels1, axs; fn = mode, kwargs...)
+    return ax, h
+end

@@ -43,11 +43,6 @@ select!(obs0, Not(:Continent, :Year))
 
 # run stats.jl first
 include("../src/stats.jl")
-
-# # load also ERA5 and PEICube
-# peis = open_dataset("/Net/Groups/BGI/work_1/scratch/s3/xaida/v2/PEICube.zarr")
-# zg = zopen("/Net/Groups/BGI/work_1/scratch/s3/xaida/v2/ERA5Data.zarr",consolidated=true, fill_as_missing = false)
-# era = open_dataset(zg)
     
 # for trial in ["ranked_pot0.01_ne0.1"]
 #     eventspath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventCube_$trial.zarr"
@@ -195,27 +190,6 @@ function getx(lon)
     x = lon[1] >= 180 ? x.-360 : x
 end
 
-function labelplot!(ax, labels, period, lat, lon, lblt; kwargs...)
-    # retrieve relevant labelcube
-    i = findlast((period[1] .>= Date.(startyears)) .& (period[2] .< Date.(startyears .+ 13)))
-    # subset labelcube
-    sublabels = labels[i].layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
-    # load to memory and set all other values to 0 (so that they will be set to NaN by prephm)
-    # small events have been discarded from the plot
-    sublabels1 = map(x -> x in lblt ? x : 0, (sublabels.data)[:,:,:]);
-    
-    if any(lon.>180)
-        # modify axes
-        axs = modaxs(sublabels.axes)
-        # modify sublabels1: shift lon
-        shifts = getshifts(axs)
-        sublabels1 = circshift(sublabels1, shifts)
-    else
-        axs = sublabels.axes
-    end
-    h = hm!(ax, sublabels1, axs; fn = mode, kwargs...)
-    return ax, h
-end
 function expand(x::Tuple{Int, Int})
     convert(Tuple{Float64, Float64}, x)
 end
@@ -228,7 +202,8 @@ end
 
 # for trial in ("ranked_pot0.01_ne0.1_cmp_2016_2021")#,"ranked_pot0.01_ne0.1_tcmp_2016_2021"# "ranked_pot0.01_ne0.1_tcmp_2016_2021","ranked_pot0.01_ne0.1_cmp_Sdiam3_T5_new_2016_2021")
 # trial = "ranked_pot0.01_ne0.1_cmp_2016_2021" # "ranked_pot0.01_ne0.1_cmp_2016_2021_land"#"ranked_pot0.01_ne0.1_tcmp_Sdiam3_T5_2016_2021" # "ranked_pot0.01_ne0.1_cmp_2016_2021" # 
-trial = "ranked_pot0.01_ne0.1_cmp_S1_T3"
+trial = "ranked_pot0.01_ne0.1"
+etrial = "$(trial)_cmp_S1_T3"
 startyears = 1970:10:2010 
 intervals = map( y -> (y, y+12), startyears)
 landonly = "landonly"
@@ -237,11 +212,11 @@ statevents = DataFrame()
 labels = ()
 for i in 1:length(intervals)
     # EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1970_1982_landonly.csv
-    eventsi = CSV.read("$(path)EventStats_$(trial)_$(intervals[i][1])_$(intervals[i][2])_$(landonly).csv", DataFrame)
+    eventsi = CSV.read("$(path)EventStats_$(etrial)_$(intervals[i][1])_$(intervals[i][2])_$(landonly).csv", DataFrame)
     eventsi.interval .= i
     append!(statevents, eventsi)
     # look for intersection between spatial and temporal range of events from the table or directly in the labelcube
-    labelpathi = "$(path)labelcube_$(trial)_$(intervals[i][1])_$(intervals[i][2]).zarr"
+    labelpathi = "$(path)labelcube_$(etrial)_$(intervals[i][1])_$(intervals[i][2]).zarr"
     # labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_$trial.zarr"
     labelsi = open_dataset(labelpathi)# labels = Cube(labelpath)
     labels = (labels..., labelsi)
@@ -249,11 +224,11 @@ end
 # labels_all = open_dataset(path * "labelcube_ranked_pot0.01_ne0.1_cmp_2016_2021.zarr")
 
 global df0 = DataFrame()
- # df0 = CSV.read("$(path)SanityCheck_$trial.csv", DataFrame, header=1)
+ # df0 = CSV.read("$(path)SanityCheck_$etrial.csv", DataFrame, header=1)
 
 # loop over observed events
 # tmp = deepcopy(findall(!in(unique(df0.obs_event)),1:36))
-for obs_event in 1 : nrow(obs)
+for obs_event in 8#1 : nrow(obs)
     # obs_event=10
     print(obs[obs_event,:])
     period =( Date(obs[obs_event,:Start]), Date(obs[obs_event,:End])+Day(1))
@@ -292,8 +267,8 @@ for obs_event in 1 : nrow(obs)
 end
 unique!(df0)
 # export to csv
-CSV.write(path * "SanityCheck_$(trial)_all.csv", df0)
-# df0 = CSV.read("$(path)SanityCheck_$trial.csv", DataFrame, header=1)
+CSV.write(path * "SanityCheck_$etrial)_all.csv", df0)
+# global df0 = CSV.read("$(path)SanityCheck_$(etrial)_all.csv", DataFrame, header=1)
 
 ## 20240525 need to do the rest with labels[i] (+solve CubeTable)
 
@@ -435,9 +410,9 @@ for obs_event in 1:nrow(obs)
         end
     
     end
-    save(path * "fig/plot_" * trial * "_HistEvent_$(obs_event)_LatLon.png", figT)
-    save(path * "fig/plot_" * trial * "_HistEvent_$(obs_event)_LatTime.png", figL)
-    # save(path * "fig/plot_" * trial * "event_$(obs_event)_LatLonTime.png", fig3)
+    save(path * "fig/plot_" * etrial * "_HistEvent_$(obs_event)_LatLon.png", figT)
+    save(path * "fig/plot_" * etrial * "_HistEvent_$(obs_event)_LatTime.png", figL)
+    # save(path * "fig/plot_" * etrial * "event_$(obs_event)_LatLonTime.png", fig3)
 
     # or 
     # plot them simultaneously in different colours and plot times separately
@@ -570,7 +545,7 @@ for obs_event in 1:nrow(obs)
             axt.yticklabelsvisible = false;  
         end
         
-        save(path * "fig/plot" * "_" * trial * "_Event_$obs_event" * "_labels.png", fig) 
+        save(path * "fig/plot" * "_" * etrial * "_Event_$obs_event" * "_labels.png", fig) 
     end
 end
 
@@ -580,7 +555,7 @@ end
 # CSV.write(path * "RecentEvents.csv", obs)
 
 # 
-# df0 = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/SanityCheck_$trial.csv", DataFrame, header=1)
+# df0 = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/SanityCheck_$etrial.csv", DataFrame, header=1)
 
 # no lables found for 3, 8 and 14; 25, 31, 36.
 # validation results
@@ -603,7 +578,7 @@ f = with_theme(theme_latexfonts()) do
     ax2.ylabel = L"\log_{10}\text{Area}"
     f
 end
-save(path * "fig/plot" * "_" * trial * "_validation.png", f) 
+save(path * "fig/plot" * "_" * etrial * "_validation.png", f) 
 
 
 # ax2, v2 = violin(f[3,1], df0.obs_event, df0.t2mmax_mean)
@@ -615,3 +590,147 @@ save(path * "fig/plot" * "_" * trial * "_validation.png", f)
 # ax5, v5 = violin(f[6,1], df0.obs_event, df0.pei_180_mean)
 # ax5.ylabel = "Mean PE180"
 # f
+
+################ 
+## Investigate 
+# Event 8: heatwave in British Columbia around 29 June 2021
+Lytton  = (-121.5885 +360, 50.2260284,)
+
+# load also ERA5 and PEICube
+zg = zopen("$(path)ERA5Cube.zarr",consolidated=true, fill_as_missing = false)
+era = open_dataset(zg)
+# For whatever reason, the time axis of pet is 
+# ↗ Time      Sampled{Int64} 1:26663 ForwardOrdered Regular Points
+# instead of 
+# ↗ Ti        Sampled{DateTime} [1950-01-01T00:00:00, …, 2022-12-31T00:00:00] ForwardOrdered Irregular Points
+# solved manually by editing .zmetadata
+tmax = era.t2mmax
+rt = Cube("$(path)tmax_ranked.zarr")
+
+peis = open_dataset(zopen("$(path)PEICube.zarr",consolidated=true, fill_as_missing = false))
+rp = open_dataset(zopen("$(path)pei_ranks.zarr",consolidated=true, fill_as_missing = false))
+
+eec = open_dataset(zopen("$(path)EventCube_$(trial).zarr",consolidated=true, fill_as_missing = false))
+
+period = Date("2021-06-21")..Date("2021-08-17")
+
+deo = eec.layer[time = period, latitude = At(Lytton[2], atol=0.25), longitude = At(Lytton[1], atol=0.25)];
+
+import Statistics
+qtN = Statistics.quantile(tmax[lon = At(Lytton[1], atol=0.25), lat = At(Lytton[2], atol=0.25)][:], [0.99, 0.9])
+qtN .- 273.15
+qpe30N = Statistics.quantile(skipmissing(peis.pei_30[lon = At(Lytton[1], atol=0.25), lat = At(Lytton[2], atol=0.25)][:]), 0.01)
+# qpeiN = mapCube(x -> Statistics.quantile(skipmissing(x), 0.01), peis[lon = At(Lytton[1], atol=0.25), lat = At(Lytton[2], atol=0.25)], indims = InDims(:Ti, ), inplace = false)
+
+stp = era.tp[time = period, latitude = At(Lytton[2], atol=0.25), longitude = At(Lytton[1], atol=0.25)]
+spet = era.pet[time = period, latitude = At(Lytton[2], atol=0.25), longitude = At(Lytton[1], atol=0.25)]
+stmx = tmax[time = period, latitude = At(Lytton[2], atol=0.25), longitude = At(Lytton[1], atol=0.25)];
+spei = peis[time = period, latitude = At(Lytton[2], atol=0.25), longitude = At(Lytton[1], atol=0.25)];
+
+function tspl(;title = nothing, size=(600,450))
+    f = Figure(size=size)
+    
+    tempo = lookup(stp, :Ti)
+    ti = 1:length(tempo)
+
+    ax1 = Axis(f[1,1],
+        xlabel = "Time [day]",
+        ylabel = "°C",)
+    if !isnothing(title)
+        Label(f[1,1, Top()], 
+        text = title,
+        halign = :left
+        )
+    end
+    # Tmax
+    tm = scatter!(ax1,
+        # twinx(), 
+        ti, stmx[:] .- 273.15, #yguideposition = :right, 
+        # yaxis = "Temperature [Kelvin]", 
+        label = "Max. temperature at 2m",
+        # markersize = 2,
+        # markeralpha = 0.3
+        );
+    # thresholds
+    t99 = hlines!(ax1, qtN[2]-273.15, label = "90th") #; xmin = ti[1], xmax = ti[end],  )
+    t90 = hlines!(ax1, qtN[1]-273.15, label = "99th") #; xmin = ti[1], xmax = ti[end], )
+    
+    ax2 = Axis(f[2,1][1,1],
+        xlabel = "Time [day]",
+        ylabel ="mm/day"
+    )
+    # tp
+    btp = barplot!(ax2, ti, stp[:].*1e3, 
+        label = "Total precipitation", 
+        linewidth=0, 
+        linealpha = 1.0,
+        color = :blue,
+        );
+    
+    # pet
+    bpet = barplot!(ax2, ti, spet[:], label = "Ref. evapotranspiration",
+        linewidth=0,
+        linealpha = 1.0,
+        color = :red,
+        );
+
+    ax22 = Axis(f[2,1][2,1],
+        xlabel = "Time [day]",
+        ylabel ="mm/day"
+    )
+    # PE
+    pe30 = lines!(ax22, ti, spei["pei_30"][:], label = "pei_30",);
+    pe90 = lines!(ax22, ti, spei["pei_90"][:], label = "pei_90",);
+    pe180 = lines!(ax22, ti, spei["pei_180"][:], label = "pei_180",);
+    
+    
+    # ax.(
+    #     dpi = 300, 
+    #     size = (800, 600),
+    #     legend = :outerbottom,
+    #     legend_column = 3,
+    #     xlims = (spei.time[1], spei.time[end]),
+    #     );
+    ax3 = Axis(f[3,1],
+        xlabel = "Time [day]",
+        ylabel = "Event"
+        )
+    stairs!(ax3, ti, deo, )
+    linkxaxes!(ax1, ax2, ax3)
+    hidexdecorations!(ax1, grid = false)
+    hidexdecorations!(ax2, grid = false)
+    hidexdecorations!(ax22, grid = false)
+    xpos, ticks = time_ticks(tempo)
+    ax1.xticks = ax2.xticks = ax3.xticks = (xpos, ticks)
+    ax3.xticklabelrotation = π / 4
+    ax3.xticklabelalign = (:right, :center)
+    rowsize!(f.layout,1,Relative(1/4))
+    rowsize!(f.layout,2,Relative(1/2))
+    # rowsize!(f.layout,3,Relative(1/5))
+
+    plots = [tm, t90, t99, btp, bpet, pe30, pe90, pe180]
+    f[4,1] = Legend(f,
+        plots,
+        map(x -> x.label, plots), 
+        position = :lb, 
+        orientation = :horizontal,
+        nbanks = 3,
+        )
+    
+    return f
+end
+
+function time_ticks(dates; frac=8)
+    tempo = string.(Date.(dates))
+    lentime = length(tempo)
+    slice_dates = range(1, lentime, step=lentime ÷ frac)
+    return slice_dates, tempo[slice_dates]
+end
+
+f = tspl(;title = "Lytton, BC, Canada", size=(600,800))
+# When the strong heatwave occurs, PEIs are still ok.
+# Temperature reaches 33.5 degrees on 29th-30th June, far from 
+# Tempertaures remain above 90th percentile for a while
+# but are not so high when the PEI30 drops below the 1% threshold.
+# Temperatures rise again reaching 
+save("$path/fig/Lytton.png", f)
