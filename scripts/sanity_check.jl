@@ -555,9 +555,9 @@ end
 # CSV.write(path * "RecentEvents.csv", obs)
 
 # 
-# df0 = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/SanityCheck_$etrial.csv", DataFrame, header=1)
+# df0 = CSV.read("$(path)/SanityCheck_$etrial.csv", DataFrame, header=1)
 
-# no lables found for 3, 8 and 14; 25, 31, 36.
+# no labels found for 3, 8 and 14; 25, 31, 36.
 # validation results
 tmp = df0 |> 
     (df -> DataFrames.groupby(df, :obs_event)) |>
@@ -619,7 +619,9 @@ deo = eec.layer[time = period, latitude = At(Lytton[2], atol=0.25), longitude = 
 import Statistics
 qtN = Statistics.quantile(tmax[lon = At(Lytton[1], atol=0.25), lat = At(Lytton[2], atol=0.25)][:], [0.99, 0.9])
 qtN .- 273.15
-qpe30N = Statistics.quantile(skipmissing(peis.pei_30[lon = At(Lytton[1], atol=0.25), lat = At(Lytton[2], atol=0.25)][:]), 0.01)
+qpe30N = Statistics.quantile(skipmissing(peis.pei_30[lon = At(Lytton[1], atol=0.25), lat = At(Lytton[2], atol=0.25)][:]), [0.01, 0.1])
+qpe90N = Statistics.quantile(skipmissing(peis.pei_90[lon = At(Lytton[1], atol=0.25), lat = At(Lytton[2], atol=0.25)][:]), [0.01, 0.1])
+qpe180N = Statistics.quantile(skipmissing(peis.pei_180[lon = At(Lytton[1], atol=0.25), lat = At(Lytton[2], atol=0.25)][:]), [0.01, 0.1])
 # qpeiN = mapCube(x -> Statistics.quantile(skipmissing(x), 0.01), peis[lon = At(Lytton[1], atol=0.25), lat = At(Lytton[2], atol=0.25)], indims = InDims(:Ti, ), inplace = false)
 
 stp = era.tp[time = period, latitude = At(Lytton[2], atol=0.25), longitude = At(Lytton[1], atol=0.25)]
@@ -633,7 +635,7 @@ function tspl(;title = nothing, size=(600,450))
     tempo = lookup(stp, :Ti)
     ti = 1:length(tempo)
 
-    ax1 = Axis(f[1,1],
+    ax1 = Axis(f[1,1:3],
         xlabel = "Time [day]",
         ylabel = "°C",)
     if !isnothing(title)
@@ -645,17 +647,18 @@ function tspl(;title = nothing, size=(600,450))
     # Tmax
     tm = scatter!(ax1,
         # twinx(), 
-        ti, stmx[:] .- 273.15, #yguideposition = :right, 
+        ti, stmx[:] .- 273.15, 
         # yaxis = "Temperature [Kelvin]", 
         label = "Max. temperature at 2m",
         # markersize = 2,
-        # markeralpha = 0.3
+        # markeralpha = 0.3,
+        color = :grey50,
         );
     # thresholds
-    t99 = hlines!(ax1, qtN[2]-273.15, label = "90th") #; xmin = ti[1], xmax = ti[end],  )
-    t90 = hlines!(ax1, qtN[1]-273.15, label = "99th") #; xmin = ti[1], xmax = ti[end], )
+    t90 = hlines!(ax1, qtN[2]-273.15, label = "90th percentile", color = :grey50, linestyle = :dot) 
+    t99 = hlines!(ax1, qtN[1]-273.15, label = "99th percentile", color = :grey50, linestyle = :dash) #; xmin = ti[1], xmax = ti[end], )
     
-    ax2 = Axis(f[2,1][1,1],
+    ax2 = Axis(f[2,1:3],
         xlabel = "Time [day]",
         ylabel ="mm/day"
     )
@@ -664,58 +667,110 @@ function tspl(;title = nothing, size=(600,450))
         label = "Total precipitation", 
         linewidth=0, 
         linealpha = 1.0,
-        color = :blue,
+        color = Colors.JULIA_LOGO_COLORS.blue,
         );
     
     # pet
     bpet = barplot!(ax2, ti, spet[:], label = "Ref. evapotranspiration",
         linewidth=0,
         linealpha = 1.0,
-        color = :red,
+        color = Colors.JULIA_LOGO_COLORS.red,
         );
 
-    ax22 = Axis(f[2,1][2,1],
+    ax3 = Axis(f[3,1:3],
         xlabel = "Time [day]",
         ylabel ="mm/day"
     )
     # PE
-    pe30 = lines!(ax22, ti, spei["pei_30"][:], label = "pei_30",);
-    pe90 = lines!(ax22, ti, spei["pei_90"][:], label = "pei_90",);
-    pe180 = lines!(ax22, ti, spei["pei_180"][:], label = "pei_180",);
+    pe30 = lines!(ax3, ti, spei["pei_30"][:], label = "pei_30",);
+    pe90 = lines!(ax3, ti, spei["pei_90"][:], label = "pei_90",);
+    pe180 = lines!(ax3, ti, spei["pei_180"][:], label = "pei_180",);
+    # thresholds
+    pe30_90 = hlines!(ax3, qpe30N[2], label = "pei_30 10th percentile", color = 1, colormap = :tab10, colorrange = (1, 10), linestyle = :dot) #; xmin = ti[1], xmax = ti[end],  )
+    pe30_99 = hlines!(ax3, qpe30N[1], label = "pei_30 1st percentile", color = 1, colormap = :tab10, colorrange = (1, 10), linestyle = :dash) #; xmin = ti[1], xmax = ti[end], )
+    pe90_90 = hlines!(ax3, qpe90N[2], label = "pei_90 10th percentile", color = 2, colormap = :tab10, colorrange = (1, 10), linestyle = :dot) #; xmin = ti[1], xmax = ti[end],  )
+    pe90_99 = hlines!(ax3, qpe90N[1], label = "pei_90 1st percentile", color = 2, colormap = :tab10, colorrange = (1, 10), linestyle = :dash) #; xmin = ti[1], xmax = ti[end], )
+    pe180_90 = hlines!(ax3, qpe180N[2], label = "pei_180 10th percentile", color = 3, colormap = :tab10, colorrange = (1, 10), linestyle = :dot) #; xmin = ti[1], xmax = ti[end],  )
+    pe180_99 = hlines!(ax3, qpe180N[1], label = "pei_180 1st percentile", color = 3, colormap = :tab10, colorrange = (1, 10), linestyle = :dash) #; xmin = ti[1], xmax = ti[end], )
     
     
-    # ax.(
-    #     dpi = 300, 
-    #     size = (800, 600),
-    #     legend = :outerbottom,
-    #     legend_column = 3,
-    #     xlims = (spei.time[1], spei.time[end]),
-    #     );
-    ax3 = Axis(f[3,1],
+    
+    ax4 = Axis(f[4,1:3],
+        backgroundcolor = :transparent,
         xlabel = "Time [day]",
-        ylabel = "Event"
+        ylabel = "Event \n type"
         )
-    stairs!(ax3, ti, deo, )
-    linkxaxes!(ax1, ax2, ax3)
+    cols = [colorant"#FFFFFF",  
+        colorant"#FFB86F", # 1 Light Orange
+        colorant"#A6C5E8", # 2 Light Blue
+        colorant"#A386BB", # 3 Medium Purple (Light)
+        colorant"#4C7FB8", # 4 Medium Blue
+        colorant"#8464A5", # 5 Medium Purple (Medium)
+        colorant"#4C7FB8", # 6 Medium Blue
+        colorant"#8464A5", # 7 Medium Purple (Medium)
+        colorant"#002D5A", # 8 Dark Blue
+        colorant"#65498C", # 9 Medium Purple (Dark)
+        colorant"#002D5A", # 10 Dark Blue
+        colorant"#65498C", # 11 Medium Purple (Dark)
+        colorant"#002D5A", # 12 Dark Blue
+        colorant"#65498C", # 13 Medium Purple (Dark)
+        colorant"#002D5A", # 14 Dark Blue
+        colorant"#65498C", # 15 Medium Purple (Dark)
+        colorant"#BBBBBB", # 16
+        ] 
+    # stairs!(ax3, ti, deo, 
+    #     # color = repeat(deo, inner=2), colorrange = 0:16, colormap = cols
+    # )
+    b = barplot!(ax4, ti, repeat([1], length(deo)), 
+        gap = 0, 
+        color = map(x -> cols[x+1], deo),
+        )
+    translate!(b, 0, 0, -1000)
+    # Colorbar(f[3,1],
+    # )
+
+    # Axes
+    linkxaxes!(ax1, ax2, ax3, ax4)
     hidexdecorations!(ax1, grid = false)
     hidexdecorations!(ax2, grid = false)
-    hidexdecorations!(ax22, grid = false)
+    hidexdecorations!(ax3, grid = false)
+    hidespines!(ax4)
+    hideydecorations!(ax4, label = false)
     xpos, ticks = time_ticks(tempo)
-    ax1.xticks = ax2.xticks = ax3.xticks = (xpos, ticks)
-    ax3.xticklabelrotation = π / 4
-    ax3.xticklabelalign = (:right, :center)
+    ax1.xticks = ax2.xticks = ax3.xticks = ax4.xticks = (xpos, ticks)
+    ax4.xticklabelrotation = π / 4
+    ax4.xticklabelalign = (:right, :center)
+    # arrange plots on
     rowsize!(f.layout,1,Relative(1/4))
-    rowsize!(f.layout,2,Relative(1/2))
-    # rowsize!(f.layout,3,Relative(1/5))
+    rowsize!(f.layout,2,Relative(1/4))
+    rowsize!(f.layout,3,Relative(1/4))
 
-    plots = [tm, t90, t99, btp, bpet, pe30, pe90, pe180]
-    f[4,1] = Legend(f,
+    plots = [tm, t90, t99, btp, bpet, pe30, pe90, pe180, pe30_90, pe30_99]
+    f[5,2:3] = Legend(f,
         plots,
         map(x -> x.label, plots), 
         position = :lb, 
         orientation = :horizontal,
-        nbanks = 3,
+        nbanks = 5,
+        framevisible = false,
         )
+    ecbar = Colorbar(f[5,1], 
+            colormap = cgrad(cols[[1,2,3,4,17]], categorical=true),
+            limits = (-0.5,4.5),
+            halign = :left,
+            spinewidth = 0,
+            ticksvisible = false,
+        )
+    ecbar.ticks = (
+        [4;0:3], 
+        [
+            "no extreme",
+            "10th/90th percentile",
+            "only hot",
+            "only dry",
+            "dry and hot",
+        ],
+    )
     
     return f
 end
@@ -729,7 +784,7 @@ end
 
 f = tspl(;title = "Lytton, BC, Canada", size=(600,800))
 # When the strong heatwave occurs, PEIs are still ok.
-# Temperature reaches 33.5 degrees on 29th-30th June, far from 
+# Temperature reaches 33.5 degrees on 29th-30th June, far from reported maximum of 40+
 # Tempertaures remain above 90th percentile for a while
 # but are not so high when the PEI30 drops below the 1% threshold.
 # Temperatures rise again reaching 
