@@ -133,7 +133,7 @@ function myfig(;size = (2400, 1500), kwargs...)
 fig = Figure(;size = size, kwargs...);
 for t in 1:n
     periodt = (period[1] + (t - 1) * time_lapse, period[1] + t * time_lapse - Day(1))
-    Label(fig[0, t], string(periodt[1]); padding=(2, 2, 2, 2))
+    Label(fig[1, t, Top()], string(periodt[1]); padding=(2, 2, 2, 2))
     lvls = [0.01, 0.1, 0.9]
     for i in 1:4
         # aggregate over time by mode
@@ -210,6 +210,7 @@ end
 Label(fig[1, n+1, Left()], 
     "Tmax (°C)",
     rotation = π/ 2, padding=(2, 2, 2, 2))
+    rotation = π/ 2, padding=(2, 2, 2, 2))
 fg = fig[1,n+1] = GridLayout()
 cbar1 = Colorbar(fg[1,1],
         colormap = Reverse(:lajolla), 
@@ -232,7 +233,7 @@ lt = Legend(fg[1,2],
 # pei
 Label(fig[2, n+1, Left()], 
     "PE30 (mm day⁻¹)",
-    rotation = π/ 2, padding = (4,4,4,4))
+    rotation = π/ 2, padding = (2, 2, 2, 2))
 
 pcbar1 = Colorbar(fig[2,n+1][1,1],
         # label = L"\text{PE30 (mm day}^{-1})",
@@ -254,7 +255,7 @@ lp = Legend(fig[2,n+1][1,2],
     )
 
 # EventCube
-Label(fig[3, n+1, Left()], "Event-Cube", rotation = π/ 2, padding = (4,4,4,4))
+Label(fig[3, n, Right()], "Event-Cube", rotation = π/ 2, padding=(2, 2, 2, 2))
 
 ecbar = Colorbar(fig[3,n+1], 
             colormap = cgrad(etcols[[1,2,3,4,17]], categorical=true),
@@ -292,7 +293,7 @@ ecbar.ticks = (
     )
 
 # labels
-Label(fig[4, n+1, Left()], "Label-Cube", rotation = π/ 2, padding = (4,4,4,4))
+Label(fig[4, n, Right()], "Label-Cube", rotation = π/ 2, padding=(2, 2, 2, 2))
 
 lcbar = Colorbar(fig[4,n+1], 
         # label = L"Labelled CHD events lasting $> 2$ days)",
@@ -313,7 +314,7 @@ end
 
 fontsize_theme = Theme(fontsize = 32)
 fig = with_theme(fontsize_theme) do
-    fig = myfig(font = "DejaVu Sans")
+    fig = myfig()
 end
 
 if haskey(ENV, "https_proxy") && occursin( "bgc-jena", ENV["https_proxy"])
