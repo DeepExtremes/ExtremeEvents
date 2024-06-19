@@ -1,11 +1,11 @@
 using OnlineStats, WeightedOnlineStats
 using DataFrames
-import Dates
+import Dates, Tables
 
 # create function to define the basic stats we want to run on the events as pairs of variable => statistic()
 function defineallstats()
     (EventLabel(),
-    :time => MinMaxTime(),
+    :Ti => MinMaxTime(),
     :longitude => Extrema(),
     :latitude => Extrema(),
     :t2mmax => WeightedMean(),
@@ -30,6 +30,19 @@ end
 
 function defineintensitystats()
     (EventLabel(),
+    :Ti => MinMaxTime(),
+    :longitude => Extrema(),
+    :latitude => Extrema(),
+    :t2mmax => WeightedMean(),
+    :t2mmax => Extrema(),
+    :pei_30 => WeightedMean(),
+    :pei_30 => Extrema(),
+    :pei_90 => WeightedMean(),
+    :pei_90 => Extrema(),
+    :pei_180 => WeightedMean(),
+    :pei_180 => Extrema(),
+    EventType(),
+    LandShare(),
     Intensity(),
     Volume(),
     )
@@ -119,12 +132,13 @@ mutable struct Intensity{F1<:Float64, F2<:Float64, F3<:Float64, F4<:Float64}
 end
 Intensity() = Intensity(0.0, 0.0, 0.0, 0.0)
 # Define function computestat for objects of type Intensity:
-# Update Intensity by adding 1-rank weighted by grid cells' area (approximated by cosine of latitude)
+# Update Intensity by adding threshold - rank only when threshold is passed over weighted by grid cells' area (approximated by cosine of latitude)
+# multiplied by 100, so that value is between 0 and 1.
 function computestat(in::Intensity, row)
-    in.h = in.h .+ (1 .- row.rt) .* cosd.(row.latitude)
-    in.d30 = in.d30 .+ (1 .- row.rd30) .* cosd.(row.latitude)
-    in.d90 = in.d90 .+ (1 .- row.rd90) .* cosd.(row.latitude)
-    in.d180 = in.d180 .+ (1 .- row.rd180) .* cosd.(row.latitude)
+    in.h = in.h .+ max.(0.01 .- row.rt, 0.0 ) .* cosd.(row.latitude) .* 100
+    in.d30 = in.d30 .+ max.(0.01 .- row.rd30, 0.0) .* cosd.(row.latitude) .* 100
+    in.d90 = in.d90 .+ max.(0.01 .- row.rd90, 0.0) .* cosd.(row.latitude) .* 100
+    in.d180 = in.d180 .+ max.(0.01 .- row.rd180, 0.0) .* cosd.(row.latitude) .* 100
 end
 
 # Define function computestat for objects of type Pair 
