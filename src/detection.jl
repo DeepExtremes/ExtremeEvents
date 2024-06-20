@@ -1,4 +1,4 @@
-using YAXArrays, EarthDataLab, DiskArrays
+using YAXArrays, DiskArrays, Dates, DimensionalData
 """
     rescale(inputcube::YAXArray, outputpath::String; <keyword arguments>))
 
@@ -321,7 +321,7 @@ end
     overwrite = true, backend = :zarr)
 
 Function to compute quantiles q over reference period ref for each day of the year using moving window 2*w+1 centered on day of the year.
-    For leap years, the missing day of the year, the window ignores the missing 29th February (only 2*w values).
+    Quantiles for Feb 29 are computed centered on Mar 01 for non leap years.
     Days from the end (beginning) of the time series are added for dates <= (>) w.
 
 """
@@ -331,6 +331,119 @@ function qdoy(
     outputpath::String;
     ref::Tuple{Int,Int} = (1971,2000), 
     w::Int = 15, 
+    q::Vector = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975, 0.99],
+    overwrite = true,
+    backend = :zarr,
+    chunksizes = Dict("longitude" => 60, "latitude" => 60, "doy" => 366, "quantiles" => 10),
+    )
+
+    # assert that c has a time axis with years ref
+    s = try
+        # c[time = Date(ref[1])..Date(ref[2]+1) - Day(1), latitude = At(Lytton[2], atol=0.25), longitude = At(Lytton[1], atol=0.25)]
+        # c[time = Date(ref[1])..Date(ref[2]+1) - Day(1), latitude = 45.0 .. 46.0, longitude = 15.0 .. 16.0]
+        c[time = Date(ref[1])..Date(ref[2]+1) - Day(1)]
+    catch
+        @error "Input YAXArray c should have a time axis containing reference years $ref"
+    end
+
+    # day of year for a leap year
+    doy = map(x->Dates.format(x, "u-d"), Dim{:Time}(Date("2000-01-01"):Day(1):Date("2000-12-31")))
+    ndays = length(doy)
+
+    # time axis
+    ti = lookup(s, :Ti)
+    n = length(ti)
+
+    ## filterig by month-day
+    monthday = map(x->Dates.format(x, "u-d"), ti)
+    
+    # number of years
+    NpY = size(monthday,1)÷(ndays-1)
+
+    ## leap years
+    leapyears = map(x -> isleapyear(Date(x)), Dates.year(ti[1]):Dates.year(ti[end]))
+
+    ## get the day-month indices for data subsetting
+    idx = Array{Union{Missing, Int64}}(missing, ndays, NpY)
+    for i in 1:(ndays)
+        if i != 60
+            idx[i,:] = Int.(findall(x-> x == doy[i], monthday))
+        else
+            # for non leapyears, use Mar-01
+            idx[i, :] = Int.(findall(x-> x == doy[i+1], monthday))
+            # replace values at Feb-29
+            idx[i,leapyears] = Int.(findall(x-> x == doy[i], monthday))
+        end
+    end
+
+    # precompute indices in Ti for each doy
+    indices = map(eachslice(idx, dims=1)) do x
+        values = map(skipmissing(x)) do y
+            if y <= w
+                o = 1 : (y+w)
+                # add end of time series
+                cat(o, (n+(y-w)) : n, dims = 1)
+            elseif y > (n-w)
+                o = (y-w) : n
+                # add beginning of time series
+                cat(1 : (y+w-n), o, dims = 1)
+            else
+                (y-w) : (y+w)
+            end
+        end
+        sort(cat(values..., dims=1))
+    end
+
+    # input dimension: time
+    indims = InDims(:Ti;
+        # artype = YAXArray
+        # artype = DimArray
+        )
+ 
+    # output YAXArray should have time dimension as day of year
+    outdims = OutDims(Dim{:doy}(doy), Dim{:quantiles}(q),
+        # outtype = Any, # same as (first) input
+        chunksize = chunksizes, 
+        path = outputpath,
+        overwrite = overwrite,
+        backend = backend,
+    )
+
+    # map quantile computation over each grid cell
+    mapCube(getquantiles!, s, indices, q; indims = indims, outdims = outdims)
+
+    # edit metadata
+    # replace name
+
+end
+
+# compute quantiles from indices
+function getquantiles!(xout, xin, indices, q)
+    
+    quantiles = map(indices) do idxi
+        Statistics.quantile(skipmissing(xin[idxi]), q)
+    end
+    # xout has size (366,10)
+    xout[:] = stack(quantiles, dims=1)[:]
+    return xout
+end
+
+#
+
+"""
+    qref(c::YAXArray, outputpath::String; ref::NTuple{Int,Int} = (1971,2000), 
+    q::Vector = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975, 0.99], 
+    overwrite = true, backend = :zarr)
+
+Function to compute quantiles q over reference period ref.
+    Output has no time dimension.
+
+"""
+#
+function qref(
+    c::YAXArray,
+    outputpath::String;
+    ref::Tuple{Int,Int} = (1971,2000), 
     q::Vector = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975, 0.99],
     overwrite = true,
     backend = :zarr
@@ -345,79 +458,25 @@ function qdoy(
         @error "Input YAXArray c should have a time axis containing reference years $ref"
     end
 
-    # day of year for a leap year
-    doy = map(x->Dates.dayofyear(x), Dim{:Time}(Date("2000-01-01"):Day(1):Date("2000-12-31")))
-    
     # map quantile computation over each grid cell
     indims = InDims(:Ti;
         # artype = YAXArray
-        artype = DimArray
+        # artype = DimArray
         )
  
-    outdims = OutDims(Dim{:doy}(doy), Dim{:quantiles}(q),
-        outtype = Float32,
+    outdims = OutDims(Dim{:quantiles}(q),
+        # outtype = Any, #same as input
         # chunksize = :input, 
         path = outputpath,
         overwrite = overwrite,
         backend = backend,
     )
-    # output YAXArray should have time dimension as day of year
-    # time axis
-    ti = lookup(s, :Ti)
-    mapCube(getquantiles!, s, ti, q, w; indims = indims, outdims = outdims)
+    
+    mapCube(getquantiles!, s, q; indims = indims, outdims = outdims)
 
 end
 
-# from YAXArrays tuto
-function getquantiles!(xout, xin, ti, q, w)
-    # even if artype is set to YAXArray, in is passed as a SubArray (not DimArray). 
-    # Hence, add ti as argument
-    c = xin
-    ndays = 365
-    ## filterig by month-day
-    monthday = map(x->Dates.format(x, "u-d"), ti)
-    # # for a leap year
-    # datesid = map(x->Dates.format(x, "u-d"), Dim{:Time}(Date("2000-01-01"):Day(1):Date("2000-12-31")))
-    # ## number of years
-    NpY = size(monthday,1)÷ndays
-    idx = Array{Union{Missing, Int64}}(missing, ndays+1, NpY)
-    ## leap years
-    leapyears = map(x -> isleapyear(Date(x)), Dates.year(ti[1]):Dates.year(ti[end]))
-    ## get the day-month indices for data subsetting
-    for i in 1:(ndays+1)
-        if i != 60
-            idx[i,:] = Int.(findall(x-> x == datesid[i], monthday))
-        else
-            # Feb-29
-            idx[i,leapyears] = Int.(findall(x-> x == datesid[i], monthday))
-        end
-    end
-    # version below only for each dayofyear without window.
-    quantiles = map(eachslice(idx, dims=1)) do x
-        values = map(skipmissing(x)) do y
-            if y <= w
-                o = c[1 : y+w]
-                # add end of time series
-                cat(o,c[end+(y-w) : end], dims = 1)
-            elseif y > length(ti)-w
-                o = c[y-w : end]
-                # add beginning of time series
-                cat(c[1 : y+w-length(ti)], o, dims = 1)
-            else
-                c[y-w : y+w]
-            end
-        end
-        # typeof(values)
-        # Vector{YAXArray{Union{Missing, Float64}, 1, Vector{Union{Missing, Float64}}, D, Dict{String, Any}} where D} (alias for Array{YAXArray{Union{Missing, Float64}, 1, Array{Union{Missing, Float64}, 1}, D, Dict{String, Any}} where D, 1})
-        # how could I get just a YAXArray?
-        # if I cat(values, dims=:Ti), Ti axis is empty. but maybe not a problem as long as I can access the data
-        v = cat(values..., dims=1)
-        Statistics.quantile(skipmissing(v), q)
-    end
-  
-    # # from YAXArrays
-    # InDims(YAXArrays.MovingWindow("Time", 15, 15); window_oob_value = missing)
-    xout[:] = stack(quantiles, dims=1)[:]
+function getquantiles!(xout, xin, q)
+    xout[:] = Statistics.quantile(skipmissing(xin), q)
     return xout
 end
-

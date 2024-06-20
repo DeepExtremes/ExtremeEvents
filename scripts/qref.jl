@@ -24,19 +24,16 @@ path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
 
 zg = zopen("$(path)ERA5Cube.zarr",consolidated=true, fill_as_missing = false)
 era = Cube(open_dataset(zg))
-# tmax = era.t2mmax
 
-@time qdoy(
+@time qref(
     era, #[latitude = 40.0 .. 42.0, longitude = 10.0 .. 12.0], #tmax
-    "$(path)qdoy_era.zarr/";
+    "$(path)qref_era_1971_2000.zarr/";
     ref = (1971,2000), 
-    w = 15, 
     q = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975, 0.99],
     overwrite = true,
     backend = :zarr
     )
-# Progress: 100%|█████████████████████████████████████████| Time: 6:59:44[K
-# 25198.262774 seconds (28.88 M allocations: 1.909 GiB, 0.00% gc time, 0.07% compilation time)
+# 7694.231031 seconds (25.78 M allocations: 1.706 GiB, 0.01% gc time, 0.20% compilation time)
 
 println("done!")
 
