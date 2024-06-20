@@ -35,7 +35,7 @@ if occursin("/Users", pwd())
     path = "https://s3.bgc-jena.mpg.de:9000/deepextremes/v3/"
     patho = "./"
 else
-    path = "/Net/Groups/BGI/work_1/scratch/s3/deepextremes/v3"
+    path = "/Net/Groups/BGI/work_1/scratch/s3/deepextremes/v3/"
     patho = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
 end
 
