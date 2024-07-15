@@ -87,6 +87,8 @@ sbatch label_events.slurm
 - labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_2000_2012.zarr
 - labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022.zarr
 
+The labels are then merged into a single mergedlabels cube.
+
 
 ### Compute statistics
 Statistics for all labelled events are computed and gathered in a unique table.
@@ -96,13 +98,7 @@ sbatch stats_extremes.slurm
 ```
 
 *Output*: 
-- EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1950_1962_landonly.csv
-- EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1960_1972_landonly.csv
-- EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1970_1982_landonly.csv
-- EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1980_1992_landonly.csv
-- EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1990_2002_landonly.csv
-- EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_2000_2012_landonly.csv
-- EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022_landonly.csv
+- MergedEventStats_landonly.csv
 
 ```julia
 plot_stats.jl
