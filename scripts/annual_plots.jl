@@ -42,8 +42,8 @@ aml= Cube("$(path)AnnualMaxLabel_cmp_S1_T3.zarr")
 
 years = lookup(aec, :year, )
 
-cmap = vcat(colorant"grey95", resample_cmap(cgrad(:viridis, 100, categorical = true), 100))
-cmap1 = vcat(colorant"grey95", resample_cmap(Reverse(:acton50),50))#cgrad(:acton50, 50, categorical = true))
+cmap = vcat(colorant"grey99", resample_cmap(cgrad(:viridis, 100, categorical = true), 100))
+cmap1 = vcat(colorant"grey99", resample_cmap(Reverse(:acton50),50))#cgrad(:acton50, 50, categorical = true))
 
 lon = lookup(aec, :longitude);
 lat = lookup(aec, :latitude)[end:-1:1];
@@ -61,15 +61,16 @@ shifts = getshifts(axs)
 # shifts_aml = getshifts(axsl)
 
 plotorder = ["d30", "d90", "d180", "h", "dh"]
-# plottitles = ["30 days evaporative stress"]
+plottitles = ["dry (30 days)", "dry (90 days)", "dry (180 days)", "hot", "dry and hot"]
 
 pmap(years) do y
-f0 = Figure(;size=(1500,600), fontsize = 32);
+f0 = Figure(;size=(1500,600), fontsize = 24);
 for i in eachindex(plotorder)
     row = Int((i + 2.5) ÷ 3)
     col = i - 3 * (i ÷ 4)
     # @show (row, col)
-    ax = GeoAxis(f0[row,col], title = plotorder[i]);
+    ax = #GeoAxis
+        Axis(f0[row,col], title = plottitles[i]);
     s = surface!(ax, nlon, lat, circshift(aec[year = At(y), net = At(plotorder[i])].data[:,end:-1:1], shifts),
         colormap = cmap1,
         colorrange=(0,100),
@@ -80,13 +81,16 @@ for i in eachindex(plotorder)
         color = :grey50, linewidth=0.85,
         )
     translate!(cl, 0, 0, 1000);
-    # remove gridlines
-    ax.xgridcolor[] = colorant"transparent";
-    ax.ygridcolor[] = colorant"transparent";
-    ax.xticklabelsvisible = false;
-    ax.yticklabelsvisible = false;
+    # # remove gridlines
+    # ax.xgridcolor[] = colorant"transparent";
+    # ax.ygridcolor[] = colorant"transparent";
+    # ax.xticklabelsvisible = false;
+    # ax.yticklabelsvisible = false;
+    # remove decorations
+    hidedecorations!(ax)
 end
-ax = GeoAxis(f0[2,3], title = "Labels")
+ax = #GeoAxis
+    Axis(f0[2,3], title = "labels")
 yml = circshift(aml[year = At(y)].data[:,end:-1:1], shifts)
 # replace 0 by NaN
 replace!(yml, 0 => missing)
@@ -98,11 +102,14 @@ l = surface!(ax, nlon, lat, yml,
         color = :grey50, linewidth=0.85,
         )
     translate!(cl, 0, 0, 1000);
-    # remove gridlines
-    ax.xgridcolor[] = colorant"transparent";
-    ax.ygridcolor[] = colorant"transparent";
-    ax.xticklabelsvisible = false;
-    ax.yticklabelsvisible = false;
+    # # remove gridlines
+    # ax.xgridcolor[] = colorant"transparent";
+    # ax.ygridcolor[] = colorant"transparent";
+    # ax.xticklabelsvisible = false;
+    # ax.yticklabelsvisible = false;
+    # remove decorations
+    hidedecorations!(ax)
+
 
 cbar = Colorbar(f0[1,4], colormap = cmap1,
         colorrange=(0,100),
