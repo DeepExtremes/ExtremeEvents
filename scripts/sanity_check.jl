@@ -557,23 +557,27 @@ end
 # 
 # df0 = CSV.read("$(path)/SanityCheck_$etrial.csv", DataFrame, header=1)
 
-# no labels found for 3, 8 and 14; 25, 31, 36.
+# no labels found for 3, 8 and 14; 25, 31, 36???
+# now Tue 2024-06-11, I have no lables for 13, 25, 26, 32-34, 36-39...
 # validation results
+obs_compound = filter(:Event=>!=("drought"), obs)[!, :obs_event]
 tmp = df0 |> 
     (df -> DataFrames.groupby(df, :obs_event)) |>
     (gdf -> combine(gdf, AsTable(:) => t -> nrow(t)))
+tmp1 = df0 #|>
+    # (df -> filter(:obs_event => in(obs_compound), df)) 
 # show boxplot/vagina of volume of events
 f = with_theme(theme_latexfonts()) do
     f = Figure(size = (1000,400));
-    ax,v = boxplot(f[1,1],df0.obs_event, log10.(df0.volume));
+    ax,v = boxplot(f[1,1], tmp1.obs_event, log10.(tmp1.volume));
     ax.xticks = (tmp.obs_event, ["$x\n($y)" for (x,y) in zip(tmp.obs_event,tmp.label_start_time_etc_function)])
     ax.xticklabelsvisible = false;
     ax.ylabel = L"\log_{10}\text{Volume}"
-    ax1,v1 = boxplot(f[2,1], df0.obs_event, Dates.value.(df0.end_time .- df0.start_time) .+ 1);
+    ax1,v1 = boxplot(f[2,1], tmp1.obs_event, Dates.value.(tmp1.end_time .- tmp1.start_time) .+ 1);
     ax1.xticks = (tmp.obs_event, ["$x\n($y)" for (x,y) in zip(tmp.obs_event,tmp.label_start_time_etc_function)])
     ax1.xticklabelsvisible = false;
     ax1.ylabel = L"\text{Duration (days)}"
-    ax2,v2 = boxplot(f[3,1], df0.obs_event, log10.(df0.area));
+    ax2,v2 = boxplot(f[3,1], tmp1.obs_event, log10.(tmp1.area));
     ax2.xticks = (tmp.obs_event, ["$x\n($y)" for (x,y) in zip(tmp.obs_event,tmp.label_start_time_etc_function)])
     ax2.ylabel = L"\log_{10}\text{Area}"
     f
@@ -593,8 +597,13 @@ save(path * "fig/plot" * "_" * etrial * "_validation.png", f)
 
 ################ 
 ## Investigate 
-# Event 8: heatwave in British Columbia around 29 June 2021
-Lytton  = (-121.5885 +360, 50.2260284,)
+mutable struct City
+    name::String
+    title::String
+    lat::Float64
+    lon::Float64
+    period::Any
+end
 
 # load also ERA5 and PEICube
 zg = zopen("$(path)ERA5Cube.zarr",consolidated=true, fill_as_missing = false)
@@ -612,25 +621,22 @@ rp = open_dataset(zopen("$(path)pei_ranks.zarr",consolidated=true, fill_as_missi
 
 eec = open_dataset(zopen("$(path)EventCube_$(trial).zarr",consolidated=true, fill_as_missing = false))
 
-period = Date("2021-06-21")..Date("2021-08-17")
-
-deo = eec.layer[time = period, latitude = At(Lytton[2], atol=0.25), longitude = At(Lytton[1], atol=0.25)];
-
 import Statistics
-qtN = Statistics.quantile(tmax[lon = At(Lytton[1], atol=0.25), lat = At(Lytton[2], atol=0.25)][:], [0.99, 0.9])
-qtN .- 273.15
-qpe30N = Statistics.quantile(skipmissing(peis.pei_30[lon = At(Lytton[1], atol=0.25), lat = At(Lytton[2], atol=0.25)][:]), [0.01, 0.1])
-qpe90N = Statistics.quantile(skipmissing(peis.pei_90[lon = At(Lytton[1], atol=0.25), lat = At(Lytton[2], atol=0.25)][:]), [0.01, 0.1])
-qpe180N = Statistics.quantile(skipmissing(peis.pei_180[lon = At(Lytton[1], atol=0.25), lat = At(Lytton[2], atol=0.25)][:]), [0.01, 0.1])
-# qpeiN = mapCube(x -> Statistics.quantile(skipmissing(x), 0.01), peis[lon = At(Lytton[1], atol=0.25), lat = At(Lytton[2], atol=0.25)], indims = InDims(:Ti, ), inplace = false)
+function plot_city(city::City)
+    deo = eec.layer[time = city.period, latitude = At(city.lat, atol=0.25), longitude = At(city.lon, atol=0.25)];
 
-stp = era.tp[time = period, latitude = At(Lytton[2], atol=0.25), longitude = At(Lytton[1], atol=0.25)]
-spet = era.pet[time = period, latitude = At(Lytton[2], atol=0.25), longitude = At(Lytton[1], atol=0.25)]
-stmx = tmax[time = period, latitude = At(Lytton[2], atol=0.25), longitude = At(Lytton[1], atol=0.25)];
-spei = peis[time = period, latitude = At(Lytton[2], atol=0.25), longitude = At(Lytton[1], atol=0.25)];
+    qtN = Statistics.quantile(tmax[lon = At(city.lon, atol=0.25), lat = At(city.lat, atol=0.25)][:], [0.99, 0.9])
+    qtN .- 273.15
+    qpe30N = Statistics.quantile(skipmissing(peis.pei_30[lon = At(city.lon, atol=0.25), lat = At(city.lat, atol=0.25)][:]), [0.01, 0.1])
+    qpe90N = Statistics.quantile(skipmissing(peis.pei_90[lon = At(city.lon, atol=0.25), lat = At(city.lat, atol=0.25)][:]), [0.01, 0.1])
+    qpe180N = Statistics.quantile(skipmissing(peis.pei_180[lon = At(city.lon, atol=0.25), lat = At(city.lat, atol=0.25)][:]), [0.01, 0.1])
 
-function tspl(;title = nothing, size=(600,450))
-    f = Figure(size=size)
+    stp = era.tp[time = city.period, latitude = At(city.lat, atol=0.25), longitude = At(city.lon, atol=0.25)]
+    spet = era.pet[time = city.period, latitude = At(city.lat, atol=0.25), longitude = At(city.lon, atol=0.25)]
+    stmx = tmax[time = city.period, latitude = At(city.lat, atol=0.25), longitude = At(city.lon, atol=0.25)]
+    spei = peis[time = city.period, latitude = At(city.lat, atol=0.25), longitude = At(city.lon, atol=0.25)]
+    
+    f = Figure(size=(600,800))
     
     tempo = lookup(stp, :Ti)
     ti = 1:length(tempo)
@@ -638,12 +644,11 @@ function tspl(;title = nothing, size=(600,450))
     ax1 = Axis(f[1,1:3],
         xlabel = "Time [day]",
         ylabel = "°C",)
-    if !isnothing(title)
-        Label(f[1,1, Top()], 
-        text = title,
+    Label(f[1,1, Top()], 
+        text = city.title,
         halign = :left
         )
-    end
+    
     # Tmax
     tm = scatter!(ax1,
         # twinx(), 
@@ -693,8 +698,6 @@ function tspl(;title = nothing, size=(600,450))
     pe180_90 = hlines!(ax3, qpe180N[2], label = "pei_180 10th percentile", color = 3, colormap = :tab10, colorrange = (1, 10), linestyle = :dot) #; xmin = ti[1], xmax = ti[end],  )
     pe180_99 = hlines!(ax3, qpe180N[1], label = "pei_180 1st percentile", color = 3, colormap = :tab10, colorrange = (1, 10), linestyle = :dash) #; xmin = ti[1], xmax = ti[end], )
     
-    
-    
     ax4 = Axis(f[4,1:3],
         backgroundcolor = :transparent,
         xlabel = "Time [day]",
@@ -718,16 +721,11 @@ function tspl(;title = nothing, size=(600,450))
         colorant"#65498C", # 15 Medium Purple (Dark)
         colorant"#BBBBBB", # 16
         ] 
-    # stairs!(ax3, ti, deo, 
-    #     # color = repeat(deo, inner=2), colorrange = 0:16, colormap = cols
-    # )
     b = barplot!(ax4, ti, repeat([1], length(deo)), 
         gap = 0, 
         color = map(x -> cols[x+1], deo),
         )
     translate!(b, 0, 0, -1000)
-    # Colorbar(f[3,1],
-    # )
 
     # Axes
     linkxaxes!(ax1, ax2, ax3, ax4)
@@ -755,14 +753,14 @@ function tspl(;title = nothing, size=(600,450))
         framevisible = false,
         )
     ecbar = Colorbar(f[5,1], 
-            colormap = cgrad(cols[[1,2,3,4,17]], categorical=true),
+            colormap = cgrad(cols[[17,1,2,3,4]], categorical=true),
             limits = (-0.5,4.5),
             halign = :left,
             spinewidth = 0,
             ticksvisible = false,
         )
     ecbar.ticks = (
-        [4;0:3], 
+        0:4, 
         [
             "no extreme",
             "10th/90th percentile",
@@ -772,6 +770,7 @@ function tspl(;title = nothing, size=(600,450))
         ],
     )
     
+    save("$path/fig/City_$(city.name).png", f)
     return f
 end
 
@@ -782,10 +781,26 @@ function time_ticks(dates; frac=8)
     return slice_dates, tempo[slice_dates]
 end
 
-f = tspl(;title = "Lytton, BC, Canada", size=(600,800))
+# Event 8: heatwave in British Columbia around 29 June 2021
+Lytton  = (-121.5885 +360, 50.2260284,)
+period = Date("2021-06-21")..Date("2021-08-17")
+f = plot_city(City("Lytton", "Lytton, BC, Canada", 50.2260284, -121.5885 +360, Date("2021-06-21")..Date("2021-08-17")))
 # When the strong heatwave occurs, PEIs are still ok.
-# Temperature reaches 33.5 degrees on 29th-30th June, far from reported maximum of 40+
-# Tempertaures remain above 90th percentile for a while
-# but are not so high when the PEI30 drops below the 1% threshold.
-# Temperatures rise again reaching 
-save("$path/fig/Lytton.png", f)
+    # Temperature reaches 33.5 degrees on 29th-30th June, far from reported maximum of 40+
+    # Tempertaures remain above 90th percentile for a while
+    # but are not so high when the PEI30 drops below the 1% threshold.
+    # Temperatures rise again reaching 
+    
+# Event 33: heatwave in France 2003. Lyon - Latitude : 45.750000. Longitude : 4.850000
+f = plot_city(City("Lyon", "Lyon, France", 45.75, 4.85, Date("2003-07-10")..Date("2003-08-31")))
+f = plot_city(City("Clermont", "Clermont-Ferrand, France", 45.7871015,3.071508, Date("2003-07-10") .. Date("2003-09-09")))
+f = plot_city(City("Clermont1", "Clermont-Ferrand, France", 45.7871015,3.071508, Date("2003-07-10") .. Date("2003-09-30")))
+# Carcassone: Latitude : 43.216667. Longitude : 2.350000
+# Event 33 - France/Europe heatwave of 2003
+f = plot_city(City("Carcassonne", "Carcassone, France", 43.22, 2.35, Date("2003-07-10") .. Date("2003-08-31")))
+# Beauraing
+f = plot_city(City("Beauraing_22", "Beauraing, Belgium", 50.1102, 4.9554, Date("2022-06-21") .. Date("2022-09-20")))
+f = plot_city(City("Beauraing_21", "Beauraing, Belgium", 50.1102, 4.9554, Date("2021-06-21") .. Date("2021-09-20")))
+f = plot_city(City("Beauraing_20", "Beauraing, Belgium", 50.1102, 4.9554, Date("2020-06-21") .. Date("2020-09-20")))
+f = plot_city(City("Beauraing_19", "Beauraing, Belgium", 50.1102, 4.9554, Date("2019-06-21") .. Date("2019-09-20")))
+f = plot_city(City("Beauraing_18", "Beauraing, Belgium", 50.1102, 4.9554, Date("2018-06-21") .. Date("2018-09-20")))
