@@ -1,8 +1,19 @@
-using YAXArrays, DiskArrays, Dates, DimensionalData
+module detection
+using YAXArrays
+using DiskArrays
+using Zarr # (default backend)
+using Dates: Date
+using DimensionalData: DimensionalData
+using Distributed
+# spatial filter
+using SphericalConvolutions
+
+export rescale, compute_extremes, qdoy, qref
+
 """
     rescale(inputcube::YAXArray, outputpath::String; <keyword arguments>))
 
-Rescale time series between 0 and 1
+Rescale (rank transform) time series between 0 and 1
 ### Arguments
 * `inputcube`: Data cube with Time dimension
 * `outputpath`: Path to write result to disk
@@ -24,12 +35,12 @@ function rescale(
 )  
 
     # apply rank_transform to time series
-    indims = InDims("Time")
+    indims = InDims("Ti")
     outdims = OutDims(
-        "Time", 
+        "Ti", 
         path=outputpath, 
-        backend=:zarr, 
-        overwrite=true, 
+        backend=backend, 
+        overwrite=overwrite, 
         chunksize=chunksize,
         )
 
@@ -38,7 +49,7 @@ function rescale(
         inputcube;
         indims=indims,
         outdims=outdims,
-        max_cache=1e9,
+        max_cache=max_cache,
         multiplier=multiplier
         )
 end
@@ -66,67 +77,70 @@ function rank_transform!(xout, xin; multiplier = nothing)
 end
 
 
-"""
-    smooth(inputcube::YAXArray, outputpath::AbstractString; <keyword arguments>)
-apply low-pass spatial filter
-## Arguments
-* `inputcube`: Input data cube (of type YAXArray) with Lon and Lat dimensions, on which to apply the low-pass spatial filter.
-* `outputpath`: Path to write result to disk
-## Keyword Arguments
-* `lbord`: parameter of low-pass filter. Defaults to 20
-* `width`: parameter of low-pass filter. Defaults to 2
-* `backend`: Backend for writing cube to disk. Defaults to :zarr
-* `overwrite`: If false, output will only be written to outputpath if no such file exists. Defaults to true.
-* `max_cache`: Maximum cache size. Defaults to 5e8.
-"""
-function smooth(
-    inputcube::YAXArray,
-    outputpath::AbstractString;
-    lbord::Integer = 20,
-    width::Integer = 2,
-    backend::Symbol = :zarr,
-    overwrite::Bool = true,
-    max_cache::Float64 = 5e8
-)
-    function applylowpass(xout,xin;lbord=lbord,width=width)
-        # @show size(xin)
-        im2 = [xin[j,i] for i in size(xin,2):-1:2,j in 1:(size(xin,1)-1)]
-        # @show im2
-        # @show lbord
-        # @show width
-        imfiltered = SphericalConvolutions.lowpass(Float64.(im2),lbord = lbord,width=width)
-        # @show imfiltered
-        xout[1:end-1,end:-1:2] = permutedims(imfiltered)
-        xout[end,:] = xout[end-1,:]
-        xout[:,1] = xout[:,end]
-        # @show size(xout)
-        # @show sum(ismissing(xout))
-        xout
-    end
-
-    # apply low pass filter to spatial data
-    indims = InDims("Lon","Lat")
-    outdims = OutDims(
-        "Lon","Lat",
-        path=outputpath,
-        backend=backend,
-        overwrite=overwrite)
+# """
+#     smooth(inputcube::YAXArray, outputpath::AbstractString; <keyword arguments>)
+# apply low-pass spatial filter
+# ## Arguments
+# * `inputcube`: Input data cube (of type YAXArray) with Lon and Lat dimensions, on which to apply the low-pass spatial filter.
+# * `outputpath`: Path to write result to disk
+# ## Keyword Arguments
+# * `lat` : name (String) of latitude dimension. Defaults to "latitude"
+# * `lon` : name (String) of longitude dimension. Default to "longitude"
+# * `lbord`: parameter of low-pass filter. Defaults to 20
+# * `width`: parameter of low-pass filter. Defaults to 2
+# * `backend`: Backend for writing cube to disk. Defaults to :zarr
+# * `overwrite`: If false, output will only be written to outputpath if no such file exists. Defaults to true.
+# * `max_cache`: Maximum cache size. Defaults to 5e8.
+# """
+# function smooth(
+#     inputcube::YAXArray,
+#     outputpath::AbstractString;
+#     lat = "latitude",
+#     lon = "longitude",
+#     lbord::Integer = 20,
+#     width::Integer = 2,
+#     backend::Symbol = :zarr,
+#     overwrite::Bool = true,
+#     max_cache::Float64 = 5e8
+# )
+#     # apply low pass filter to spatial data
+#     indims = InDims(lon, lat)
+#     outdims = OutDims(
+#         lon, lat,
+#         path=outputpath,
+#         backend=backend,
+#         overwrite=overwrite)
     
-    # limit number of threads to 1 per worker. (lowpass doesn't work with multiple threads)
-    ntr = Dict(w=>1 for w in workers())
-    @show ntr
+#     # limit number of threads to 1 per worker. (lowpass doesn't work with multiple threads)
+#     ntr = Dict(w=>1 for w in workers())
+#     @show ntr
 
-    mapCube(
-        applylowpass,
-        inputcube,
-        indims=indims,
-        outdims=outdims,
-        max_cache=max_cache,
-        nthreads=ntr;
-        lbord=lbord,
-        width=width)
-end
+#     mapCube(
+#         applylowpass!,
+#         inputcube,
+#         indims=indims,
+#         outdims=outdims,
+#         max_cache=max_cache,
+#         nthreads=ntr;
+#         lbord=lbord,
+#         width=width)
+# end
 
+# function applylowpass!(xout,xin;lbord=lbord,width=width)
+#         # @show size(xin)
+#         im2 = [xin[j,i] for i in size(xin,2):-1:2,j in 1:(size(xin,1)-1)]
+#         # @show im2
+#         # @show lbord
+#         # @show width
+#         imfiltered = SphericalConvolutions.lowpass(Float64.(im2),lbord = lbord,width=width)
+#         # @show imfiltered
+#         xout[1:end-1,end:-1:2] = permutedims(imfiltered)
+#         xout[end,:] = xout[end-1,:]
+#         xout[:,1] = xout[:,end]
+#         # @show size(xout)
+#         # @show sum(ismissing(xout))
+#         xout
+#     end
 
 # with input as a tupple of YAXArrays, or rather anything that is not a YAXArray
 """
@@ -185,14 +199,16 @@ function compute_extremes(
     c::YAXArray, 
     tres::Float64,
     outputpath::String;
+    tempo = "Ti",
+    fun = <,
     tresne::Union{Float64,Nothing} = nothing,
     backend::Symbol = :zarr,
     overwrite::Bool = true,
     max_cache::Float64 = 1e9
 )   
-    indims = InDims("Time","Variable",)
+    indims = InDims(tempo,"Variable",)
     #@show indims
-    outdims = OutDims("Time",
+    outdims = OutDims(tempo,
         outtype = UInt8,
         chunksize = :input, 
         path = outputpath,
@@ -200,34 +216,43 @@ function compute_extremes(
         backend = backend,
     )
 
-    mapCube(getextremes!,c; indims=indims, outdims=outdims, max_cache=max_cache, tres = tres, tresne = tresne)
+    mapCube(getextremes!,c; indims=indims, outdims=outdims, max_cache=max_cache, tres = tres, tresne = tresne, fun = fun)
 
 end
 
-function getextremes!(xout, xin...; tres=0.01, tresne = nothing)
+function getextremes!(xout, xin...; tres=0.01, tresne = nothing, fun = <)
     # reduce tuple of vectors to matrix dim(Time) x dim(Variable)
     xin = reduce(hcat, xin)
     # then run the method for matrix
-    xout = getextremes!(xout, xin; tres, tresne)
-end
+    xout = getextremes!(xout, xin; tres, tresne, fun)
+end    
 
-function getextremes!(xout, xin; tres=0.01, tresne = nothing)
+function getextremes!(xout, xin; tres=0.01, tresne = nothing, fun = <)
     ninputs = size(xin)[2]
     ints = map(x -> UInt8(2^x), 0:ninputs)
     # first determine thresold exceedance, then allocate to bits
-    bytear = broadcast(*, xin .< tres, ints[1:ninputs]') 
+    if typeof(fun) <: Function
+        bytear = broadcast(*, broadcast(fun, xin, tres'), ints[1:ninputs]') 
+    elseif typeof(fun) <: Vector{Function}
+        b = BitArray(undef, size(xin))
+        for (f,i,t) in zip(fun, axes(xin)[2], tres)
+            b[i,:] .= broadcast(f, xin[i], t)
+        end
+        bytear = broadcast(*, b, ints[1:ninputs]') 
+    else
+        error("$fun must be of type Function or Vector{Function}")
+    end
     # reduce along variable dimension
     jointar = reduce(|, bytear, dims=2, init = 0x00) 
     # non extremes
-    if isnothing(tresne)
-        xout[:] .= jointar[:]
-        return xout
-    else # assign value non extreme events
-        nee = reduce(&, (xin .> (tresne)) .& (xin .< (1-tresne)), dims = 2, init = true) * ints[ninputs+1]
+    if ! isnothing(tresne)
+        # assign value non extreme events
+        nee = reduce(&, (xin .> (tresne)) .& (xin .< (1 .- tresne)), dims = 2, init = true) * ints[ninputs+1]
         jointar = nee .| jointar
     end
     #@show size(xin),size(xout), size(jointar[:])
     xout[:] .= jointar[:]
+    return xout
 end
 
 # filters
@@ -261,7 +286,7 @@ function get_diamond_indices(window)
     diamondindices = findall(diamond)
 end
 
-myfilter = function(img)
+function myfilter(img)
     # img has size = window
     # window = size(img)
     # @show window
@@ -295,7 +320,7 @@ myfilter = function(img)
     return v && d && s >= t
 end
 
-mytimefilter = function(img)
+function mytimefilter(img)
     # # central get_diamond_indices
     # Nh = map(x->Int((x+1)/2), window)
     # Nh = Int((size(img,3) + 1) /2 )
@@ -445,6 +470,7 @@ function qref(
     outputpath::String;
     ref::Tuple{Int,Int} = (1971,2000), 
     q::Vector = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975, 0.99],
+    rule::Function = identity,
     overwrite = true,
     backend = :zarr
     )
@@ -472,11 +498,21 @@ function qref(
         backend = backend,
     )
     
-    mapCube(getquantiles!, s, q; indims = indims, outdims = outdims)
-
+    if rule == identity
+        mapCube(getquantiles!, s, q; indims = indims, outdims = outdims)
+    else
+        mapCube(getquantiles!, s, q, rule; indims = indims, outdims = outdims)
+    end
 end
 
 function getquantiles!(xout, xin, q)
     xout[:] = Statistics.quantile(skipmissing(xin), q)
     return xout
+end
+
+function getquantiles!(xout, xin, q, rule)
+    xout[:] = Statistics.quantile(skipmissing(rule(xin)), q)
+    return xout
+end
+
 end
