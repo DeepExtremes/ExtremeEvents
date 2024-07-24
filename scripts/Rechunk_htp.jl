@@ -88,7 +88,4 @@ ds = Dataset(;nt...)
 ds = setchunks(ds,target_chunks)
 # data are Float64, so 1 chunk (for one variable) would be around (64*60*7*53*365+(53÷4))/8 *1e-6 = 65 MB
 
-# writefac: read/write speed factor. Estimate of time ratio between reading input and writing output.
-# Usually reading input is faster than writing output, hence default value is 4.0
-# Here reading is much slower than writing because we aggregate on the fly the hourly data to daily, therefore value is set to 0.1.
-savedataset(ds, path="/Net/Groups/BGI/work_2/scratch/mweynants/ARCEME/era_0d25_hourly_tp_tschunked.zarr", max_cache=1e9,writefac=0.1)
+savedataset(ds, path="/Net/Groups/BGI/work_2/scratch/mweynants/ARCEME/era_0d25_hourly_tp_tschunked.zarr", max_cache=8e9, overwrite = true)
