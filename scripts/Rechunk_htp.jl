@@ -88,4 +88,4 @@ ds = Dataset(;nt...)
 ds = setchunks(ds,target_chunks)
 # data are Float64, so 1 chunk (for one variable) would be around (64*60*7*53*365+(53÷4))/8 *1e-6 = 65 MB
 
-savedataset(ds, path="/Net/Groups/BGI/work_2/scratch/mweynants/ARCEME/era_0d25_hourly_tp_tschunked.zarr", max_cache=8e9, overwrite = true)
+savedataset(ds, path="/Net/Groups/BGI/work_2/scratch/mweynants/ARCEME/era_0d25_hourly_tp_tschunked.zarr", max_cache=5e9, overwrite = true)
