@@ -1,8 +1,8 @@
-module detection
+# module detection
 using YAXArrays
 using DiskArrays
 using Zarr # (default backend)
-using Dates: Date
+using Dates: Date, Day
 using DimensionalData: DimensionalData
 using Distributed
 # spatial filter
@@ -469,7 +469,7 @@ function qref(
     c::YAXArray,
     outputpath::String;
     ref::Tuple{Int,Int} = (1971,2000), 
-    q::Vector = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975, 0.99],
+    q::Vector = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.99],
     rule::Function = identity,
     overwrite = true,
     backend = :zarr
@@ -479,7 +479,7 @@ function qref(
     s = try
         # c[time = Date(ref[1])..Date(ref[2]+1) - Day(1), latitude = At(Lytton[2], atol=0.25), longitude = At(Lytton[1], atol=0.25)]
         # c[time = Date(ref[1])..Date(ref[2]+1) - Day(1), latitude = 45.0 .. 46.0, longitude = 15.0 .. 17.0]
-        c[time = Date(ref[1])..Date(ref[2]+1) - Day(1)]
+        c[time = Date(ref[1]) .. Date(ref[2]+1) - Day(1)]
     catch
         @error "Input YAXArray c should have a time axis containing reference years $ref"
     end
@@ -515,4 +515,4 @@ function getquantiles!(xout, xin, q, rule)
     return xout
 end
 
-end
+# end
