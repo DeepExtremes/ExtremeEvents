@@ -594,3 +594,34 @@ function expand(x::Tuple{Float64, Float64})
     x2 = round(x[2] + 1, RoundUp; digits = -1, base = 5)
     return (x1, x2)
 end
+
+# Theil-Sen estimator
+# median m of the slopes (yj − yi)/(xj − xi) 
+# b to be the median of the values yi − mxi
+function theilsen(x::AbstractVector, y::AbstractVector)
+    n = length(x)
+    if n != length(y)
+        error("x and y should have the same length")
+    end
+    S = convert(Matrix{Union{AbstractFloat, Missing}}, fill(missing, n, n))
+    for i in 1:n
+        for j in 1:n
+            if x[i] == x[j]
+                S[i,j] = missing
+            else
+                S[i,j] = (y[j] − y[i])/(x[j] − x[i])
+            end
+        end
+    end
+    # Calculate Theil-Sen slope
+    sk = collect(skipmissing(vec(S)))
+    nk = length(sk)
+    ssk = sort(sk)
+    # @show ssk[(nk ÷ 2) : (nk ÷ 2 +1)]
+    theil_sen_slope = iseven(nk) ? (ssk[nk ÷ 2 + 1] + ssk[nk ÷ 2])/2 : ssk[nk ÷ 2]
+    # Calculate Theil-Sen intercept
+    intercepts = y - (theil_sen_slope * x)
+    si = sort(intercepts)
+    theil_sen_intercept = iseven(n) ? (si[n ÷ 2 + 2] + si[n ÷ 2])/2 : si[n ÷ 2]
+    return theil_sen_slope, theil_sen_intercept 
+end
