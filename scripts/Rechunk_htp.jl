@@ -60,7 +60,7 @@ end
     ntsa = daysinmonth(y,m)*24
     # check that data array has the right size
     mfd = open_dataset(fnow)
-    nts = length(mfd.axes[:time])
+    nts = length(mfd.axes[:Ti])
     nlons = length(mfd.axes[:longitude])
     nlats = length(mfd.axes[:latitude])
     @assert nts == ntsa "Problem with $fshort : time axis has length $nts instead of $ntsa"
