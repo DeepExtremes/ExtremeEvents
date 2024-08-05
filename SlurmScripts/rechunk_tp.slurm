@@ -5,8 +5,8 @@
 #SBATCH --mail-type FAIL,END
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem-per-cpu=30GB
-#SBATCH --time=72:00:00
+#SBATCH --mem-per-cpu=40GB
+#SBATCH --time=5-00
 #SBATCH --nodes=1
 
 export JULIA_NUM_THREADS=${SLURM_CPUS_PER_TASK}
