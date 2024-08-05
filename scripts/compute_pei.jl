@@ -13,7 +13,7 @@ end
     Pkg.activate("$(@__DIR__)/..")
 end
 
-@everywhere using EarthDataLab, YAXArrays, Zarr, RollingFunctions, DiskArrays
+@everywhere using YAXArrays, Zarr, RollingFunctions, DiskArrays
 
 zg = zopen("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr",consolidated=true, fill_as_missing = false)
 ds = open_dataset(zg)

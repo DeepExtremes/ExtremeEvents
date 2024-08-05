@@ -1,14 +1,4 @@
-using Pkg
-Pkg.activate("$(@__DIR__)/..")
-
-using Pkg
-Pkg.activate("$(@__DIR__)/..")
-
 using SlurmClusterManager, Distributed
-
-using NetCDF
-using Printf
-using Dates
 
 #Quick check if we are in a slurm job
 if haskey(ENV,"SLURM_CPUS_PER_TASK")
@@ -21,7 +11,7 @@ end
 end
 
 @everywhere begin
-using EarthDataLab, YAXArrays, Zarr, DiskArrays
+using YAXArrays, Zarr, DiskArrays, NetCDF
 using Dates, YAXArrayBase
 using DataStructures, DiskArrayTools
 using Printf: @sprintf
