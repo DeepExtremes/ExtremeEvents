@@ -101,8 +101,10 @@ gdf = fev |>
 fig = Figure();
 ax = Axis(fig[1, 1], yscale = log10)
 for q in [:q05, :q25, :q50, :q75, :q95]
-    lines!(ax, gdf[:,:yr], gdf[:, q])
+    scatter!(ax, gdf[:,:yr], gdf[:, q], label = String(q))
+    
 end
+
 
 fig
 
