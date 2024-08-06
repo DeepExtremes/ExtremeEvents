@@ -8,7 +8,12 @@ using SlurmClusterManager, Distributed
 
 #Quick check if we are in a slurm job
 if haskey(ENV,"SLURM_CPUS_PER_TASK")
-    addprocs(SlurmManager())
+    # addprocs(SlurmManager())
+    # delay addprocs
+    for iproc in 1:haskey(ENV, "SLURM_NTASKS")
+        addprocs(1)
+        sleep(0.001)
+    end
 end
 
 @everywhere begin
