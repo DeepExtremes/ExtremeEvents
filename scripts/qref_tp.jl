@@ -4,7 +4,7 @@ using SlurmClusterManager, Distributed
 if haskey(ENV,"SLURM_CPUS_PER_TASK")
     # addprocs(SlurmManager())
     # delay addprocs
-    for iproc in 1:ENV["SLURM_NTASKS"]
+    for iproc in 1:parse(Int,ENV["SLURM_NTASKS"])
         addprocs(1)
         sleep(0.001)
     end
