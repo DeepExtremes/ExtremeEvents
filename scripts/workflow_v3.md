@@ -87,14 +87,16 @@ sbatch label_events.slurm
 - labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_2000_2012.zarr
 - labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022.zarr
 
-The labels are then merged into a single mergedlabels cube.
+The labels are then merged into a single mergedlabels cube with `scripts/merge_labels.jl`.
 
+*Output*: 
+- mergedlabels.zarr
 
 ### Compute statistics
 Statistics for all labelled events are computed and gathered in a unique table.
 
 ```
-sbatch stats_extremes.slurm
+sbatch stats_extremes_merged.slurm
 ```
 
 *Output*: 
@@ -103,6 +105,9 @@ sbatch stats_extremes.slurm
 ```julia
 plot_stats.jl
 ```
+*Output*:
+- EventStats_landonly.csv
+
 Where are the labelled events in the period 2010-2022?
 
 <img src="../v3/fig/nolabel_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022.png" alt="plot_event" width="800"/>
@@ -111,8 +116,42 @@ Where are the labelled events in the period 2010-2022?
 
 ## Postprocessing
 
-### Sanity check
+### Annual global/continental summary
+
+Compute annual statistics of indicators, globally and by continent.
+
+```
+julia --project="ExtremeEvents.toml" plot_ind_annual.jl
+```
+
+Compute annual statistics of EventCube at global and continental scale, by summing all extremes by type and plotting results.
+
+```
+julia --project="ExtremeEvents.toml" plot_EventType.jl
+```
+
+Extract largest and longest events from `EventStats_landonly` with `largest_labels.jl` and plot statistics with `plotstats.jl`.
+
+### Validation
+
+Compare labelcube with table of reported events compiled *a priori* with `SanityCheck.jl`
+
+## Figures
+
+### fig01_workflow.png
+
+Flowchart designed in ppt. 
+
+### fig02_workflow-plot-33.png
+
+Example of dry and hot extreme event detection workflow over the 2003 summer heatwave in Europe.
+
+See `fig4dheed.jl`
+
+### fig03: timeseries
+
+Timeseries of indicators for 2 contrasted locations: Jena (timeseries_11.59_50.92_2012_2023.png) and Niamey (timeseries_2.1254_13.5116_2012_2023.png).
 
 
-### Annual continental summary
+
 
