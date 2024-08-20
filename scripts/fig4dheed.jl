@@ -30,19 +30,21 @@ else
     path = "https://s3.bgc-jena.mpg.de:9000/deepextremes/v3/"
 end
 
-labels = ()
-statevents = DataFrame()
-for i in 1:length(intervals)
-    # EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1970_1982_landonly.csv
-    eventsi = CSV.read("$(path)EventStats_$(etrial)_$(intervals[i][1])_$(intervals[i][2])_$(landonly).csv", DataFrame)
-    eventsi.interval .= i
-    append!(statevents, eventsi)
-    # look for intersection between spatial and temporal range of events from the table or directly in the labelcube
-    labelpathi = "$(path)labelcube_$(etrial)_$(intervals[i][1])_$(intervals[i][2]).zarr"
-    # labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_$trial.zarr"
-    labelsi = open_dataset(labelpathi)
-    labels = (labels..., labelsi)
-end
+# labels = ()
+# statevents = DataFrame()
+# for i in 1:length(intervals)
+#     # EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1970_1982_landonly.csv
+#     eventsi = CSV.read("$(path)EventStats_$(etrial)_$(intervals[i][1])_$(intervals[i][2])_$(landonly).csv", DataFrame)
+#     eventsi.interval .= i
+#     append!(statevents, eventsi)
+#     # look for intersection between spatial and temporal range of events from the table or directly in the labelcube
+#     labelpathi = "$(path)labelcube_$(etrial)_$(intervals[i][1])_$(intervals[i][2]).zarr"
+#     # labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_$trial.zarr"
+#     labelsi = open_dataset(labelpathi)
+#     labels = (labels..., labelsi)
+# end
+labels = open_dataset("$(path)mergedlabels.zarr")
+statevents = CSV.read("$(path)MergedEventStats_landonly.csv", DataFrame)
 
 zg = zopen("$(path)ERA5Cube.zarr",consolidated=true, fill_as_missing = false)
 era = open_dataset(zg)
@@ -55,9 +57,9 @@ rp = open_dataset(zopen("$(path)pei_ranks.zarr",consolidated=true, fill_as_missi
 eec = open_dataset(zopen("$(path)EventCube_$(trial).zarr",consolidated=true, fill_as_missing = false))
 
 if haskey(ENV, "https_proxy") && occursin( "bgc-jena", ENV["https_proxy"])
-    df0 = CSV.read("$(path)SanityCheck_$etrial.csv", DataFrame, header=1)
+    df0 = CSV.read("$(path)SanityCheck_merged.csv", DataFrame, header=1)
 else
-    df0_http = HTTP.get("$(path)SanityCheck_$etrial.csv")
+    df0_http = HTTP.get("$(path)SanityCheck_merged.csv")
     df0 = CSV.read(df0_http.body, DataFrame, header=1)
 end 
 df = subset(df0, :obs_event => x -> x .== obs_event, :volume => x -> x .>= 70.0, :area => x -> x .>= 5.0)
@@ -68,7 +70,7 @@ include("../src/plots.jl")
 
 lat = (43.0, 53);
 lon = (-5,15);
-period = (Date("2003-08-01"), Date("2003-08-15"))
+period = (Date("2003-08-02"), Date("2003-08-16"))
 # transform lon to match cube
 if lon[1] < 0 
     if lon[2] <= 0
@@ -137,6 +139,7 @@ etcols = [colorant"#FFFFFF",
 
 # Threshold colours
 tthcols = cgrad([colorant"#FFB86F", colorant"#BBBBBB", colorant"#FFFFFF",], [0.02,0.5], categorical = true)
+tthcols = cgrad([colorant"#000000", colorant"#666666", colorant"#bbbbbb",], [0.02,0.5], categorical = true)
 pthcols = cgrad([colorant"#A6C5E8", colorant"#BBBBBB", colorant"#FFFFFF",], [0.02,0.5], categorical = true)
 
 # ratio = diff([xlims[1],xlims[2]]) ./ diff([ylims[1], ylims[2]])
@@ -185,7 +188,7 @@ for t in 1:Int(round(n / time_lapse.value))
             cubeplot!(axt,eec.layer, periodt, ylims, lon;
                 reducefn = maximum,
                 colormap = Makie.Categorical(etcols), 
-                zlims = (0,16),
+                # zlims = (0,16),
                 colorrange = (0,16))
         end
 
@@ -348,8 +351,8 @@ n = Int(round(nd / time_lapse.value))
 for t in 1:n
     global periodt = (period[1] + (t - 1) * time_lapse, period[1] + t * time_lapse - Day(1))
     Label(fig[0, t], string(periodt[1]); padding = (4,4,4,4))
-    lvls = [0.01, 0.1, 0.9]
-    for i in 1:3#4
+    lvls = [0.01, 0.1, 0.9, 1.0]
+    for i in 1:4
         # aggregate over time by mode
         # plot bounding box
         axt = Axis(fig[i,t],
@@ -375,10 +378,17 @@ for t in 1:n
         if i == 1
 
             # heatmap of t2mmax
-            cubeplot!(axt, tmax, periodt, ylims, lon; reducefn = maximum, colormap = Reverse(:lajolla), colorrange = (288.15, 318.15)) # :lajolla # vik 
+            cubeplot!(axt, tmax, periodt, ylims, lon; reducefn = first, colormap = Reverse(:lajolla), colorrange = (288.15, 318.15)) # :lajolla # vik 
 
             # contour of rt 0.01
-            cubeplot!(axt, rt, periodt, ylims, lon; plotfn = contour!, reducefn = minimum, levels = lvls, colormap = tthcols, colorrange = (0.0, 1.0))
+            cubeplot!(axt, rt, periodt, ylims, lon; 
+                plotfn = contour!, 
+                reducefn = first, 
+                levels = lvls, 
+                colormap = tthcols, 
+                linewidth = 2,
+                colorrange = (0.0, 1.0),
+                )
             # cubeplot!(axt, rt, periodt, ylims, lon; reducefn = minimum, colorrange = (0.0, 0.1))
 
         end 
@@ -386,25 +396,31 @@ for t in 1:n
         # PEICube
         if i == 2
             # plot pei_30
-            cubeplot!(axt, peis.pei_30, periodt, ylims, lon; reducefn = minimum, colormap = Reverse(:vik), colorrange = (-5,5)) # :bilbao # :managua # Reverse(:berlin)
+            cubeplot!(axt, peis.pei_30, periodt, ylims, lon; reducefn = first, colormap = Reverse(:vik), colorrange = (-5,5)) # :bilbao # :managua # Reverse(:berlin)
             # contour rp 0.01
-            cubeplot!(axt, rp.pei_30, periodt, ylims, lon; plotfn = contour!, reducefn = minimum, levels = lvls, colormap = pthcols, colorrange = (0.0, 1.0))
+            cubeplot!(axt, rp.pei_30, periodt, ylims, lon; plotfn = contour!, reducefn = first, 
+                levels = lvls, 
+                # colormap = pthcols, 
+                colormap = tthcols, 
+                linewidth = 2,
+                # linestyle = [:solid, :dash, :dot],
+                colorrange = (0.0, 1.0))
 
         end 
 
         # EventCube
         if i == 3
             cubeplot!(axt,eec.layer, periodt, ylims, lon;
-                reducefn = mode,
-                # colormap = Makie.Categorical(etcols), 
-                zlims = (0,16),
+                reducefn = first,
+                colormap = Makie.Categorical(etcols), 
+                # zlims = (0,16),
                 colorrange = (0,16))
         end
 
         # labelcube
         if i == 4
-            # skip timestep if no data
-            ind = df.start_time .<= periodt[2] .&& df.end_time .>= periodt[1];  
+            # skip timestep if no data. only first frame.
+            ind = df.start_time .<= periodt[1] .&& df.end_time .>= periodt[1];  
             if any(ind)
                 latt = (
                     minimum(df.latitude_min[ind]),
@@ -413,7 +429,10 @@ for t in 1:n
                 lont = (minimum(df.longitude_min[ind]), maximum(df.longitude_max[ind])+.25)
                 # labels in this time step
                 lblt = sort(unique(df.label[ind]))
-                axt, h = labelplot!(axt, labels, periodt, latt, lont, lblt; colormap = labcols[indexin(lblt, ulbls)])
+                # only first frame
+                labelplot!(axt, labels.labels, (periodt[1], periodt[1]), latt, lont, lblt; reducefn = first, colormap = labcols[indexin(lblt, ulbls)], 
+                    # colorrange = 1:length(lblt)
+                    )
             end
         end
         # remove grid and axes styles
@@ -442,9 +461,9 @@ cbar1 = Colorbar(fg[1,1],
     )
 
 lt = Legend(fg[1,2],
-    [LineElement(color = tthcols[1], linestyle = nothing), 
-    LineElement(color = tthcols[2], linestyle = nothing), 
-    LineElement(color = tthcols[3], linestyle = nothing), ],
+    [LineElement(color = tthcols[1], linestyle = nothing, linewidth = 2),
+    LineElement(color = tthcols[2], linestyle = nothing, linewidth = 2), 
+    LineElement(color = tthcols[3], linestyle = nothing, linewidth = 2), ],
     ["0.01", "0.1", "0.9"],
     "Tmax Rank",
     titlefont = :regular,
@@ -455,7 +474,7 @@ lt = Legend(fg[1,2],
     
 # pei
 Label(fig[2, n+1, Left()], 
-    "PE30 (mm day⁻¹)",
+    "PEI_30 (mm day⁻¹)",
     rotation = π/ 2, padding = (4,4,4,4))
 
 pcbar1 = Colorbar(fig[2,n+1][1,1],
@@ -465,11 +484,12 @@ pcbar1 = Colorbar(fig[2,n+1][1,1],
     )
 
 lp = Legend(fig[2,n+1][1,2],
-    [LineElement(color = pthcols[1], linestyle = nothing), 
-    LineElement(color = pthcols[2], linestyle = nothing), 
-    LineElement(color = pthcols[3], linestyle = nothing), ],
+    # instead of pthcols use tthcols
+    [LineElement(color = tthcols[1], linestyle = nothing,  linewidth = 2),
+    LineElement(color = tthcols[2], linestyle = nothing,  linewidth = 2),
+    LineElement(color = tthcols[3], linestyle = nothing,  linewidth = 2),],
     ["0.01", "0.1", "0.9"],
-    "PEI30 Rank",
+    "PEI_30 Rank",
     titlefont = :regular,
     patchsize = (25, 25), rowgap = 10,
     backgroundcolor = RGB(0.83723, 0.61876, 0.50053),
@@ -496,19 +516,19 @@ ecbar.ticks = (
     ],
     )
 
-# # labels
-# Label(fig[4, n+1, Left()], "Label-Cube", rotation = π/ 2, padding=(2, 2, 2, 2))
+# labels
+Label(fig[4, n+1, Left()], "Label-Cube", rotation = π/ 2, padding=(2, 2, 2, 2))
 
-# lcbar = Colorbar(fig[4,n+1], 
-#         colormap = cgrad(labcols[1:nlb], nlb, categorical=true),
-#         halign = :left,
-#     )
-# if length(ulbls) > 1 
-#     lcbar.limits = (1,nlb)
-#     lcbar.ticks = ((1+(nlb-1)/nlb/2):((nlb-1)/nlb):(nlb), string.(ulbls))
-# else
-#     lcbar.ticks = ([0.5], string.(ulbls))
-# end
+lcbar = Colorbar(fig[4,n+1], 
+        colormap = cgrad(labcols[1:nlb], nlb, categorical=true),
+        halign = :left,
+    )
+if length(ulbls) > 1 
+    lcbar.limits = (1,nlb)
+    lcbar.ticks = ((1+(nlb-1)/nlb/2):((nlb-1)/nlb):(nlb), string.(ulbls))
+else
+    lcbar.ticks = ([0.5], string.(ulbls))
+end
 
 # Set gap between rows and columns
 colgap!(fig.layout, 4)
@@ -522,9 +542,212 @@ fig = with_theme(fontsize_theme) do
 end
 
 if haskey(ENV, "https_proxy") && occursin( "bgc-jena", ENV["https_proxy"])
-    save("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/plot" * "_" * trial * "_Event_$obs_event" * ".png", fig, dpi = 300) 
-    save("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/plot" * "_" * trial * "_Event_$obs_event" * ".pdf", fig, dpi = 300) 
+    save("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/plot" * "_" * trial * "_Event_$obs_event" * "_first.png", fig, dpi = 300) 
+    save("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/plot" * "_" * trial * "_Event_$obs_event" * "_first.pdf", fig, dpi = 300) 
 else
-    save("plot" * "_" * trial * "_Event_$obs_event" * ".png", fig, dpi = 300) 
+    save("plot" * "_" * trial * "_Event_$obs_event" * "_first.png", fig, dpi = 300) 
 end
 
+# without geoAxis, with function over periodt
+function myfigfn(;size = (2400, 1500), kwargs...)
+fig = Figure(;size = size, kwargs...);
+n = Int(round(nd / time_lapse.value))
+for t in 1:n
+    global periodt = (period[1] + (t - 1) * time_lapse, period[1] + t * time_lapse - Day(1))
+    Label(fig[0, t], string(periodt[1])*" -- "*string(periodt[2])[end-1:end]; padding = (4,4,4,4))
+    lvls = [0.01, 0.1, 0.9, 1.0]
+    for i in 1:4
+        # aggregate over time by mode
+        # plot bounding box
+        axt = Axis(fig[i,t],
+            # topspinevisible = i == 4 ? true : false,
+            # leftspinevisible = i == 4 ? true : false,
+            # bottomspinevisible = i == 4 ? true : false,
+            # rightspinevisible = i == 4 ? true : false,
+            # spinewidth = 0.5,
+            topspinecolor = colorant"#aaaaaa",
+            leftspinecolor = colorant"#aaaaaa",
+            bottomspinecolor = colorant"#aaaaaa",
+            rightspinecolor = colorant"#aaaaaa",
+            aspect = DataAspect(),
+        );
+        limits!(axt, xlims, ylims,)
+        cl=lines!(axt, 
+            GeoMakie.coastlines(),
+            color = :grey20, linewidth=0.5)
+        translate!(cl, 0, 0, 1000)
+
+        # indicators
+        # Tmax
+        if i == 1
+
+            # heatmap of t2mmax
+            cubeplot!(axt, tmax, periodt, ylims, lon; reducefn = maximum, colormap = Reverse(:lajolla), colorrange = (288.15, 318.15)) # :lajolla # vik 
+
+            # contour of rt 0.01
+            cubeplot!(axt, rt, periodt, ylims, lon; 
+                plotfn = contour!, 
+                reducefn = minimum, 
+                levels = lvls, 
+                colormap = tthcols, 
+                linewidth = 2,
+                colorrange = (0.0, 1.0),
+                )
+            # cubeplot!(axt, rt, periodt, ylims, lon; reducefn = minimum, colorrange = (0.0, 0.1))
+
+        end 
+
+        # PEICube
+        if i == 2
+            # plot pei_30
+            cubeplot!(axt, peis.pei_30, periodt, ylims, lon; reducefn = minimum, colormap = Reverse(:vik), colorrange = (-5,5)) # :bilbao # :managua # Reverse(:berlin)
+            # contour rp 0.01
+            cubeplot!(axt, rp.pei_30, periodt, ylims, lon; plotfn = contour!, reducefn = minimum, 
+                levels = lvls, 
+                # colormap = pthcols, 
+                colormap = tthcols, 
+                linewidth = 2,
+                # linestyle = [:solid, :dash, :dot],
+                colorrange = (0.0, 1.0))
+
+        end 
+
+        # EventCube
+        if i == 3
+            cubeplot!(axt,eec.layer, periodt, ylims, lon;
+                reducefn = mode,
+                colormap = Makie.Categorical(etcols), 
+                # zlims = (0,16),
+                colorrange = (0,16))
+        end
+
+        # labelcube
+        if i == 4
+            # skip timestep if no data. 
+            ind = df.start_time .<= periodt[2] .&& df.end_time .>= periodt[1];  
+            if any(ind)
+                latt = (
+                    minimum(df.latitude_min[ind]),
+                    maximum(df.latitude_max[ind])
+                    )
+                lont = (minimum(df.longitude_min[ind]), maximum(df.longitude_max[ind])+.25)
+                # labels in this time step
+                lblt = sort(unique(df.label[ind]))
+                # only first frame
+                labelplot!(axt, labels.labels, periodt, latt, lont, lblt; reducefn = mode, colormap = labcols[indexin(lblt, ulbls)], 
+                    # colorrange = 1:length(lblt)
+                    )
+            end
+        end
+        # remove grid and axes styles
+        hidedecorations!(axt)  # Hide the default grid and decorations for customization
+
+        if t==1 
+            # rowsize!(fig.layout,i,Relative(1/4))
+            # rowsize!(fig.layout,i,Fixed(345))
+        end
+        if i == 1
+            colsize!(fig.layout,t,Relative(1/(n+1)))
+            # colsize!(fig.layout,t,Fixed(345))
+        end
+    end
+end
+# colorbar
+# t2mmax
+Label(fig[1, n+1, Left()], 
+    "Tmax (°C)",
+    rotation = π/ 2, padding = (4,4,4,4))
+fg = fig[1,n+1] = GridLayout()
+cbar1 = Colorbar(fg[1,1],
+        colormap = Reverse(:lajolla), 
+        colorrange = (288.15, 318.15),
+        ticks = ([293.15, 303.15, 313.15], ["20", "30", "40"])
+    )
+
+lt = Legend(fg[1,2],
+    [LineElement(color = tthcols[1], linestyle = nothing, linewidth = 2),
+    LineElement(color = tthcols[2], linestyle = nothing, linewidth = 2), 
+    LineElement(color = tthcols[3], linestyle = nothing, linewidth = 2), ],
+    ["0.01", "0.1", "0.9"],
+    "Tmax Rank",
+    titlefont = :regular,
+    patchsize = (25, 25),
+    backgroundcolor = RGB(1, 0.9978, 0.79425),
+    framecolor = colorant"#FFFFFF",
+    )
+    
+# pei
+Label(fig[2, n+1, Left()], 
+    "PEI_30 (mm day⁻¹)",
+    rotation = π/ 2, padding = (4,4,4,4))
+
+pcbar1 = Colorbar(fig[2,n+1][1,1],
+        colormap = Reverse(:vik), #:bilbao, # :managua # Reverse(:berlin)
+        colorrange = (-5, 5),
+        halign = :left,
+    )
+
+lp = Legend(fig[2,n+1][1,2],
+    # instead of pthcols use tthcols
+    [LineElement(color = tthcols[1], linestyle = nothing,  linewidth = 2),
+    LineElement(color = tthcols[2], linestyle = nothing,  linewidth = 2),
+    LineElement(color = tthcols[3], linestyle = nothing,  linewidth = 2),],
+    ["0.01", "0.1", "0.9"],
+    "PEI_30 Rank",
+    titlefont = :regular,
+    patchsize = (25, 25), rowgap = 10,
+    backgroundcolor = RGB(0.83723, 0.61876, 0.50053),
+    framecolor = colorant"#FFFFFF",
+    )
+
+# EventCube
+Label(fig[3, n+1, Left()], "Event-Cube", rotation = π/ 2, padding=(2, 2, 2, 2))
+
+ecbar = Colorbar(fig[3,n+1], 
+            colormap = cgrad(etcols[[1,2,3,4,17]], categorical=true),
+            limits = (-0.5,4.5),
+            halign = :left,
+        )
+ecbar.ticks = (
+    # 0:16,
+    0:4, 
+    [
+        "10th/90th percentile",
+        "only hot",
+        "only dry",
+        "dry and hot",
+        "no extreme",
+    ],
+    )
+
+# labels
+Label(fig[4, n+1, Left()], "Label-Cube", rotation = π/ 2, padding=(2, 2, 2, 2))
+
+lcbar = Colorbar(fig[4,n+1], 
+        colormap = cgrad(labcols[1:nlb], nlb, categorical=true),
+        halign = :left,
+    )
+if length(ulbls) > 1 
+    lcbar.limits = (1,nlb)
+    lcbar.ticks = ((1+(nlb-1)/nlb/2):((nlb-1)/nlb):(nlb), string.(ulbls))
+else
+    lcbar.ticks = ([0.5], string.(ulbls))
+end
+
+# Set gap between rows and columns
+colgap!(fig.layout, 4)
+rowgap!(fig.layout, 4)
+return fig
+end
+
+fontsize_theme = Theme(fontsize = 32)
+fig = with_theme(fontsize_theme) do
+    fig = myfigfn(size = (2500, 1500), font = "Helvetica")
+end
+
+if haskey(ENV, "https_proxy") && occursin( "bgc-jena", ENV["https_proxy"])
+    save("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/plot" * "_" * trial * "_Event_$obs_event" * "_fn.png", fig, dpi = 300) 
+    save("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/plot" * "_" * trial * "_Event_$obs_event" * "_fn.pdf", fig, dpi = 300) 
+else
+    save("plot" * "_" * trial * "_Event_$obs_event" * "_fn.png", fig, dpi = 300) 
+end
