@@ -48,17 +48,18 @@ lon1 = 50 .. 51; lat1 = 54 .. 55;
     # more events in recent years, hence reverse lbls
     lbls1 = reverse(lbls)
     # i want the smallest events among the largest. Hence reverse as input
+    # assign index in non reverted 
     islargest = 0; islongest = 0
-    for i in largest
-        if in(i, lbls1)
-            islargest = i
+    for i in axes(largest,2)
+        if in(largest[i], lbls1)
+            islargest = 11 - i
             break
         end
     end
     xout[1] = islargest
-    for i in longest
-        if in(i, lbls1)
-            islongest = i
+    for i in axes(longest, 2)
+        if in(longest[i], lbls1)
+            islongest = 11 - i
             break
         end
     end
@@ -87,7 +88,7 @@ end
     outdims = OutDims(
         Dim{:Variable}(["largest", "longest"]),
         outtype = Int64,
-        path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/largest_longest_labels.zarr",
+        path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/largest_longest_idx_labels.zarr",
         backend = :zarr,
         overwrite = true,
         chunksize=Dict("Variable"=>1),
