@@ -133,12 +133,11 @@ end
 Intensity() = Intensity(0.0, 0.0, 0.0, 0.0)
 # Define function computestat for objects of type Intensity:
 # Update Intensity by adding threshold - rank only when threshold is passed over weighted by grid cells' area (approximated by cosine of latitude)
-# multiplied by 100, so that value is between 0 and 1.
 function computestat(in::Intensity, row)
-    in.h = in.h .+ max.(0.1 .- row.rt, 0.0 ) .* 10 .* cosd.(row.latitude)
-    in.d30 = in.d30 .+ max.(0.1 .- row.rd30, 0.0) .* 10 .* cosd.(row.latitude)
-    in.d90 = in.d90 .+ max.(0.1 .- row.rd90, 0.0) .* 10 .* cosd.(row.latitude)
-    in.d180 = in.d180 .+ max.(0.1 .- row.rd180, 0.0) .* 10 .* cosd.(row.latitude)
+    in.h = in.h + 0.01 - min(row.rt, 0.01 ) * cosd(row.latitude)
+    in.d30 = in.d30 + 0.01 - min(row.rd30, 0.01 ) * cosd(row.latitude)
+    in.d90 = in.d90 + 0.01 - min(row.rd90, 0.01 ) * cosd(row.latitude)
+    in.d180 = in.d180 + 0.01 - min(row.rd180, 0.01 ) * cosd(row.latitude)
 end
 
 # Define function computestat for objects of type Pair 

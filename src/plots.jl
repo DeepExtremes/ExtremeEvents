@@ -3,6 +3,7 @@
 using Dates
 using DimensionalData
 using DimensionalData.LookupArrays
+using CairoMakie
 
 """
     simpleplot(
@@ -294,7 +295,10 @@ function getsubcube(cube, periodt, lato, lon)
     return subcubedata, axs
 end
 
-# function to plot a heatmap (default) or other function of a cube subset reduced over time with mode (default) or other function, on existsing Makie Axis
+"""
+    cubeplot!(ax, cube, periodt, lato, lon; plotfn = heatmap!, reducefn = mode, kwargs...)
+    function to plot a heatmap (default) or other function of a cube subset reduced over time with mode (default) or other function, on existsing Makie Axis
+"""
 function cubeplot!(ax, cube, periodt, lato, lon; plotfn = heatmap!, reducefn = mode, kwargs...)
     # subset cube
     if typeof(lon) <: Vector
@@ -317,13 +321,16 @@ function cubeplot!(ax, cube, periodt, lato, lon; plotfn = heatmap!, reducefn = m
     return ax, h
 end
 
-# plot labels on existing Makie Axis
+"""
+    labelplot!(ax, labels::Dataset, period, lat, lon, lblt; kwargs...)
+    plot labels on existing Makie Axis
+"""
 function labelplot!(ax, labels::Dataset, period, lat, lon, lblt; kwargs...)
     # subset labelcube
     if typeof(lon) <: Vector
         # load 2 parts and join them
-        sublabelsp1, axsp1 = getsublabels(labels, periodt, lato, lon[1], lblt)
-        sublabelsp2, axsp2 = getsublabels(labels, periodt, lato, lon[2], lblt)
+        sublabelsp1, axsp1 = getsublabels(labels, period, lat, lon[1], lblt)
+        sublabelsp2, axsp2 = getsublabels(labels, period, lat, lon[2], lblt)
         sublabels1 = cat(sublabelsp1, sublabelsp2, dims = 2)
         axs = (axsp1[1], Dim{:longitude}(vcat(axsp1[2].val, axsp2[2][1]:0.25:axsp2[2][end])), axsp1[3])
     else
@@ -342,7 +349,7 @@ function labelplot!(ax, labels::Dataset, period, lat, lon, lblt; kwargs...)
     return ax, h
 end
 
-function getsublabels(labels, period, lat, lon, lblt)
+function getsublabels(labels::Dataset, period, lat, lon, lblt)
     sublabels = labels.layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
         # load to memory and set all other values to 0 (so that they will be set to NaN by prephm)
         # small events have been discarded from the plot
@@ -360,14 +367,14 @@ function getsublabels(labels, period, lat, lon, lblt)
         return sublabels1, axs
     end
 
-    function labelplot!(ax, labels::Tuple, period, lat, lon, lblt; kwargs...)
+function labelplot!(ax, labels::Tuple, period, lat, lon, lblt; kwargs...)
     # retrieve relevant labelcube
     i = findlast((period[1] .>= Date.(startyears)) .& (period[2] .< Date.(startyears .+ 13)))
     # subset labelcube
     if typeof(lon) <: Vector
         # load 2 parts and join them
-        sublabelsp1, axsp1 = getsublabels(labels[i], periodt, lato, lon[1], lblt)
-        sublabelsp2, axsp2 = getsublabels(labels[i], periodt, lato, lon[2], lblt)
+        sublabelsp1, axsp1 = getsublabels(labels[i], period, lat, lon[1], lblt)
+        sublabelsp2, axsp2 = getsublabels(labels[i], period, lat, lon[2], lblt)
         sublabels1 = cat(sublabelsp1, sublabelsp2, dims = 2)
         axs = (axsp1[1], Dim{:longitude}(vcat(axsp1[2].val, axsp2[2][1]:0.25:axsp2[2][end])), axsp1[3])
     else
@@ -385,3 +392,52 @@ function getsublabels(labels, period, lat, lon, lblt)
     # h = hm!(ax, sublabels1, axs; fn = mode, kwargs...)
     return ax, h
 end
+
+
+function getsublabels(labels::YAXArray, period, lat, lon, lblt)
+    sublabels = labels[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
+    # load to memory and set all other values to 0 (so that they will be set to NaN by prephm)
+    # small events have been discarded from the plot
+    sublabels1 = map(x -> x in lblt ? x : 0, (sublabels.data)[:,:,:]);
+
+    if any(lon.>180)
+        # modify axes
+        axs = modaxs(sublabels.axes)
+        # modify sublabels1: shift lon
+        shifts = getshifts(axs)
+        sublabels1 = circshift(sublabels1, shifts)
+    else
+        axs = sublabels.axes
+    end
+    return sublabels1, axs
+end
+
+function labelplot!(ax, labels::YAXArray, period, lat, lon, lblt; reducefn=mode, kwargs...)
+    # subset labelcube
+    if typeof(lon) <: Vector
+        # load 2 parts and join them
+        sublabelsp1, axsp1 = getsublabels(labels, period, lat, lon[1], lblt)
+        sublabelsp2, axsp2 = getsublabels(labels, period, lat, lon[2], lblt)
+        dimlon = dimnum(axsp1, :longitude)
+        sublabels1 = cat(sublabelsp1, sublabelsp2, dims = dimlon)
+        axs = (dimlon == 1 ? Dim{:longitude}(vcat(axsp1[1].val, axsp2[1][1]:0.25:axsp2[1][end])) : axsp1[1], 
+            dimlon == 2 ? Dim{:longitude}(vcat(axsp1[2].val, axsp2[2][1]:0.25:axsp2[2][end])) : axsp1[2],
+            dimlon == 3 ? Dim{:longitude}(vcat(axsp1[3].val, axsp2[3][1]:0.25:axsp2[3][end])) : axsp1[3]
+            )
+    else
+        sublabels1, axs = getsublabels(labels, period, lat, lon, lblt)
+    end
+    # cols = Makie.Categorical(:tab20)
+    # fg = Figure(); ax1 = Axis(fg)
+    x,y,z = prephm(sublabels1, axs, reducefn)
+    res = Dict()
+    foreach((x, y) -> push!(res, x => Float64(y)), lblt, eachindex(lblt))
+    # res
+    replace!(z, Tuple(res)...);
+    # heatmap(x, y, z; colormap = cols[1:length(lblt)])
+    h = heatmap!(ax, x, y, z; kwargs...)
+    # h = hm!(ax, sublabels1, axs; fn = mode, kwargs...)
+    return ax, h
+end
+
+# labelplot!(axt, labels.labels, periodt, latt, lont, lblt; colormap = labcols[indexin(lblt, ulbls)], colorrange = 1:length(lblt))
