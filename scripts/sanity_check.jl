@@ -77,8 +77,11 @@ select!(obs0, :obs_event, :)
 # merge 2 tables:
 obs = vcat(obs, obs0)
 
+# sort by starting date
+sort(obs, :Start)
+
 # export to latex table
-show(stdout, MIME("text/latex"),obs)
+show(stdout, MIME("text/latex"),select(obs, Not(:obs_event)))
 show(stdout, MIME("text/csv"),obs)
 
 #### start helper fns
@@ -111,6 +114,45 @@ function labobs(df0::DataFrame, lon, lat, period, obs_event)
     append!(df0, df)
     return df0
 end
+
+function labobsm(df0::DataFrame, lon, lat, period, obs_event)
+    #
+    # plot labelled events flattened over time
+    
+    # retrive labels and count them
+    tab = CubeTable(
+        label    = labels_all.labels[time=period, latitude=lat, longitude=lon]
+    )
+    labcount = fitalllabelcount(tab);
+    sort!(labcount, by=i->i[end].c, rev=true);
+    # toDF
+    labcountdf = DataFrame(map(collectresults, labcount));
+    # remove event with few voxels (arbitrarily I had 99, but maybe lower to 14) and empty lines
+    labcountdf = labcountdf[map(>(0), labcountdf.count), :]
+    # extract stats from events
+    df = filter(:label => in(labcountdf.label), statevents)
+    if isempty(df)
+        return df0
+    end
+    df.start_time = Date.(df.start_time);
+    df.end_time = Date.(df.end_time);
+    # add column obs_event
+    df.obs_event .= obs_event;
+    # vcat df
+    df0 = vcat(df0, df)
+    # sublabels = Cube(subsetcube(labels_all, time=period, latitude=lat, longitude=lon))
+    # sublabels1 = ( in(df.label).(sublabels.data))[:,:,:];
+    # if lon[1] >= 180
+    #     # modify axes
+    #     axs = modaxs(sublabels.axes)
+    #     # p = hm!(sublabels1, axs = axs, c = cgrad(:inferno, categorical = true))
+    # else
+    #     p = hm!(sublabels1, axs = sublabels.axes, c = cgrad(:inferno, categorical = true))
+    # end   
+    # # but this approach doesn't show if labelled events span outside the observed event bbox
+    # return p, df0
+end
+
 
 function labplot!(ax, lon, lat, period, dflabels; reduced = :Ti, obs_event = nothing, nd = 1, kwargs...)
     # retrieve relevant labelcube
@@ -209,30 +251,32 @@ intervals = map( y -> (y, y+12), startyears)
 landonly = "landonly"
 # events_all = CSV.read(path * "EventStats_ranked_pot0.01_ne0.1_cmp_2016_2021.csv", DataFrame)
 statevents = DataFrame()
-labels = ()
-for i in 1:length(intervals)
-    # EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1970_1982_landonly.csv
-    eventsi = CSV.read("$(path)EventStats_$(etrial)_$(intervals[i][1])_$(intervals[i][2])_$(landonly).csv", DataFrame)
-    eventsi.interval .= i
-    append!(statevents, eventsi)
-    # look for intersection between spatial and temporal range of events from the table or directly in the labelcube
-    labelpathi = "$(path)labelcube_$(etrial)_$(intervals[i][1])_$(intervals[i][2]).zarr"
-    # labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_$trial.zarr"
-    labelsi = open_dataset(labelpathi)# labels = Cube(labelpath)
-    labels = (labels..., labelsi)
-end
+# labels = ()
+# for i in 1:length(intervals)
+#     # EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1970_1982_landonly.csv
+#     eventsi = CSV.read("$(path)EventStats_$(etrial)_$(intervals[i][1])_$(intervals[i][2])_$(landonly).csv", DataFrame)
+#     eventsi.interval .= i
+#     append!(statevents, eventsi)
+#     # look for intersection between spatial and temporal range of events from the table or directly in the labelcube
+#     labelpathi = "$(path)labelcube_$(etrial)_$(intervals[i][1])_$(intervals[i][2]).zarr"
+#     # labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_$trial.zarr"
+#     labelsi = open_dataset(labelpathi)# labels = Cube(labelpath)
+#     labels = (labels..., labelsi)
+# end
 # labels_all = open_dataset(path * "labelcube_ranked_pot0.01_ne0.1_cmp_2016_2021.zarr")
+labels_all = open_dataset(path * "mergedlabels.zarr")
+statevents = CSV.read(path*"MergedEventStats_landonly.csv", DataFrame)
 
 global df0 = DataFrame()
- # df0 = CSV.read("$(path)SanityCheck_$etrial.csv", DataFrame, header=1)
+# global df0 = CSV.read(path * "SanityCheck_merged.csv", DataFrame, header=1)
 
 # loop over observed events
 # tmp = deepcopy(findall(!in(unique(df0.obs_event)),1:36))
-for obs_event in 8#1 : nrow(obs)
+for obs_event in 39:40#obs.obs_event #8#1 : nrow(obs)
     # obs_event=10
     print(obs[obs_event,:])
-    period =( Date(obs[obs_event,:Start]), Date(obs[obs_event,:End])+Day(1))
-    lat = (obs[obs_event,:South], obs[obs_event,:North])
+    period = Date(obs[obs_event,:Start]) .. Date(obs[obs_event,:End])+Day(1)
+    lat = obs[obs_event,:South] .. obs[obs_event,:North]
     lon = (obs[obs_event,:West], obs[obs_event,:East])
     # transform lon to match cube
     if lon[1] < 0 
@@ -254,11 +298,11 @@ for obs_event in 8#1 : nrow(obs)
     # try
         if typeof(lon) <: Vector{}
             # do everything twice...
-            df1 = labobs(df0, lon[1], lat, period, obs_event);
-            df1 = labobs(df1, lon[2], lat, period, obs_event);
+            df1 = labobsm(df0, lon[1][1] .. lon[1][2], lat, period, obs_event);
+            df1 = labobsm(df1, lon[2][1] .. lon[2][2], lat, period, obs_event);
         else
             # do only once
-            df1 = labobs(df0, lon, lat, period, obs_event);
+            df1 = labobsm(df0, lon[1] .. lon[2], lat, period, obs_event);
         end
         global df0 = df1;
     # catch
@@ -267,8 +311,10 @@ for obs_event in 8#1 : nrow(obs)
 end
 unique!(df0)
 # export to csv
-CSV.write(path * "SanityCheck_$etrial)_all.csv", df0)
+# CSV.write(path * "SanityCheck_$etrial)_all.csv", df0)
+CSV.write(path * "SanityCheck_merged.csv", df0)
 # global df0 = CSV.read("$(path)SanityCheck_$(etrial)_all.csv", DataFrame, header=1)
+# global df0 = CSV.read(path * "SanityCheck_merged.csv", DataFrame, header=1)
 
 ## 20240525 need to do the rest with labels[i] (+solve CubeTable)
 
@@ -563,7 +609,8 @@ end
 obs_compound = filter(:Event=>!=("drought"), obs)[!, :obs_event]
 tmp = df0 |> 
     (df -> DataFrames.groupby(df, :obs_event)) |>
-    (gdf -> combine(gdf, AsTable(:) => t -> nrow(t)))
+    (gdf -> combine(gdf, AsTable(:) => t -> nrow(t))) # |>
+    # (df -> leftjoin(df, obs, on = :obs_event))
 tmp1 = df0 #|>
     # (df -> filter(:obs_event => in(obs_compound), df)) 
 # show boxplot/vagina of volume of events
@@ -652,7 +699,7 @@ function plot_city(city::City)
     # Tmax
     tm = scatter!(ax1,
         # twinx(), 
-        ti, stmx[:] .- 273.15, 
+        ti, stmx.data[:] .- 273.15, 
         # yaxis = "Temperature [Kelvin]", 
         label = "Max. temperature at 2m",
         # markersize = 2,
@@ -668,17 +715,18 @@ function plot_city(city::City)
         ylabel ="mm/day"
     )
     # tp
-    btp = barplot!(ax2, ti, stp[:].*1e3, 
+    btp = barplot!(ax2, ti, stp.data[:].*1e3, 
         label = "Total precipitation", 
-        linewidth=0, 
-        linealpha = 1.0,
+        strokewidth=0, 
+        # linealpha = 1.0,
         color = Colors.JULIA_LOGO_COLORS.blue,
         );
     
     # pet
-    bpet = barplot!(ax2, ti, spet[:], label = "Ref. evapotranspiration",
-        linewidth=0,
-        linealpha = 1.0,
+    bpet = barplot!(ax2, ti, convert(Vector{Float64},  spet.data[:]), 
+        label = "Ref. evapotranspiration",
+        strokewidth=0,
+        # linealpha = 1.0,
         color = Colors.JULIA_LOGO_COLORS.red,
         );
 
@@ -687,9 +735,9 @@ function plot_city(city::City)
         ylabel ="mm/day"
     )
     # PE
-    pe30 = lines!(ax3, ti, spei["pei_30"][:], label = "pei_30",);
-    pe90 = lines!(ax3, ti, spei["pei_90"][:], label = "pei_90",);
-    pe180 = lines!(ax3, ti, spei["pei_180"][:], label = "pei_180",);
+    pe30 = lines!(ax3, ti, spei["pei_30"].data[:], label = "pei_30",);
+    pe90 = lines!(ax3, ti, spei["pei_90"].data[:], label = "pei_90",);
+    pe180 = lines!(ax3, ti, spei["pei_180"].data[:], label = "pei_180",);
     # thresholds
     pe30_90 = hlines!(ax3, qpe30N[2], label = "pei_30 10th percentile", color = 1, colormap = :tab10, colorrange = (1, 10), linestyle = :dot) #; xmin = ti[1], xmax = ti[end],  )
     pe30_99 = hlines!(ax3, qpe30N[1], label = "pei_30 1st percentile", color = 1, colormap = :tab10, colorrange = (1, 10), linestyle = :dash) #; xmin = ti[1], xmax = ti[end], )
@@ -723,7 +771,7 @@ function plot_city(city::City)
         ] 
     b = barplot!(ax4, ti, repeat([1], length(deo)), 
         gap = 0, 
-        color = map(x -> cols[x+1], deo),
+        color = map(x -> cols[x+1], deo.data[:]),
         )
     translate!(b, 0, 0, -1000)
 
@@ -783,14 +831,25 @@ end
 
 # Event 8: heatwave in British Columbia around 29 June 2021
 Lytton  = (-121.5885 +360, 50.2260284,)
-period = Date("2021-06-21")..Date("2021-08-17")
-f = plot_city(City("Lytton", "Lytton, BC, Canada", 50.2260284, -121.5885 +360, Date("2021-06-21")..Date("2021-08-17")))
+period = Date("2021-06-21") .. Date("2021-08-17")
+city = City("Lytton", "Lytton, BC, Canada", 50.2260284, -121.5885 +360, Date("2021-06-21") .. Date("2021-08-20"))
+f = plot_city(city)
 # When the strong heatwave occurs, PEIs are still ok.
     # Temperature reaches 33.5 degrees on 29th-30th June, far from reported maximum of 40+
     # Tempertaures remain above 90th percentile for a while
     # but are not so high when the PEI30 drops below the 1% threshold.
     # Temperatures rise again reaching 
-    
+# Event 3: heatwve in Pakistan
+f = plot_city(City("Karachi", "Karachi, Pakistan", 24.8607, 67.0011, Date("2018-05-12") .. Date("2018-05-22")))
+# Event 14: heatwave in Northern India. Temperature in Delhi reaching 47 ?
+f = plot_city(City("Delhi", "Delhi, India", 28.7041, 77.1025, Date("2018-05-12") .. Date("2018-06-10")))
+
+# Event 25: heatwave in Tunisia
+f = plot_city(City("Tunis", "Tunis, Tunisia", 36.806389, 10.181667, Date("2022-07-10") .. Date("2022-07-25")))
+
+# Event 28: drought + heat in Texas, 2011
+f = plot_city(City("SanAngelo", "San Angelo, TX, USA", 31.4638, -100.4370 +360, Date("2011-05-01") .. Date("2011-08-31")))
+
 # Event 33: heatwave in France 2003. Lyon - Latitude : 45.750000. Longitude : 4.850000
 f = plot_city(City("Lyon", "Lyon, France", 45.75, 4.85, Date("2003-07-10")..Date("2003-08-31")))
 f = plot_city(City("Clermont", "Clermont-Ferrand, France", 45.7871015,3.071508, Date("2003-07-10") .. Date("2003-09-09")))
