@@ -1,10 +1,32 @@
-################ 
-## Investigate 
+##################################
+## Investigate single locations ##
+##################################
+using YAXArrays, OnlineStats, WeightedOnlineStats, Zarr
+using DimensionalData
+using DimensionalData.LookupArrays
+using DataFrames, Dates #DateFormats
+import CSV
+# import StatsBase
+# using Measures
+using CairoMakie, GeoMakie
+
+if occursin("/Users", pwd())
+    path = "/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/v3"
+else
+    path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
+end
+
+trial = "ranked_pot0.01_ne0.1"
+etrial = "$(trial)_cmp_S1_T3"
+startyears = 1970:10:2010 
+intervals = map( y -> (y, y+12), startyears)
+landonly = "landonly"
+
 mutable struct City
     name::String
     title::String
-    lat::Float64
     lon::Float64
+    lat::Float64
     period::Any
 end
 
@@ -44,11 +66,15 @@ function plot_city(city::City)
     tempo = lookup(stp, :Ti)
     ti = 1:length(tempo)
 
-    ax1 = Axis(f[1,1:3],
+    ax1 = Axis(f[1,1:4],
         xlabel = "Time [day]",
         ylabel = "°C",)
     Label(f[1,1, Top()], 
         text = city.title,
+        halign = :left
+        )
+    Label(f[1,1, TopLeft()], 
+        text = "(a)",
         halign = :left
         )
     
@@ -66,10 +92,14 @@ function plot_city(city::City)
     t90 = hlines!(ax1, qtN[2]-273.15, label = "90th percentile", color = :grey50, linestyle = :dot) 
     t99 = hlines!(ax1, qtN[1]-273.15, label = "99th percentile", color = :grey50, linestyle = :dash) #; xmin = ti[1], xmax = ti[end], )
     
-    ax2 = Axis(f[2,1:3],
+    ax2 = Axis(f[2,1:4],
         xlabel = "Time [day]",
         ylabel ="mm/day"
     )
+    Label(f[2,1, TopLeft()], 
+        text = "(b)",
+        halign = :left
+        )
     # tp
     btp = barplot!(ax2, ti, stp.data[:].*1e3, 
         label = "Total precipitation", 
@@ -86,10 +116,14 @@ function plot_city(city::City)
         color = Colors.JULIA_LOGO_COLORS.red,
         );
 
-    ax3 = Axis(f[3,1:3],
+    ax3 = Axis(f[3,1:4],
         xlabel = "Time [day]",
         ylabel ="mm/day"
     )
+    Label(f[3,1, TopLeft()], 
+        text = "(c)",
+        halign = :left
+        )
     # PE
     pe30 = lines!(ax3, ti, spei["pei_30"].data[:], label = "pei_30",);
     pe90 = lines!(ax3, ti, spei["pei_90"].data[:], label = "pei_90",);
@@ -102,10 +136,14 @@ function plot_city(city::City)
     pe180_90 = hlines!(ax3, qpe180N[2], label = "pei_180 10th percentile", color = 3, colormap = :tab10, colorrange = (1, 10), linestyle = :dot) #; xmin = ti[1], xmax = ti[end],  )
     pe180_99 = hlines!(ax3, qpe180N[1], label = "pei_180 1st percentile", color = 3, colormap = :tab10, colorrange = (1, 10), linestyle = :dash) #; xmin = ti[1], xmax = ti[end], )
     
-    ax4 = Axis(f[4,1:3],
+    ax4 = Axis(f[4,1:4],
         backgroundcolor = :transparent,
         xlabel = "Time [day]",
-        ylabel = "Event \n type"
+        ylabel = "DEO", #"Event \n type"
+        )
+    Label(f[4,1, TopLeft()], 
+        text = "(d)",
+        halign = :left
         )
     cols = [colorant"#FFFFFF",  
         colorant"#FFB86F", # 1 Light Orange
@@ -148,7 +186,7 @@ function plot_city(city::City)
     rowsize!(f.layout,3,Relative(1/4))
 
     plots = [tm, t90, t99, btp, bpet, pe30, pe90, pe180, pe30_90, pe30_99]
-    f[5,2:3] = Legend(f,
+    f[5,1:2] = Legend(f,
         plots,
         map(x -> x.label, plots), 
         position = :lb, 
@@ -156,7 +194,7 @@ function plot_city(city::City)
         nbanks = 5,
         framevisible = false,
         )
-    ecbar = Colorbar(f[5,1], 
+    ecbar = Colorbar(f[5,3], 
             colormap = cgrad(cols[[17,1,2,3,4]], categorical=true),
             limits = (-0.5,4.5),
             halign = :left,
@@ -173,6 +211,14 @@ function plot_city(city::City)
             "dry and hot",
         ],
     )
+    ecbar1 = Colorbar(f[5,4], 
+            colormap = cgrad([:white, :white], categorical=true),
+            halign = :left,
+            spinewidth = 0,
+            labelvisible = false,
+            ticksvisible = false,
+            ticklabelsvisible = false,
+        )
     
     save("$path/fig/City_$(city.name).png", f)
     return f
@@ -188,7 +234,7 @@ end
 # Event 8: heatwave in British Columbia around 29 June 2021
 Lytton  = (-121.5885 +360, 50.2260284,)
 period = Date("2021-06-21") .. Date("2021-08-17")
-city = City("Lytton", "Lytton, BC, Canada", 50.2260284, -121.5885 +360, Date("2021-06-21") .. Date("2021-08-20"))
+city = City("Lytton", "Lytton, BC, Canada", -121.5885 +360, 50.2260284, Date("2021-06-21") .. Date("2021-08-20"))
 f = plot_city(city)
 # When the strong heatwave occurs, PEIs are still ok.
     # Temperature reaches 33.5 degrees on 29th-30th June, far from reported maximum of 40+
@@ -196,26 +242,26 @@ f = plot_city(city)
     # but are not so high when the PEI30 drops below the 1% threshold.
     # Temperatures rise again reaching 
 # Event 3: heatwve in Pakistan
-f = plot_city(City("Karachi", "Karachi, Pakistan", 24.8607, 67.0011, Date("2018-05-12") .. Date("2018-05-22")))
+f = plot_city(City("Karachi", "Karachi, Pakistan", 67.0011, 24.8607, Date("2018-05-12") .. Date("2018-05-22")))
 # Event 14: heatwave in Northern India. Temperature in Delhi reaching 47 ?
-f = plot_city(City("Delhi", "Delhi, India", 28.7041, 77.1025, Date("2018-05-12") .. Date("2018-06-10")))
+f = plot_city(City("Delhi", "Delhi, India", 77.1025, 28.7041, Date("2018-05-12") .. Date("2018-06-10")))
 
 # Event 25: heatwave in Tunisia
-f = plot_city(City("Tunis", "Tunis, Tunisia", 36.806389, 10.181667, Date("2022-07-10") .. Date("2022-07-25")))
+f = plot_city(City("Tunis", "Tunis, Tunisia", 10.181667, 36.806389, Date("2022-07-10") .. Date("2022-07-25")))
 
 # Event 28: drought + heat in Texas, 2011
-f = plot_city(City("SanAngelo", "San Angelo, TX, USA", 31.4638, -100.4370 +360, Date("2011-05-01") .. Date("2011-08-31")))
+f = plot_city(City("SanAngelo", "San Angelo, TX, USA", -100.4370 +360, 31.4638, Date("2011-05-01") .. Date("2011-08-31")))
 
 # Event 33: heatwave in France 2003. Lyon - Latitude : 45.750000. Longitude : 4.850000
-f = plot_city(City("Lyon", "Lyon, France", 45.75, 4.85, Date("2003-07-10")..Date("2003-08-31")))
-f = plot_city(City("Clermont", "Clermont-Ferrand, France", 45.7871015,3.071508, Date("2003-07-10") .. Date("2003-09-09")))
-f = plot_city(City("Clermont1", "Clermont-Ferrand, France", 45.7871015,3.071508, Date("2003-07-10") .. Date("2003-09-30")))
+f = plot_city(City("Lyon", "Lyon, France", 4.85, 45.75, Date("2003-07-10")..Date("2003-08-31")))
+f = plot_city(City("Clermont", "Clermont-Ferrand, France",3.071508, 45.7871015, Date("2003-07-10") .. Date("2003-09-09")))
+f = plot_city(City("Clermont1", "Clermont-Ferrand, France",3.071508, 45.7871015, Date("2003-07-10") .. Date("2003-09-30")))
 # Carcassone: Latitude : 43.216667. Longitude : 2.350000
 # Event 33 - France/Europe heatwave of 2003
-f = plot_city(City("Carcassonne", "Carcassone, France", 43.22, 2.35, Date("2003-07-10") .. Date("2003-08-31")))
+f = plot_city(City("Carcassonne", "Carcassone, France", 2.35, 43.22, Date("2003-07-10") .. Date("2003-08-31")))
 # Beauraing
-f = plot_city(City("Beauraing_22", "Beauraing, Belgium", 50.1102, 4.9554, Date("2022-06-21") .. Date("2022-09-20")))
-f = plot_city(City("Beauraing_21", "Beauraing, Belgium", 50.1102, 4.9554, Date("2021-06-21") .. Date("2021-09-20")))
-f = plot_city(City("Beauraing_20", "Beauraing, Belgium", 50.1102, 4.9554, Date("2020-06-21") .. Date("2020-09-20")))
-f = plot_city(City("Beauraing_19", "Beauraing, Belgium", 50.1102, 4.9554, Date("2019-06-21") .. Date("2019-09-20")))
-f = plot_city(City("Beauraing_18", "Beauraing, Belgium", 50.1102, 4.9554, Date("2018-06-21") .. Date("2018-09-20")))
+f = plot_city(City("Beauraing_22", "Beauraing, Belgium", 4.9554, 50.1102, Date("2022-06-21") .. Date("2022-09-20")))
+f = plot_city(City("Beauraing_21", "Beauraing, Belgium", 4.9554, 50.1102, Date("2021-06-21") .. Date("2021-09-20")))
+f = plot_city(City("Beauraing_20", "Beauraing, Belgium", 4.9554, 50.1102, Date("2020-06-21") .. Date("2020-09-20")))
+f = plot_city(City("Beauraing_19", "Beauraing, Belgium", 4.9554, 50.1102, Date("2019-06-21") .. Date("2019-09-20")))
+f = plot_city(City("Beauraing_18", "Beauraing, Belgium", 4.9554, 50.1102, Date("2018-06-21") .. Date("2018-09-20")))
