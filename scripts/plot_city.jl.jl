@@ -84,7 +84,7 @@ function plot_city(city::City)
         ti, stmx.data[:] .- 273.15, 
         # yaxis = "Temperature [Kelvin]", 
         label = "Max. temperature at 2m",
-        # markersize = 2,
+        markersize = 4,
         # markeralpha = 0.3,
         color = :grey50,
         );
@@ -176,10 +176,11 @@ function plot_city(city::City)
     hidexdecorations!(ax3, grid = false)
     hidespines!(ax4)
     hideydecorations!(ax4, label = false)
-    xpos, ticks = time_ticks(tempo)
-    ax1.xticks = ax2.xticks = ax3.xticks = ax4.xticks = (xpos, ticks)
-    ax4.xticklabelrotation = π / 4
-    ax4.xticklabelalign = (:right, :center)
+    # xpos, ticks = time_ticks(tempo)
+    # ax1.xticks = ax2.xticks = ax3.xticks = ax4.xticks = (xpos, ticks)
+    ax1.xticks = ax2.xticks = ax3.xticks = ax4.xticks = setticks(tempo, 5, x -> string(Date(x)); ticksvalue=false)
+    # ax4.xticklabelrotation = π / 4
+    # ax4.xticklabelalign = (:right, :center)
     # arrange plots on
     rowsize!(f.layout,1,Relative(1/4))
     rowsize!(f.layout,2,Relative(1/4))
@@ -195,14 +196,14 @@ function plot_city(city::City)
         framevisible = false,
         )
     ecbar = Colorbar(f[5,3], 
-            colormap = cgrad(cols[[17,1,2,3,4]], categorical=true),
-            limits = (-0.5,4.5),
+            colormap = cgrad(cols[[17,1,2,9,5,3,10,6,4]], categorical=true),
+            limits = (-0.5,8.5),
             halign = :left,
             spinewidth = 0,
             ticksvisible = false,
         )
     ecbar.ticks = (
-        0:4, 
+        [0,1,2,5,8,],#0:4, 
         [
             "no extreme",
             "10th/90th percentile",
@@ -231,6 +232,20 @@ function time_ticks(dates; frac=8)
     return slice_dates, tempo[slice_dates]
 end
 
+# setticks
+function setticks(x::Any, n::Int, f::Any; ticksvalue = true)
+    ticks = [1] #; ticks[n] = x[end];
+    nx = length(x)
+    for i in 2:n
+        push!(ticks, convert(Int, round(nx/(n-1) * (i-1))))
+    end
+    ticklabels = map(f, x[ticks])
+    if ticksvalue
+        return((x[ticks], ticklabels))
+    else
+        return((ticks, ticklabels))
+    end
+end
 # Event 8: heatwave in British Columbia around 29 June 2021
 Lytton  = (-121.5885 +360, 50.2260284,)
 period = Date("2021-06-21") .. Date("2021-08-17")
@@ -265,3 +280,11 @@ f = plot_city(City("Beauraing_21", "Beauraing, Belgium", 4.9554, 50.1102, Date("
 f = plot_city(City("Beauraing_20", "Beauraing, Belgium", 4.9554, 50.1102, Date("2020-06-21") .. Date("2020-09-20")))
 f = plot_city(City("Beauraing_19", "Beauraing, Belgium", 4.9554, 50.1102, Date("2019-06-21") .. Date("2019-09-20")))
 f = plot_city(City("Beauraing_18", "Beauraing, Belgium", 4.9554, 50.1102, Date("2018-06-21") .. Date("2018-09-20")))
+
+Niameylon = 2.1254; Niameylat = 13.5116
+f = plot_city(City("Niamey_81_85", "Niamey, Niger", Niameylon, Niameylat, Date(1981) .. Date(1985,12,31)))
+f = plot_city(City("Niamey_83", "Niamey, Niger", Niameylon, Niameylat, Date(1983) .. Date(1983,12,31)))
+
+Jenalat = 50.92; Jenalon = 11.59
+f = plot_city(City("Jena", "Jena, Germany", Jenalon, Jenalat, Date(2018) .. Date(2022,12,31)))
+f = plot_city(City("Jena_20", "Jena, Germany", Jenalon, Jenalat, Date(2020) .. Date(2020,12,31)))
