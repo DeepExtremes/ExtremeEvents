@@ -114,29 +114,7 @@ Where are the labelled events in the period 2010-2022?
 
 ![alt text](../v3/fig/nolabel_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022.png)
 
-## Postprocessing
-
-### Annual global/continental summary
-
-Compute annual statistics of indicators, globally and by continent.
-
-```
-julia --project="ExtremeEvents.toml" plot_ind_annual.jl
-```
-
-Compute annual statistics of EventCube at global and continental scale, by summing all extremes by type and plotting results.
-
-```
-julia --project="ExtremeEvents.toml" plot_EventType.jl
-```
-
-Extract largest and longest events from `EventStats_landonly` with `largest_labels.jl` and plot statistics with `plotstats.jl`.
-
-### Validation
-
-Compare labelcube with table of reported events compiled *a priori* with `SanityCheck.jl`
-
-## Figures
+## Figures and Postprocessing
 
 ### fig01_workflow.png
 
@@ -151,6 +129,45 @@ See `fig4dheed.jl`
 ### fig03: timeseries
 
 Timeseries of indicators for 2 contrasted locations: Jena (timeseries_11.59_50.92_2012_2023.png) and Niamey (timeseries_2.1254_13.5116_2012_2023.png).
+
+See `plot_t2mmax.jl`
+
+### fig04 - fig06: Trends -- Annual global/continental summary
+
+Trends in annual global/continental indicators.
+
+Compute annual statistics of indicators, globally and by continent.
+
+```
+julia --project="ExtremeEvents.toml" plot_ind_annual.jl
+```
+
+Compute annual statistics of EventCube at global and continental scale, by summing all extremes by type.
+
+```
+julia --project="ExtremeEvents.toml" hist_EventType.jl
+```
+
+Plot the results of the EventCube analysis.
+
+```
+julia --project="ExtremeEvents.toml" plot_EventType.jl
+```
+
+### fig07: events_stats_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022_landonly_1970.png
+
+Extract largest and longest events from `MergedEventStats_landonly` with `largest_labels.jl` and plot statistics with `plotstats.jl`.
+
+### fig08: largest_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022_landonly_1970.png
+
+
+### fig09: Validation
+
+Compare MergedEventStats_landonly with table of reported events compiled *a priori* with `SanityCheck.jl`. 
+
+### fig10: Lytton.png
+
+Extract timeseries at single locations with `plot_city.jl`
 
 
 

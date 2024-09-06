@@ -15,110 +15,15 @@ else
     path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
 end
 
-# load list of events
-obs0 = CSV.read("$path/../EventPart1_csv_Ltime.csv", DataFrame)
-rename!(obs0, Dict("Name" => :Area, 
-    "Event type" => :Event, 
-    "when_from" => :Start, 
-    "when_until" => :End, 
-    "where_SW" => :West, 
-    "where_SE" => :East,
-    "where_NW" => :South,
-    "where_NE" => :North,)
-)
-obs0.Start .= replace.(obs0.Start, r"\." => "-");
-obs0.End .= replace.(obs0.End, r"\." => "-");
-# remove spaces in columns names. DataConvenience.cleannames! from DataConvenience.jl
-# import DataConvenience
-# DataConvenience.cleannames!(obs)
-sort!(obs0, :Start, rev=true)
-# select drought and heatwave (drop floods)
-filter!(:Event=>!=("flood"), obs0)
-# drop Continent
-select!(obs0, Not(:Continent, :Year))
-
-# for each event documented in the literature, subset eventcube according to time and spatial extent, 
-# mask > 
-# compute weighted "volume" of each type of event, (min, mean, max) for t2mmax, 
+obs = CSV.read(path * "refEvents.csv", DataFrame)
 
 # run stats.jl first
 include("../src/stats.jl")
-    
-# for trial in ["ranked_pot0.01_ne0.1"]
-#     eventspath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventCube_$trial.zarr"
-#     @time obs_check = sanity_check(obs, eventspath, peis, era);
-
-#     # join data frames df and obs
-#     obs.rowid = rownumber.(eachrow(obs));
-#     obs_with_check = leftjoin(obs, obs_check, on=:rowid=>:label )
-#     # export to csv
-#     CSV.write("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventPart1_SanityCheck_$trial.csv", obs_with_check)
-
-# end
-
-# obs_with_check[:,[:Name,:Event_type, :Year, :heat, :drought30, :drought90, :drought180, :compound]]
-
 include("../src/plots.jl")
 
-### EventPart2
-obs = CSV.read("$(path)../EventPart3.csv", DataFrame; header=3)
-# obs = CSV.read("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventPart2.csv", DataFrame; header=3)
-# clean obs
-obs = dropmissing!(obs)
-obs.Start .= replace.(obs.Start, r"\." => "-");
-obs.End .= replace.(obs.End, r"\." => "-");
-
-# add obs_event
-obs0.obs_event .= nrow(obs) .+ (1:nrow(obs0))
-# reorder columns
-select!(obs0, :obs_event, :)
-
-
-# merge 2 tables:
-obs = vcat(obs, obs0)
-
-# sort by starting date
-sort(obs, :Start)
-
-# export to latex table
-show(stdout, MIME("text/latex"),select(obs, Not(:obs_event)))
-show(stdout, MIME("text/csv"),obs)
-
 #### start helper fns
-function labobs(df0::DataFrame, lon, lat, period, obs_event)
-    #
-    # retrieve relevant labelcube
-    i = findlast((period[1] .>= Date.(startyears)) .& (period[2] .< Date.(startyears .+ 13)))
-    
-    # retrive labels and count them
-    tmp = labels[i].layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
-    tab = CubeTable(
-        label    = labels[i].layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
-    )
-    labcount = fitalllabelcount(tab);
-    sort!(labcount, by=i->i[end].c, rev=true);
-    # toDF
-    labcountdf = DataFrame(map(collectresults, labcount));
-    # remove event with few voxels (arbitrarily I had 99, but maybe lower to 14) and empty lines
-    labcountdf = labcountdf[map(>(0), labcountdf.count), :]
-    # extract stats from events
-    df = filter([:label, :interval] => (label, interval) -> in(label,labcountdf.label) && interval == i, statevents)
-    if isempty(df)
-        return df0
-    end
-    df.start_time = Date.(df.start_time);
-    df.end_time = Date.(df.end_time);
-    # add column obs_event
-    df.obs_event .= obs_event;
-    # vcat df
-    append!(df0, df)
-    return df0
-end
 
-function labobsm(df0::DataFrame, lon, lat, period, obs_event)
-    #
-    # plot labelled events flattened over time
-    
+function labobsm(df0::DataFrame, lon, lat, period, obs_event)    
     # retrive labels and count them
     tab = CubeTable(
         label    = labels_all.labels[time=period, latitude=lat, longitude=lon]
@@ -140,25 +45,11 @@ function labobsm(df0::DataFrame, lon, lat, period, obs_event)
     df.obs_event .= obs_event;
     # vcat df
     df0 = vcat(df0, df)
-    # sublabels = Cube(subsetcube(labels_all, time=period, latitude=lat, longitude=lon))
-    # sublabels1 = ( in(df.label).(sublabels.data))[:,:,:];
-    # if lon[1] >= 180
-    #     # modify axes
-    #     axs = modaxs(sublabels.axes)
-    #     # p = hm!(sublabels1, axs = axs, c = cgrad(:inferno, categorical = true))
-    # else
-    #     p = hm!(sublabels1, axs = sublabels.axes, c = cgrad(:inferno, categorical = true))
-    # end   
-    # # but this approach doesn't show if labelled events span outside the observed event bbox
-    # return p, df0
 end
 
 
 function labplot!(ax, lon, lat, period, dflabels; reduced = :Ti, obs_event = nothing, nd = 1, kwargs...)
-    # retrieve relevant labelcube
-    i = findlast((period[1] .>= Date.(startyears)) .& (period[2] .< Date.(startyears .+ 13)))
-    # sublabels = labels.layer[time=periodo[1]..periodo[2], latitude=lato[1]..lato[2], longitude=lono[1]..lono[2]]
-    sublabels = labels[i].layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
+    sublabels = labels_all.labels[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
     data = ( in(dflabels).(sublabels.data))[:,:,:];
     if lon[1] >= 180
         # modify axes
@@ -176,12 +67,10 @@ end
 
 function labplot3!(ax3, lon, lat, period, dflabel; kwargs...)
     # retrieve relevant labelcube
-    i = findlast((period[1] .>= Date.(startyears)) .& (period[2] .< Date.(startyears .+ 13)))
-    # sublabels = labels.layer[time=timlim[1]..timlim[2], latitude=latlim[1]..latlim[2], longitude=lon1[1]..lon1[2]]
     if typeof(lon) <: Vector
-        sublabels1 = labels[i].layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1][1]..lon[1][2]]
+        sublabels1 = labels_all.labels[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1][1]..lon[1][2]]
         data1 = ( in(dflabel).(sublabels1.data))[:,:,:];
-        sublabels2 = labels[i].layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[2][1]..lon[2][2]]
+        sublabels2 = labels_all.labels[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[2][1]..lon[2][2]]
         data2 = ( in(dflabel).(sublabels2.data))[:,:,:];
         # concatenate over :longitude
         data = cat(data1, data2; dims = 1);
@@ -192,7 +81,7 @@ function labplot3!(ax3, lon, lat, period, dflabel; kwargs...)
         y = lookup(sublabels1, :latitude)
         tempo = lookup(sublabels1, :Ti)
     else
-        sublabels = labels[i].layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
+        sublabels = labels_all.labels[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
         data = ( in(dflabel).(sublabels.data))[:,:,:];
 
         x = lookup(sublabels, :longitude)
@@ -228,7 +117,6 @@ end
 
 function getx(lon)
     x = [lon[1], lon[1], lon[2], lon[2], lon[1]];
-    #### need to fix for Europe etc. e.g obs_event = 5
     x = lon[1] >= 180 ? x.-360 : x
 end
 
@@ -242,28 +130,11 @@ function expand(x::Tuple{Float64, Float64})
 end
 ##### end helper fns
 
-# for trial in ("ranked_pot0.01_ne0.1_cmp_2016_2021")#,"ranked_pot0.01_ne0.1_tcmp_2016_2021"# "ranked_pot0.01_ne0.1_tcmp_2016_2021","ranked_pot0.01_ne0.1_cmp_Sdiam3_T5_new_2016_2021")
 # trial = "ranked_pot0.01_ne0.1_cmp_2016_2021" # "ranked_pot0.01_ne0.1_cmp_2016_2021_land"#"ranked_pot0.01_ne0.1_tcmp_Sdiam3_T5_2016_2021" # "ranked_pot0.01_ne0.1_cmp_2016_2021" # 
 trial = "ranked_pot0.01_ne0.1"
 etrial = "$(trial)_cmp_S1_T3"
-startyears = 1970:10:2010 
-intervals = map( y -> (y, y+12), startyears)
 landonly = "landonly"
-# events_all = CSV.read(path * "EventStats_ranked_pot0.01_ne0.1_cmp_2016_2021.csv", DataFrame)
 statevents = DataFrame()
-# labels = ()
-# for i in 1:length(intervals)
-#     # EventStats_ranked_pot0.01_ne0.1_cmp_S1_T3_1970_1982_landonly.csv
-#     eventsi = CSV.read("$(path)EventStats_$(etrial)_$(intervals[i][1])_$(intervals[i][2])_$(landonly).csv", DataFrame)
-#     eventsi.interval .= i
-#     append!(statevents, eventsi)
-#     # look for intersection between spatial and temporal range of events from the table or directly in the labelcube
-#     labelpathi = "$(path)labelcube_$(etrial)_$(intervals[i][1])_$(intervals[i][2]).zarr"
-#     # labelpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/labelcube_$trial.zarr"
-#     labelsi = open_dataset(labelpathi)# labels = Cube(labelpath)
-#     labels = (labels..., labelsi)
-# end
-# labels_all = open_dataset(path * "labelcube_ranked_pot0.01_ne0.1_cmp_2016_2021.zarr")
 labels_all = open_dataset(path * "mergedlabels.zarr")
 statevents = CSV.read(path*"MergedEventStats_landonly.csv", DataFrame)
 
@@ -271,8 +142,7 @@ global df0 = DataFrame()
 # global df0 = CSV.read(path * "SanityCheck_merged.csv", DataFrame, header=1)
 
 # loop over observed events
-# tmp = deepcopy(findall(!in(unique(df0.obs_event)),1:36))
-for obs_event in 39:40#obs.obs_event #8#1 : nrow(obs)
+for obs_event in 1 : nrow(obs)
     # obs_event=10
     print(obs[obs_event,:])
     period = Date(obs[obs_event,:Start]) .. Date(obs[obs_event,:End])+Day(1)
@@ -311,18 +181,8 @@ for obs_event in 39:40#obs.obs_event #8#1 : nrow(obs)
 end
 unique!(df0)
 # export to csv
-# CSV.write(path * "SanityCheck_$etrial)_all.csv", df0)
 CSV.write(path * "SanityCheck_merged.csv", df0)
-# global df0 = CSV.read("$(path)SanityCheck_$(etrial)_all.csv", DataFrame, header=1)
-# global df0 = CSV.read(path * "SanityCheck_merged.csv", DataFrame, header=1)
-
-## 20240525 need to do the rest with labels[i] (+solve CubeTable)
-
-# df0 crashed for 
-# 3 (2018.05.12,2018.05.22,61,89,7,34) => Offsets must be positive and smaller than the chunk size
-# 14 (2018.05.12,2018.05.22,68,97.5,6.5,36) => Offsets must be positive and smaller than the chunk size
-# ==> problem in CubeTable coming from time. changed to longer period until it worked...
-# 2018.04.20,2018.06.20
+global df0 = CSV.read(path * "SanityCheck_merged.csv", DataFrame, header=1)
 
 for obs_event in 1:nrow(obs)
     println(obs_event)
@@ -595,24 +455,13 @@ for obs_event in 1:nrow(obs)
     end
 end
 
-
-    
-
-# CSV.write(path * "RecentEvents.csv", obs)
-
-# 
 # df0 = CSV.read("$(path)/SanityCheck_$etrial.csv", DataFrame, header=1)
-
-# no labels found for 3, 8 and 14; 25, 31, 36???
-# now Tue 2024-06-11, I have no lables for 13, 25, 26, 32-34, 36-39...
 # validation results
 obs_compound = filter(:Event=>!=("drought"), obs)[!, :obs_event]
 tmp = df0 |> 
     (df -> DataFrames.groupby(df, :obs_event)) |>
     (gdf -> combine(gdf, AsTable(:) => t -> nrow(t))) # |>
-    # (df -> leftjoin(df, obs, on = :obs_event))
 tmp1 = df0 #|>
-    # (df -> filter(:obs_event => in(obs_compound), df)) 
 # show boxplot/vagina of volume of events
 f = with_theme(theme_latexfonts()) do
     f = Figure(size = (1000,400));
@@ -630,15 +479,3 @@ f = with_theme(theme_latexfonts()) do
     f
 end
 save(path * "fig/plot" * "_" * etrial * "_validation.png", f) 
-
-
-# ax2, v2 = violin(f[3,1], df0.obs_event, df0.t2mmax_mean)
-# ax2.ylabel = "Mean Tmax"
-# ax3, v3 = violin(f[4,1], df0.obs_event, df0.pei_30_mean)
-# ax3.ylabel = "Mean PE30"
-# ax4, v4 = violin(f[5,1], df0.obs_event, df0.pei_90_mean)
-# ax4.ylabel = "Mean PE90"
-# ax5, v5 = violin(f[6,1], df0.obs_event, df0.pei_180_mean)
-# ax5.ylabel = "Mean PE180"
-# f
-
