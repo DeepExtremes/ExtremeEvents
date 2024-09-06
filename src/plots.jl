@@ -1,6 +1,9 @@
-using Plots
+# using Plots
 # import PlotUtils
 using Dates
+using DimensionalData
+using DimensionalData.LookupArrays
+using CairoMakie
 
 """
     simpleplot(
@@ -92,171 +95,136 @@ function simpleplot(dc::YAXArray,
 end
 
 # lon, lat heatmap with reduction over time
-function axnms(axes::Vector{CubeAxis})
-    types = map(x -> string(typeof(x)), axes)
-    indnms = map(x -> findfirst(":", x)[end] + 1, types)
-    nms = map((x) -> types[x][indnms[x]:(indnms[x]+2)], 1:length(types))
+function axnms(axes)
+    nms = DimensionalData.dim2key(axes)
 end
 
-function modaxs(axs::Vector{CubeAxis};lon = "longitude")
-    axs_nms = axnms(axs)
-    lon_dim =  findfirst(axs_nms .== lon[1:3])
+function modaxs(axs;lon = :longitude)
+    # axs_nms = DimensionalData.Dimensions.dim2key(axs)
+    lon_dim =  dimnum(axs, lon)
     axsl = map(x -> x > 180 ? x-360 : x, axs[lon_dim]) |> sort
-    axs[lon_dim] = RangeAxis(lon, range(axsl[1] , axsl[end], length = length(axsl)))
-    return axs
+    axsv = [i for i in axs]
+    axsv[lon_dim] = Dim{lon}(axsl)
+    axst = Tuple(axsv)
+    return axst
 end
 
-function getshifts(axs::Vector{CubeAxis};lon = "longitude")
-    axs_nms = axnms(axs)
-    lon_dim =  findfirst(axs_nms .== lon[1:3])
-    shifts = [sum(axs[lon_dim] .< 0), 1, 1]
-    dims = ["lon", "lat", "tim"];
-    i = map(x -> findfirst(dims .== x), axs_nms)
-    return shifts[i]
+function getshifts(axs::Tuple{Vararg{DimensionalData.Dimensions.Dimension}};lon = :longitude)
+    axs_nms = DimensionalData.Dimensions.dim2key(axs)
+    lon_dim =  dimnum(axs, lon) #lon_dim =  findfirst(axs_nms .== lon[1:3])
+    # lon, lat time shifts
+    lon_shifts = sum(axs[lon_dim] .< 0)
+    shifts = zeros(Int, length(axs))
+    shifts[lon_dim] = lon_shifts
+    # shifts = [sum(axs[lon_dim] .< 0), 0, 0]
+    # dims = ["lo", "la", "ti"];
+    # i = map(x -> findfirst(dims .== lowercase(string(x))[1:2]), [i for i in axs_nms])
+    # return shifts[i]
+    return shifts
 end
 
-
-# function prephm(tmp,axs,fn)
-#     axs_nms = axnms(axs)
-#     time_dim = findfirst(axs_nms .== "tim")
-#     lon_dim =  findfirst(axs_nms .== "lon")
-#     lat_dim =  findfirst(axs_nms .== "lat")
-#     rtmp = dropdims(reduce(fn, tmp, dims=time_dim),dims=time_dim);
-#     # @show size(rtmp)
-#     # convert to Float to discard 0 in plot
-#     rtmp = convert(Matrix{Float64},rtmp);
-#     replace!(rtmp, 0 => NaN)
-#     # replace!(rtmp, missing => NaN)
-#     x = axs[lon_dim][:];
-#     y = axs[lat_dim][end:-1:1];
-#     # @show x, y
-#     z = permutedims(rtmp, (time_dim < lat_dim ? lat_dim-time_dim : lat_dim, time_dim < lon_dim ? lon_dim - time_dim : lon_dim))[end:-1:1,:];   
-#     return x,y,z
-# end
-
-function prephm(tmp,axs,fn;reduced="tim")
-    axs_nms = axnms(axs)
-    red_dim = findfirst(axs_nms .== reduced)
-    time_dim = findfirst(axs_nms .== "tim")
-    lon_dim =  findfirst(axs_nms .== "lon")
-    lat_dim =  findfirst(axs_nms .== "lat")
-    rtmp = mapslices(fn, tmp, dims=red_dim)
+function prephm(tmp,axs,fn;reduced = :Ti)
+    # axs_nms = axnms(axs)
+    red_dim = dimnum(axs, reduced)
+    time_dim = dimnum(axs, :Ti)
+    lon_dim =  dimnum(axs, :longitude)
+    lat_dim =  dimnum(axs, :latitude)
+    rtmp = mapslices(fn, tmp, dims=red_dim);
     # @show size(rtmp)
     # convert to Float to discard 0 in plot
     rtmp = convert(Array{Float64},rtmp);
     replace!(rtmp, 0 => NaN)
     # replace!(rtmp, missing => NaN)
     # define x, y, z
-    if reduced  == "tim"
-        x = axs[lon_dim][:];
-        y = axs[lat_dim][end:-1:1];
-        z = permutedims(dropdims(rtmp,dims=red_dim), (time_dim < lat_dim ? lat_dim-time_dim : lat_dim, time_dim < lon_dim ? lon_dim - time_dim : lon_dim))[end:-1:1,:];   
-    elseif reduced == "lon"
+    if reduced  == :Ti
+        x = lookup(axs, lon_dim);
+        y = lookup(axs, lat_dim)[end:-1:1];
+        # z = permutedims(dropdims(rtmp,dims=red_dim), (time_dim < lat_dim ? lat_dim-time_dim : lat_dim, time_dim < lon_dim ? lon_dim - time_dim : lon_dim))[end:-1:1,:];   
+        z = dropdims(permutedims(rtmp,(lon_dim, lat_dim, time_dim)), dims=3)[:,end:-1:1];
+    elseif reduced == :longitude
+        # x = convert(Vector{Date}, lookup(axs, time_dim));
+        x = lookup(axs, time_dim);
+        y = lookup(axs, lat_dim)[end:-1:1];
+        z = dropdims(permutedims(rtmp, (time_dim, lat_dim, lon_dim)),dims=3)[:,end:-1:1];   
+    elseif reduced == :latitude
         # 
-        x = convert(Vector{Date}, axs[time_dim][:]);
-        y = axs[lat_dim][end:-1:1];
-        z = dropdims(permutedims(rtmp, (lat_dim, time_dim, lon_dim)),dims=3)[end:-1:1,:];   
-    else # reduced == "lat"
-        # 
-        x = axs[lon_dim][:];
-        y = axs[time_dim];
-        z = dropdims(permutedims(rtmp, (time_dim, lon_dim, lat_dim)),dims=3)[end:-1:1,:];   
+        x = lookup(axs, lon_dim);
+        y = lookup(axs, time_dim);
+        z = dropdims(permutedims(rtmp, (time_dim, lon_dim, lat_dim)),dims=3);   
+    else
+        error("Reduction with $reduced is not defined")
     end
 
     return x,y,z
 end
 
-function hm(tmp::BitArray{3}; title = missing, axs = axes_rt, fn = sum, reduced = "tim", kwargs...)
-    x,y,z = prephm(tmp,axs,fn;reduced)
-    @show sum(map(x->!isnan(x),z))
-    Plots.heatmap(x, y, z; title = title, kwargs...)
-end
-
-function hm(tmp::Array{Bool, 3},args...;kwargs...)
-    tmp = convert(BitArray{3}, tmp)
-    hm(tmp,args...;kwargs...)
-end
-
-function hm!(tmp::BitArray{3}; axs = axes_rt, fn = sum, reduced = "tim", xlab = "longitude", ylab = "latitude", kwargs...)
-    x,y,z = prephm(tmp,axs,fn;reduced)
-    Plots.heatmap!(x, y, z; kwargs...)
-end
-
-function hm!(tmp::Array{Bool, 3},args...;kwargs...)
-    tmp = convert(BitArray{3}, tmp)
-    hm!(tmp,args...;kwargs...)
-end
-
-function hm!(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = "tim", kwargs...)
-    x,y,z = prephm(tmp,axs,fn;reduced)
-    Plots.heatmap!(x, y, z;kwargs...)
-end
-
-function hm(tmp::Any; axs = axes_rt, fn = sum, reduced = "tim", kwargs...)
-    x,y,z = prephm(tmp,axs,fn;reduced)
-    Plots.heatmap(x, y, z;kwargs...)
-end
-
-function cf!(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = "tim", kwargs...)
-    x,y,z = prephm(tmp,axs,fn;reduced)
-    Plots.contourf!(x, y, z; kwargs...)
-end
-
-# import PlotUtils
-function getColours(colours::Union{Nothing, PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient};n=10)
-    if isnothing(colours)
-        colours = palette(:darkterrain, n)
-    else
-        if typeof(colours) in [PlotUtils.CategoricalColorGradient, PlotUtils.ContinuousColorGradient]
-            ErrorException("colours should be of type ColorGradient")
-        end
-    end
-end
-# cols = Tuple((Light1 = "#28828F",
-# Dark2 = "#6E6E6E",
-# Light2 = "#9E9E9E",
-# Accent1 = "#C8C8C8", 
-# Accent2 = "#366570",
-# Accent3 = "#8C8C8C",
-# Accent4 = "#57A9BA",
-# Accent5 = "#FFD966",
-# Accent6 = "#EAF1F3"))
-
-# DeepAIcols = map(x -> Base.parse(Colorant, x)),
-#               cols
-# )
-
-# using DataFrames, VegaLite
-# function labelplot(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = "tim", xlab = "longitude", ylab = "latitude", title= "", colours = nothing)
+# function hm(tmp::BitArray{3}; title = missing, axs = axes_rt, fn = sum, reduced = :Ti, kwargs...)
 #     x,y,z = prephm(tmp,axs,fn;reduced)
-#     df = DataFrame(x=repeat(x,inner=size(z)[1]), y=repeat(y, size(z)[2]), z=z[:]);
-#     df |> @vlplot(
-#         :rect, 
-#         x={"x:o", title=xlab}, 
-#         y={"y:o", title=ylab}, 
-#         color={
-#             "z:n",
-#             legend={title="Event label"}, 
-#             # scale={domain=[], range=[]},
-#             },
-#         title=title,
-#         )
+#     sum(map(x->!isnan(x),z))
+#     heatmap(x, y, z; axis = (title = title), kwargs...)
 # end
 
-# using GeoMakie, CairoMakie
-# function makielabel(tmp::Array{Int64, 3}; axs = axes_rt, fn = sum, reduced = "tim", xlab = "longitude", ylab = "latitude", title= "", colours = nothing)
-#     x,y,z = prephm(tmp,axs,fn;reduced)
-#     fig = Figure()
-#     ax = GeoAxis(fig[1,1],
-#         source = "+proj=longlat +datum=WGS84", 
-#         dest = "+proj=eqearth",
-#         lonlims=(x[1],x[end]),
-#         latlims=(y[1],y[end]),
-#         coastlines=true)
-#     GeoMakie.surface!(ax, x, y, z; shading = false)
-#     # GeoMakie.heatmap!(ax, x, y, z; shading = false)
-#     fig
+# function hm(tmp::Array{Bool, 3},args...;kwargs...)
+#     tmp = convert(BitArray{3}, tmp)
+#     hm(tmp,args...;kwargs...)
 # end
+
+# axs::Tuple{Vararg{DimensionalData.Dimensions.Dimension}
+function hm!(ax, tmp::BitArray{3}, axs::Tuple{Vararg{DimensionalData.Dimensions.Dimension}} ; fn = sum, reduced = :Ti, kwargs...)
+    x,y,z = prephm(tmp,axs,fn;reduced)
+    h = heatmap!(ax, x, y, z; kwargs...)
+    return h
+end
+
+function hm!(ax,tmp::Array{Bool, 3},args...;kwargs...)
+    tmp = convert(BitArray{3}, tmp)
+    h = hm!(ax,tmp,args...;kwargs...)
+    return h
+end
+
+function hm!(ax, tmp::Array{Int64, 3}, axs; fn = sum, reduced = :Ti, kwargs...)
+    x,y,z = prephm(tmp, axs, fn; reduced)
+    h = heatmap!(ax, x, y, z;kwargs...)
+    return h
+end
+
+function hm(tmp::Any, axs::Tuple{Vararg{DimensionalData.Dimensions.Dimension}} ; fn = sum, reduced = :Ti, kwargs...)
+    x,y,z = prephm(tmp,axs,fn;reduced)
+    f = Figure()
+    ax = Axis(f[1, 1])
+    h = heatmap!(ax, x, y, z; kwargs...)
+    return f, ax, h
+end
+
+function myfig!(fig, lon, lat, data, q, units)
+    ax = GeoAxis(fig[1,1], 
+        limits=(extrema(lon), extrema(lat)), 
+        source="+proj=latlong +datum=WGS84", # src CRS
+        dest="+proj=eqearth", # destination CRS, in which you want to plot
+        coastlines = true # plot coastlines from Natural Earth, as a reference.
+    )
+    s = surface!(ax, lon, lat, data; 
+        colorrange=(-maximum(abs.(q)), maximum(abs.(q))),
+        # highclip=:black,
+        # lowclip=:grey8,
+        #colorscale = sc,
+        colormap, nan_color=:grey80,
+        shading=NoShading,
+    )
+    # # coastlines
+    # cl=lines!(ax, 
+    #     # GeoMakie.coastlines(),
+    #     x1,y1,
+    #     color = :black, linewidth=0.85)
+    # translate!(cl, 0, 0, 1000)
+    Colorbar(fig[1,2], s, label = units)
+    # remove gridlines
+    ax.xgridcolor[] = colorant"transparent";
+    ax.ygridcolor[] = colorant"transparent";
+    ax.xticklabelsvisible = false;
+    ax.yticklabelsvisible = false;
+    return(fig)
+end
 
 function num2col(i, lbls, cols)
     j = findfirst(x -> x == i, lbls)
@@ -271,15 +239,6 @@ function num2col(i, lbls, cols)
     #     return colorant"black"
     # end
 end
-#
-# map(x -> num2col(x, ulbls, cols), ulbls)
-# m = rand(ulbls, (10,10));
-# colours = map(x -> num2col(x, ulbls, cols),m)
-# Plots.heatmap(1:10,1:10,m,c=colours,yflip=true)
-# colGRAD = cgrad(collect(cols), categorical=true)
-# Plots.heatmap(1:10,1:10,m,c=colGRAD,yflip=true)
-# plot(colours)
-
 
 function plotEvent(df, labelcube, label_row)
     periodl =( df[label_row,:start_time], df[label_row,:end_time]+Day(1))
@@ -289,7 +248,7 @@ function plotEvent(df, labelcube, label_row)
     @show sublabels
     # load to memory and flag pixels equal to label
     label = df[label_row, :label];
-    sublabels1 = (sublabels.data .== label)[:,:,:];
+    sublabels1 = DimArray((sublabels.data .== label)[:,:,:], sublabels.axes)#(sublabels.data .== label)[:,:,:];
     @show size(sublabels1)
     if any(lonl.>180)
         # modify axes
@@ -319,3 +278,166 @@ function plotEvent(df, labelcube, label_row)
         title = "Event $label \n from " * string(Date(df[label_row,:start_time])) * " to " * string(Date(df[label_row,:end_time]))
         )  
 end
+
+# function to extract cube subset
+function getsubcube(cube, periodt, lato, lon)
+    subcube = cube[time=periodt[1]..periodt[2], latitude=lato[1]..lato[2], longitude=lon[1]..lon[2]]
+    subcubedata = subcube.data[:,:,:]
+    if any(lon.>180)
+        # modify axes
+        axs = modaxs(subcube.axes)
+        # modify subcube shift lon
+        shifts = getshifts(axs)
+        subcubedata = circshift(subcubedata, shifts)
+    else
+        axs = subcube.axes
+    end
+    return subcubedata, axs
+end
+
+"""
+    cubeplot!(ax, cube, periodt, lato, lon; plotfn = heatmap!, reducefn = mode, kwargs...)
+    function to plot a heatmap (default) or other function of a cube subset reduced over time with mode (default) or other function, on existsing Makie Axis
+"""
+function cubeplot!(ax, cube, periodt, lato, lon; plotfn = heatmap!, reducefn = mode, kwargs...)
+    # subset cube
+    if typeof(lon) <: Vector
+        # load 2 parts and join them
+        subp1, axsp1 = getsubcube(cube, periodt, lato, lon[1]);
+        # subp1, axsp1 = getsubcube(tmax, periodt, lato, lon[1]);
+        subp2, axsp2 = getsubcube(cube, periodt, lato, lon[2]);
+        # subp2, axsp2 = getsubcube(tmax, periodt, lato, lon[2]);
+        dimlon = dimnum(axsp1, :longitude)
+        subcube = cat(subp1, subp2, dims = dimlon);
+        axs = (dimlon == 1 ? Dim{:longitude}(vcat(axsp1[1].val, axsp2[1][1]:0.25:axsp2[1][end])) : axsp1[1], 
+            dimlon == 2 ? Dim{:longitude}(vcat(axsp1[2].val, axsp2[2][1]:0.25:axsp2[2][end])) : axsp1[2],
+            dimlon == 3 ? Dim{:longitude}(vcat(axsp1[3].val, axsp2[3][1]:0.25:axsp2[3][end])) : axsp1[3]
+            )
+    else
+        subcube, axs = getsubcube(cube, period, lato, lon)
+    end
+    x,y,z = prephm(subcube, axs, reducefn)
+    h = plotfn(ax, x, y, z; kwargs...)
+    return ax, h
+end
+
+"""
+    labelplot!(ax, labels::Dataset, period, lat, lon, lblt; kwargs...)
+    plot labels on existing Makie Axis
+"""
+function labelplot!(ax, labels::Dataset, period, lat, lon, lblt; kwargs...)
+    # subset labelcube
+    if typeof(lon) <: Vector
+        # load 2 parts and join them
+        sublabelsp1, axsp1 = getsublabels(labels, period, lat, lon[1], lblt)
+        sublabelsp2, axsp2 = getsublabels(labels, period, lat, lon[2], lblt)
+        sublabels1 = cat(sublabelsp1, sublabelsp2, dims = 2)
+        axs = (axsp1[1], Dim{:longitude}(vcat(axsp1[2].val, axsp2[2][1]:0.25:axsp2[2][end])), axsp1[3])
+    else
+        sublabels1, axs = getsublabels(labels, period, lat, lon, lblt)
+    end
+    # cols = Makie.Categorical(:tab20)
+    # fg = Figure(); ax1 = Axis(fg)
+    x,y,z = prephm(sublabels1, axs, mode)
+    res = Dict()
+    foreach((x, y) -> push!(res, x => Float64(y)), lblt, eachindex(lblt))
+    # res
+    replace!(z, Tuple(res)...);
+    # heatmap(x, y, z; colormap = cols[1:length(lblt)])
+    h = heatmap!(ax, x, y, z; kwargs...)
+    # h = hm!(ax, sublabels1, axs; fn = mode, kwargs...)
+    return ax, h
+end
+
+function getsublabels(labels::Dataset, period, lat, lon, lblt)
+    sublabels = labels.layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
+        # load to memory and set all other values to 0 (so that they will be set to NaN by prephm)
+        # small events have been discarded from the plot
+        sublabels1 = map(x -> x in lblt ? x : 0, (sublabels.data)[:,:,:]);
+    
+        if any(lon.>180)
+            # modify axes
+            axs = modaxs(sublabels.axes)
+            # modify sublabels1: shift lon
+            shifts = getshifts(axs)
+            sublabels1 = circshift(sublabels1, shifts)
+        else
+            axs = sublabels.axes
+        end
+        return sublabels1, axs
+    end
+
+function labelplot!(ax, labels::Tuple, period, lat, lon, lblt; kwargs...)
+    # retrieve relevant labelcube
+    i = findlast((period[1] .>= Date.(startyears)) .& (period[2] .< Date.(startyears .+ 13)))
+    # subset labelcube
+    if typeof(lon) <: Vector
+        # load 2 parts and join them
+        sublabelsp1, axsp1 = getsublabels(labels[i], period, lat, lon[1], lblt)
+        sublabelsp2, axsp2 = getsublabels(labels[i], period, lat, lon[2], lblt)
+        sublabels1 = cat(sublabelsp1, sublabelsp2, dims = 2)
+        axs = (axsp1[1], Dim{:longitude}(vcat(axsp1[2].val, axsp2[2][1]:0.25:axsp2[2][end])), axsp1[3])
+    else
+        sublabels1, axs = getsublabels(labels[i], period, lat, lon, lblt)
+    end
+    # cols = Makie.Categorical(:tab20)
+    # fg = Figure(); ax1 = Axis(fg)
+    x,y,z = prephm(sublabels1, axs, mode)
+    res = Dict()
+    foreach((x, y) -> push!(res, x => Float64(y)), lblt, eachindex(lblt))
+    # res
+    replace!(z, Tuple(res)...);
+    # heatmap(x, y, z; colormap = cols[1:length(lblt)])
+    h = heatmap!(ax, x, y, z; kwargs...)
+    # h = hm!(ax, sublabels1, axs; fn = mode, kwargs...)
+    return ax, h
+end
+
+
+function getsublabels(labels::YAXArray, period, lat, lon, lblt)
+    sublabels = labels[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
+    # load to memory and set all other values to 0 (so that they will be set to NaN by prephm)
+    # small events have been discarded from the plot
+    sublabels1 = map(x -> x in lblt ? x : 0, (sublabels.data)[:,:,:]);
+
+    if any(lon.>180)
+        # modify axes
+        axs = modaxs(sublabels.axes)
+        # modify sublabels1: shift lon
+        shifts = getshifts(axs)
+        sublabels1 = circshift(sublabels1, shifts)
+    else
+        axs = sublabels.axes
+    end
+    return sublabels1, axs
+end
+
+function labelplot!(ax, labels::YAXArray, period, lat, lon, lblt; reducefn=mode, kwargs...)
+    # subset labelcube
+    if typeof(lon) <: Vector
+        # load 2 parts and join them
+        sublabelsp1, axsp1 = getsublabels(labels, period, lat, lon[1], lblt)
+        sublabelsp2, axsp2 = getsublabels(labels, period, lat, lon[2], lblt)
+        dimlon = dimnum(axsp1, :longitude)
+        sublabels1 = cat(sublabelsp1, sublabelsp2, dims = dimlon)
+        axs = (dimlon == 1 ? Dim{:longitude}(vcat(axsp1[1].val, axsp2[1][1]:0.25:axsp2[1][end])) : axsp1[1], 
+            dimlon == 2 ? Dim{:longitude}(vcat(axsp1[2].val, axsp2[2][1]:0.25:axsp2[2][end])) : axsp1[2],
+            dimlon == 3 ? Dim{:longitude}(vcat(axsp1[3].val, axsp2[3][1]:0.25:axsp2[3][end])) : axsp1[3]
+            )
+    else
+        sublabels1, axs = getsublabels(labels, period, lat, lon, lblt)
+    end
+    # cols = Makie.Categorical(:tab20)
+    # fg = Figure(); ax1 = Axis(fg)
+    x,y,z = prephm(sublabels1, axs, reducefn)
+    res = Dict()
+    foreach((x, y) -> push!(res, x => Float64(y)), lblt, eachindex(lblt))
+    # res
+    replace!(z, Tuple(res)...);
+    # heatmap(x, y, z; colormap = cols[1:length(lblt)])
+    h = heatmap!(ax, x, y, z; kwargs...)
+    # h = hm!(ax, sublabels1, axs; fn = mode, kwargs...)
+    return ax, h
+end
+
+# labelplot!(axt, labels.labels, periodt, latt, lont, lblt; colormap = labcols[indexin(lblt, ulbls)], colorrange = 1:length(lblt))

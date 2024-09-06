@@ -1,4 +1,6 @@
 using YAXArrays, Zarr, EarthDataLab
+using CairoMakie, GeoMakie
+
 include("../src/plots.jl")
 
 # make plots for DeepExtremes review meeting
@@ -30,7 +32,9 @@ savefig(p,"../tmax_extremes.png")
 
 ## connected components
 # eec = open_dataset(zopen("https://s3.bgc-jena.mpg.de:9000/xaida/EventCube_0.01.zarr", consolidated = true))
-eec = open_dataset(zopen("https://s3.bgc-jena.mpg.de:9000/xaida/v2/EventCube_ranked_pot0.01_ne0.1.zarr", consolidated = true))
+eec = open_dataset(zopen("https://s3.bgc-jena.mpg.de:9000/xaida/v3/EventCube_ranked_pot0.01_ne0.1.zarr", consolidated = true))
+eec = open_dataset("/Net/Groups/BGI/work_1/scratch/s3/xaida/v3/EventCube_ranked_pot0.01_ne0.1.zarr/")
+
 
 # eec_bin = subsetcube(eec, time = 2019:2019, region="Germany").data[:,:,:] .> 0;
 # Plots.heatmap(eec_bin[182,:,:]'[end:-1:1,:], c = cgrad(:thermal, categorical = true), title = "Boolean layer")
@@ -153,7 +157,7 @@ cbar.ticks = (0:16, [
     "dry (30d, 90d and 180d) and hot", 
     "no event : rank < 0.1 and rank > 0.9"])
 
-save("../DeepExtremesOutput/v2/fig/Europe_events_" * string(Date("$year") + Day(d)) * ".png", fig)
+save("../DeepExtremesOutput/v3/fig/Europe_events_" * string(Date("$year") + Day(d)) * ".png", fig)
 
 # # if selection on 1 day
 # eec_bin = eec_1.data[d,:,:]'[end:-1:1,:] .> 0 & ;

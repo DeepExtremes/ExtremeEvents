@@ -12,7 +12,7 @@ end
     Pkg.activate("$(@__DIR__)/..")
 end
 
-@everywhere using YAXArrays, EarthDataLab, Statistics, DiskArrays, ImageMorphology
+@everywhere using YAXArrays, Statistics, DiskArrays, ImageMorphology
 @everywhere import ImageFiltering
 
 # 

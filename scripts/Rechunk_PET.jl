@@ -10,7 +10,7 @@ end
 end
 
 @everywhere begin
-    using EarthDataLab, YAXArrays, Zarr, DiskArrays
+    using YAXArrays, Zarr, DiskArrays
 end
 
 using YAXArrayBase

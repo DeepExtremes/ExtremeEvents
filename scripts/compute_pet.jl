@@ -1,3 +1,5 @@
+@show years = eval(Meta.parse(ARGS[1])) # years as String
+
 using SlurmClusterManager, Distributed
 #Quick check if we are in a slurm job
 if haskey(ENV,"SLURM_CPUS_PER_TASK")
@@ -9,20 +11,20 @@ end
     Pkg.activate("$(@__DIR__)/..")
 end
 
-@everywhere using EarthDataLab, YAXArrays, Dates, YAXArrayBase
+@everywhere using YAXArrays, Dates, YAXArrayBase, Zarr, NetCDF
 # Variables: 
 # t2m temperature at 2 meters [K]
 # u10 10 m u-wind component [m s^(-1)]
 # v10 10 m v-wind component [m s^(-1)]
 # sp surface pressure [Pa]
-# snr surface net radiation [J m^(-2)] accumulated over 1 hour
+# snr surface net radiation [J m^(-2)] accumulated over 1 hour (ssr + str ?)
 # vpd_cf = swvp-vp Saturation water vapour pressure - vapour pressure = vapour pressure deficit [hPa] cf ?
 @everywhere begin 
     varlist = (:t2m, :u10, :v10, :sp, :snr, :vpd_cf)
     # load land sea mask (land>=1;sea==0)
     lsmask = open_dataset("/Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.721.static.nc")
     # filter for year 2019
-    lsm = lsmask.lsm[time=Date(2019)]
+    lsm = lsmask.lsm[Ti = At(DateTime("2019-01-01T13:00:00"))]
     # load data to memory
     lsmdata = lsm[:,:]
 
@@ -133,7 +135,7 @@ end # begin
 # run function pet_with_units on era5 0d25_hourly data
 # for each year
 
-pmap(1950:2022) do yr # 2022 # [1950:1952; 1958; 1960; 1966:2022] # [1953:1957; 1959; 1960:1965] # [1959; 1961; 1962; 1963; 1964; 1965;]
+pmap(years) do yr # 2022 # 1950:2022 #[1950:1952; 1958; 1960; 1966:2022] # [1953:1957; 1959; 1960:1965] # [1959; 1961; 1962; 1963; 1964; 1965;]
     # get all variables from varlist into new dataset
     allvars = map(varlist) do vn
         @show vn
@@ -149,11 +151,12 @@ pmap(1950:2022) do yr # 2022 # [1950:1952; 1958; 1960; 1966:2022] # [1953:1957; 
     # time resolution: day
     tr = Date(yr):Day(1):Date(yr,12,31)
     # define dimensions' axes
-    outaxes = [ds.longitude, ds.latitude, RangeAxis("Time",tr)] # why not "time"!
+    outaxes = [ds.longitude, ds.latitude, Dim{:time}(tr)] # previously :Time and not "time"!
     # create empty dataset
     outds = YAXArrays.Datasets.createdataset(
         YAXArrayBase.ZarrDataset,
         outaxes,
+        layername = "pet",
         path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/PET/$yr.zarr",
         persist = true,
         T=Union{Missing,Float32},
@@ -171,7 +174,7 @@ pmap(1950:2022) do yr # 2022 # [1950:1952; 1958; 1960; 1966:2022] # [1953:1957; 
                 missing
             end
         end
-        outar = outds[time = d].data
+        outar = outds[time = At(d)].data
         if any(ismissing,loadeddata)
             outar[:,:] .= missing
         else
@@ -184,7 +187,7 @@ println("Done!")
 
 zarrlist = readdir("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/PET")
 
-map(1950:2022) do yr
+map(1950:2023) do yr
     !( "$yr.zarr" in zarrlist) ? println("PET for $yr is missing") : missing
 end
 

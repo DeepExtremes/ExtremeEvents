@@ -1,11 +1,11 @@
 using OnlineStats, WeightedOnlineStats
 using DataFrames
-using Dates
+using Dates, Tables
 
 # create function to define the basic stats we want to run on the events as pairs of variable => statistic()
 function defineallstats()
     (EventLabel(),
-    :time => MinMaxTime(),
+    :Ti => MinMaxTime(),
     :longitude => Extrema(),
     :latitude => Extrema(),
     :t2mmax => WeightedMean(),
@@ -24,6 +24,26 @@ function defineallstats()
     # :ter => Extrema(),
     EventType(),
     LandShare(),
+    Volume(),
+    )
+end
+
+function defineintensitystats()
+    (EventLabel(),
+    :Ti => MinMaxTime(),
+    :longitude => Extrema(),
+    :latitude => Extrema(),
+    :t2mmax => WeightedMean(),
+    :t2mmax => Extrema(),
+    :pei_30 => WeightedMean(),
+    :pei_30 => Extrema(),
+    :pei_90 => WeightedMean(),
+    :pei_90 => Extrema(),
+    :pei_180 => WeightedMean(),
+    :pei_180 => Extrema(),
+    EventType(),
+    LandShare(),
+    Intensity(),
     Volume(),
     )
 end
@@ -101,6 +121,23 @@ Volume() = Volume(0.0)
 # Update volume by adding grid cells' area (approximated by cosine of latitude)
 function computestat(v::Volume,row)
     v.v = v.v + cosd(row.latitude)
+end
+
+# Intensity of event is cumulative anomalies for all 4 indicators
+mutable struct Intensity{F1<:Float64, F2<:Float64, F3<:Float64, F4<:Float64}
+    h::F1
+    d30::F2
+    d90::F3
+    d180::F4
+end
+Intensity() = Intensity(0.0, 0.0, 0.0, 0.0)
+# Define function computestat for objects of type Intensity:
+# Update Intensity by adding threshold - rank only when threshold is passed over weighted by grid cells' area (approximated by cosine of latitude)
+function computestat(in::Intensity, row)
+    in.h = in.h + 0.01 - min(row.rt, 0.01 ) * cosd(row.latitude)
+    in.d30 = in.d30 + 0.01 - min(row.rd30, 0.01 ) * cosd(row.latitude)
+    in.d90 = in.d90 + 0.01 - min(row.rd90, 0.01 ) * cosd(row.latitude)
+    in.d180 = in.d180 + 0.01 - min(row.rd180, 0.01 ) * cosd(row.latitude)
 end
 
 # Define function computestat for objects of type Pair 
@@ -223,6 +260,9 @@ end
 
 appendresult(x::EventYear,t) = (;t...,year=x.ey)
 
+function appendresult(x::Intensity, t)
+    (;t..., inth = x.h, intd30 = x.d30, intd90 = x.d90, intd180 = x.d180,  )
+end
 
 """
     This function is used to create a named tuple from a tuple, appending the elements in a loop
@@ -263,6 +303,31 @@ function fitalldata(tab)
     allstats
 end
 
+function fitalldata1(tab)
+    allstats = [defineintensitystats() for i in 1:1e6];
+    # iterate over CubeTable
+    for t in tab
+        # loop on rows
+        for row in Tables.rows(t)
+            # compute stats for labels > 0 and over land only
+            if row.label > 0 && row.landmask > 0.5
+                # compute stats for current label
+                stat = allstats[row.label]
+                map(stat) do st
+                    # @show st
+                    # skip computestat if stat can't be executed on row (e.g. :gpp => Extrema, for time>2021)
+                    # try
+                        computestat(st,row)
+                    # catch
+                        # do nothing
+                    # end
+                end
+            end
+        end
+    end
+    # return allstats
+    allstats
+end
 
 # apply collect results (convert to DataFrame) and add derived stats
 function toDF(results)
@@ -490,7 +555,8 @@ function definecountyear()
     )
 end
 
-function countyear(eventcube)
+using YAXArrays
+function countyear(eventcube::Dataset)
     @show cube_table = CubeTable(
         event = eventcube.layer,
         )
@@ -517,6 +583,16 @@ function countyear(eventcube)
     # drop empty lines if any
     df = df[map(>(0), df.year), :]
     return df    
+end
+
+# sanity check helper functions
+function expand(x::Tuple{Int, Int})
+    convert(Tuple{Float64, Float64}, x)
+end
+function expand(x::Tuple{Float64, Float64})
+    x1 = round(x[1] - 1, RoundDown; digits = -1, base = 5)
+    x2 = round(x[2] + 1, RoundUp; digits = -1, base = 5)
+    return (x1, x2)
 end
 
 # Theil-Sen estimator
@@ -550,9 +626,50 @@ function theilsen(x::AbstractVector, y::AbstractVector)
     return theil_sen_slope, theil_sen_intercept 
 end
 
-## test
-using Test, UnicodePlots
-@test x = 1:10; y = collect(range(1.0, 10.0)) .+ rand(10); y[3] = 8;
-@test @time m, b = theilsen(x,y)
-@test plt = scatterplot(x,y, smooth = true);
-@test lineplot!(plt,[0,10],[b, m*10+b])
+using Statistics, StatsFuns
+"""
+  mann_kendall(x,y;alpha=0.05)
+Code from @mixstam1821
+The non-parametric Mann-Kendall test and Sen's Slope. 
+The Mann-Kendall Test is used to determine whether a time series has a monotonic upward or downward trend. It does not require that the data be normally distributed or linear. It does require that there is no autocorrelation.
+The null hypothesis for this test is that there is no trend, and the alternative hypothesis is that there is a trend in the two-sided test or that there is an upward trend (or downward trend) in the one-sided test.
+INPUT: x=collect(1:length(y)) , y: data (1-D Array), alpha: significance level (0.05 is the default)
+OUTPUT: reject_null_hypothesis,p_value,Tau,slope,intercept ,    *reject_null_hypothesis is True or False
+Inspired by [1] TheilSen.m [Copyright (c) 2015, Zachary Danziger] , and [2] Mann_Kendall.m  [Copyright (c) 2009, Simone Fatichi]
+~ ATTENTION ! It does have some limitations to computer memory. For example, if a dataset is around 10,000 in length, 1.0 GB RAM do not work. ~
+~ I would greatly appreciate if anyone could find a solution to this. Created on 26/04/2021 by Michael Stamatis ~
+"""
+function mann_kendall(x,y,alpha=0.05)
+	V=reshape(y,length(y),1)   ;   n=length(V)
+	i=0; j=0; S=0; 
+	for i=1:n-1
+	   for j= i+1:n 
+	      S= S + sign(V[j]-V[i])
+	   end
+	end
+	VarS=(n*(n-1)*(2*n+5))/18  ;   StdS=sqrt(VarS) 
+	if S >= 0
+	   Z=((S-1)/StdS)
+	elseif S==0
+		Z=0
+	else
+	   Z=(S+1)/StdS
+	end
+	p_value=2*(1-normcdf(abs(Z))) # Two-tailed test 
+	pz=norminvcdf(1-alpha/2)
+	H=abs(Z)>pz #
+	tau = S/(0.5*n*(n-1))   #Mann-Kendall coefficient NOT adjusted for ties
+
+	sz = size([x y])
+	data = Matrix([x y]) 
+	C = zeros(size([x y])[1],size([x y])[1])
+    for i=1:sz[1]
+        # accumulate slopes
+        C[i,:] = (data[i,2].-data[:,2])./(data[i,1] .- data[:,1]);
+    end
+    m = median(filter(!isnan, C[:]))                       # calculate slope estimate
+
+    b = median(data[:,2].-m*data[:,1])   # calculate intercept if requested
+	result = (reject_null_hypothesis=H,p_value=p_value,Tau=tau,slope=m,intercept=b)
+	return result
+end

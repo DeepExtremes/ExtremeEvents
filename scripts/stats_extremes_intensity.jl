@@ -75,7 +75,7 @@ eventcube = open_dataset(eventspath)
 # not in the same grid now !!!
 # lsmask = open_dataset("/Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.720.static.nc")
 lsmask = open_dataset("/Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.721.static.nc")
-lsmask_notime = subsetcube(lsmask, time=DateTime("2019-01-01T13:00:00"))
+lsmask_notime = lsmask[time=At(DateTime("2019-01-01T13:00:00"))]
 
 # # Fluxcom carbon fluxes (gC m^(-2) year^(-1))
 # # gross primary productivity
@@ -88,6 +88,10 @@ lsmask_notime = subsetcube(lsmask, time=DateTime("2019-01-01T13:00:00"))
 # ter = Cube(open_dataset("/Net/Groups/BGI/work_1/scratch/fgans/DeepExtremes/Fluxcom_TER_final.zarr"))
 # renameaxis!(ter, "Time" => "time")
 
+# ranks
+pei_ranks = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/pei_ranks.zarr")
+tmax_ranks = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/tmax_ranked.zarr")
+
 end # begin
 
 @sync @distributed for period in p
@@ -99,27 +103,44 @@ labels = open_dataset(labelpath)
 
 # create iterable table with data cube label
 # each chunk can be read in memory
-tab = CubeTable(
-    label    = labels.layer[time=period], # [region=region,time=period] # [time=period]
-    pei_30  = pei.pei_30[time=period], 
-    pei_90  = pei.pei_90[time=period], #
-    pei_180 = pei.pei_180[time=period], #
-    t2mmax   = era.t2mmax[time=period], 
-    t2m      = era.t2m[time=period],
-    t2mmin   = era.t2mmin[time=period],
-    tp       = era.tp[time=period],
-    pet      = era.pet[time=period],
-    event    = eventcube.layer[time=period],
-    # gpp      = gpp[ time=period],
-    # nee      = nee[ time=period],
-    # ter      = ter[ time=period],
-    landmask = lsmask_notime.lsm#[region=region],
-    )
+# tab = CubeTable(
+#     label    = labels.layer[time=period], # [region=region,time=period] # [time=period]
+#     pei_30  = pei.pei_30[time=period], 
+#     pei_90  = pei.pei_90[time=period], #
+#     pei_180 = pei.pei_180[time=period], #
+#     t2mmax   = era.t2mmax[time=period], 
+#     t2m      = era.t2m[time=period],
+#     t2mmin   = era.t2mmin[time=period],
+#     tp       = era.tp[time=period],
+#     pet      = era.pet[time=period],
+#     event    = eventcube.layer[time=period],
+#     # gpp      = gpp[ time=period],
+#     # nee      = nee[ time=period],
+#     # ter      = ter[ time=period],
+#     landmask = lsmask_notime.lsm#[region=region],
+#     )
 
+# lat = (38.00, 40.00); lon = (356,358)
+# tab = CubeTable(
+#     label    = labels.layer[time=period, latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]],
+#     rt = tmax_ranks.layer[time=period, latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]],
+#     rd30 = pei_ranks.pei_30[time=period, latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]],
+#     rd90 = pei_ranks.pei_90[time=period, latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]],
+#     rd180 = pei_ranks.pei_180[time=period, latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]],
+#     landmask = lsmask_notime.lsm[ latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]],
+# );
+tab = CubeTable(
+    label    = labels.layer[time=period,],
+    rt = tmax_ranks.layer[time=period, ],
+    rd30 = pei_ranks.pei_30[time=period,],
+    rd90 = pei_ranks.pei_90[time=period,],
+    rd180 = pei_ranks.pei_180[time=period,],
+    landmask = lsmask_notime.lsm,
+);
 #tab[1]
 
 # compute all stats on CubeTable
-@time res = fitalldata(tab);
+@time res = fitalldata1(tab);
 # delete empty lines 
 # sort results by decreasing Volume of events
 sort!(res, by=i->i[end].v, rev=true);
@@ -127,9 +148,11 @@ sort!(res, by=i->i[end].v, rev=true);
 # convert res to data frame
 # res is a vector of unnamed tuples
 # first convert tuple to named tuple
-df = toDF(res)
-# write DataFrame out to CSV file
-outname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/EventStats_" * sm * "pot" * string(pot) * "_ne" * string(ne)  * cmp * filter * aperiod * land * landonly * ".csv"
+df = DataFrame(map(collectresults, res));
+# drop empty lines if any
+df = df[map(>(0), df.label), :]# write DataFrame out to CSV file
+
+outname = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/EventStatsIntensity_" * sm * "pot" * string(pot) * "_ne" * string(ne)  * cmp * filter * aperiod * land * landonly * ".csv"
 CSV.write(outname, df)
 print(outname)
 print("\n done!")
