@@ -9,6 +9,8 @@ era = open_dataset(zg)
 t = era.t2mmax
 tp = era.tp
 pet = era.pet 
+tp = era.tp
+pet = era.pet 
 rt = Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/tmax_ranked.zarr")
 pei = Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/PEICube.zarr")
 
