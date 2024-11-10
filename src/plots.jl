@@ -19,19 +19,20 @@ using CairoMakie
 """
 function simpleplot(dc::YAXArray, 
     d::Int, 
-    year::Int, 
+    yr::Int, 
     nlayers::Int; 
     variable::Union{Nothing, AbstractString} = nothing,
     replacement::Any = Pair(nothing,nothing),
     kwargs...
     )
     if isnothing(getAxis("Variable", dc))
-            sdc = subsetcube(dc, time = year:year)
+        sdc = dc[time = At(DateTime(yr) + Day(d))]
+        println(sdc)
     else
         if isnothing(variable)
             ErrorException("Please specify `variable` to be plotted")
         else
-            sdc = subsetcube(dc, time = year:year, variable = variable)
+            sdc = dc[time = At(DateTime(yr) + Day(d)), variable = At(variable)]
         end
     end
     # if isnothing(colours)
@@ -41,15 +42,20 @@ function simpleplot(dc::YAXArray,
     #         ErrorException("colours should be of type ColorGradient")
     #     end
     # end
-    # transpose and count backwards to get the map correctly
-    plotdata = sdc.data[:,:,d]'[end:-1:1,:];
-    # replace 0 
+    
+        # count backwards to get the map correctly
+        plotdata = sdc.data[:,:][:,end:-1:1];
+        @show size(plotdata)
     if !isa(replacement, Pair{Nothing, Nothing})
+        # replace 0 
         replace!(plotdata, replacement);
     end
-    @show 2^nlayers
     # Plots.heatmap(sdc.data[d,:,:]'[end:-1:1,:], c = cgrad(:thermal, categorical = true), zlims = [0,2^nlayers], title = Date("$year") + Day(d))
-    Plots.heatmap(plotdata, zlims = [0,2^nlayers], title = Date("$year") + Day(d), ylabel="latitude", xlabel="longitude", kwargs...)
+    # f = Figure();
+    # ax = Axis(f[1,1], title = "$(Date(yr) + Day(d))", )#ylabel="latitude", xlabel="longitude",)
+    f,ax,h = heatmap(plotdata, colorrange = (0,2^nlayers), kwargs...)
+    ax.title = "$(Date(yr) + Day(d))"
+    return f,ax,h
 end
 
 """

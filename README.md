@@ -1,3 +1,11 @@
+## TO DO for Dheed v4
+- [x] Rechunk_data -> new ERA5Cube with correct offset and scaling + consolidate : "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/ERA5Cube.zarr" (:attention: pet still in old cube)
+- [x] compute and rechunk PET -> not necessary, no error here
+- [x] compute PEI
+- [x] detect extremes
+- [ ] label events
+- [ ] redo all analyses from there
+
 # Workflow for building and analysing Dheed v3
 Dheed v3 is an ERA5 based global database dry and hot extreme events from 1950 to 2022, developed in the context of ESA funded project [DeepExtremes](https://eo4society.esa.int/projects/deep-extremes/).
 The workflow runs in Julia 1.10.0, except for the consolidation of the data cubes, which is run in python. 

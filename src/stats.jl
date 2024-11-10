@@ -639,7 +639,7 @@ Inspired by [1] TheilSen.m [Copyright (c) 2015, Zachary Danziger] , and [2] Mann
 ~ ATTENTION ! It does have some limitations to computer memory. For example, if a dataset is around 10,000 in length, 1.0 GB RAM do not work. ~
 ~ I would greatly appreciate if anyone could find a solution to this. Created on 26/04/2021 by Michael Stamatis ~
 """
-function mann_kendall(x,y,alpha=0.05)
+function mann_kendall(x,y;alpha=0.05)
 	V=reshape(y,length(y),1)   ;   n=length(V)
 	i=0; j=0; S=0; 
 	for i=1:n-1

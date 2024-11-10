@@ -8,7 +8,7 @@ using Distributed
 # spatial filter
 using SphericalConvolutions
 
-export rescale, compute_extremes, qdoy, qref
+# export rescale, compute_extremes, qdoy, qref
 
 """
     rescale(inputcube::YAXArray, outputpath::String; <keyword arguments>))
@@ -149,13 +149,16 @@ end
     tres::Float64,
     outputpath::AbstractString;
     tresne::Union{Float64,Nothing} = nothing,
+    tempo::String = "Ti",
+    fun::Function = <,
     backend::Symbol = :zarr,
     overwrite::Bool = true,
     max_cache::Float64 = 1e9)
 
-Compute extreme events as Peaks-over-Threshold (POT). If values have been scaled between 0 and 1, threshold is the quantile *UNDER* which an event is considered an extreme. For example, to detect high temperature extremes, the input should be (- T) or (1 - T_scaled) or argument `multiplier` must be provided as a 1x(number of Variables). The inputs will be processed as [input_1 ... input_n] .* multiplier. Values should be {-1, 1}.
+Compute extreme events as Peaks-over-Threshold (POT). If values have been scaled between 0 and 1, threshold is the quantile *UNDER* which an event is considered an extreme. Indeed the default function `fun` is `<`. It can be adjusted as a keyword parameter.
+For example, to detect high temperature extremes, the input should be (- T) or (1 - T_scaled) or argument `multiplier` must be provided as a 1x(number of Variables). The inputs will be processed as [input_1 ... input_n] .* multiplier. Values should be {-1, 1}.
 
-`input` can be a datacube of type YAXArray or a tuple of YAXArray Datasets. In case of a tuple, each Dataset must have the same dimensions. Dimension Time is mandatory. The maximum number of input layers is 7.
+`input` can be a datacube of type YAXArray or a tuple of YAXArray Datasets. In case of a tuple, each Dataset must have the same dimensions. Dimension Time is mandatory. The name can be adjusted with `tempo`. The maximum number of input layers is 7.
 
 The output is a single layer cube with UInt8 values computed as bitwise OR (|) of layers encoded each on one bit.
 E.G. if `input` has 3 layers, extreme events in each layer will be encoded respectively as 1, 2 and 4. A combined extreme event of all 3 variables will have a value of 7.
@@ -166,21 +169,23 @@ function compute_extremes(
     input::Any,
     tres::Float64,
     outputpath::String;
+    tempo::Symbol = :Ti,
+    fun::Function = <,
     tresne::Union{Float64,Nothing} = nothing,
     backend::Symbol = :zarr,
     overwrite::Bool = true,
     max_cache::Float64 = 1e9
 )   
-    indims = ntuple(_->InDims("Time"),length(input))
+    indims = ntuple(_->InDims(tempo),length(input))
     #@show indims
-    outdims = OutDims("Time",
+    outdims = OutDims(Dim{tempo}(lookup(inputs[1], tempo)), # somehow ERROR: LoadError: Multiple possible axis matches found for YAXArrays.ByName("Ti")
         outtype = UInt8,
         chunksize = :input, 
         path = outputpath,
         overwrite=overwrite,
         backend=backend,
     )
-    mapCube(getextremes!, input; indims=indims, outdims=outdims, max_cache=max_cache, tres = tres, tresne = tresne)
+    mapCube(getextremes!, input; indims=indims, outdims=outdims, max_cache=max_cache, tres = tres, tresne = tresne, fun = fun)
 end
 # method for YAXArray
 """
@@ -286,7 +291,7 @@ function get_diamond_indices(window)
     diamondindices = findall(diamond)
 end
 
-function myfilter(img)
+function myfilter(img;Nh=(1, 1, 3), diamondindices = get_diamond_indices(1))
     # img has size = window
     # window = size(img)
     # @show window
@@ -298,26 +303,26 @@ function myfilter(img)
     # t = length(diamondindices); # 0.6 * length(diamondindices);
     # # @show t
     # central value
-    v = img[Nh[1],Nh[2],Nh[3]]
+    v = view(img,Nh...)
     # @show v
     # apply diamond spatially on central slice
-    s = sum(diamondindices) do ind
+    s = sum(skipmissing(diamondindices)) do ind
         view(img,:,:,Nh[3])[ind]
     end
     # @show s
     # time (3rd) dimension
-    timewindow = function()
-        d = false;
-        for i in 0:(Nh[3]-1)
-            ind = (Nh[3]-i):((Nh[3]*2)-i-1)
-            d = d || all(view(img,Nh[1],Nh[2],ind))
-            d ? break : d
-        end
-        return d
-    end
-    d = timewindow()
+    d = timewindow(img,Nh)
     # @show d
-    return v && d && s >= t
+    return v==true && d && s >= length(diamondindices)
+end
+timewindow = function(img, Nh)
+    d = false;
+    for i in 0:(Nh[3]-1)
+        ind = (Nh[3]-i):((Nh[3]*2)-i-1)
+        d = d || all(view(img,Nh[1],Nh[2],ind))
+        d ? break : d
+    end
+    return d
 end
 
 function mytimefilter(img)
@@ -336,6 +341,31 @@ function mytimefilter(img)
         return d
     end
     return timewindow()
+end
+
+function masknfilter!(xout, (xin1,xin2), compound_events, filter_events, filter_land)
+    # xout is 1,1,time
+    # from time,lon,lat to lon,lat,time 
+    if compound_events
+        permutedims(
+        # ((broadcast(x->isodd(x),clastyears.data)) .& (clastyears.data .> 0x01))[:,:,:],
+        (broadcast(x -> isodd(x) && x > 0x01, view(clastyears.data, :,:,:))),
+        (2,3,1)
+        );
+
+        x = reshape(xin1 , 1,1,5)
+    else
+        permutedims(
+        # ((clastyears.data .> 0x00) .& (clastyears.data .< 0x10))[:,:,:],
+        (broadcast(x -> x > 0x00 && x > 0x01, view(clastyears.data,:,:,:))),
+        (2,3,1)
+        x = xin1
+    end
+    if filter_events
+        x1 = myfilter(x; Nh=(1, 1, 3), diamondindices = get_diamond_indices(1))
+    elseif 
+        x
+    end
 end
 
 ####### Towards anomalies

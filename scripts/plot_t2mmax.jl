@@ -4,22 +4,28 @@ using CairoMakie
 import Statistics
 import CairoMakie.Colors.RGB
 
-zg = zopen("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr",consolidated=true, fill_as_missing = false)
-era = open_dataset(zg)
-t = era.t2mmax
-tp = era.tp
-pet = era.pet 
-tp = era.tp
-pet = era.pet 
-rt = Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/tmax_ranked.zarr")
-pei = Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/PEICube.zarr")
+eraold = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/ERA5Cube.zarr")
+pet = eraold.pet 
+told = eraold.t2mmax
+eranew = open_dataset("/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/ERA5Cube.zarr/")
+t = eranew.t2mmax
+tp = eranew.tp
+rtold = Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/tmax_ranked.zarr")
+rtnew = Cube("/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/tmax_ranked.zarr/")
+peiold = Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/PEICube.zarr")
+peinew = Cube("/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/PEICube.zarr/")
+rpeiold = Cube("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/pei_ranks.zarr")
+rpeinew = Cube("/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/pei_ranks.zarr/")
+
 
 Jenalat = 50.92; Jenalon = 11.59
 
-path2fig = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig"
+path2fig = "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/fig"
 
 st = t[lon = At(Jenalon, atol=0.25), lat = At(Jenalat, atol=0.25)]
-srt = rt[lon = At(Jenalon, atol=0.25), lat = At(Jenalat, atol=0.25)]
+stold = told[lon = At(Jenalon, atol=0.25), lat = At(Jenalat, atol=0.25)]
+srtnew = rtnew[lon = At(Jenalon, atol=0.25), lat = At(Jenalat, atol=0.25)]
+srtold = rtold[lon = At(Jenalon, atol=0.25), lat = At(Jenalat, atol=0.25)]
 
 # setticks
 function setticks(x::Any, n::Int, f::Any; ticksvalue = true)
@@ -55,14 +61,120 @@ end
 #     label = "Extremes")
 # savefig(p,"$(path2fig)/tmax_extremes.png")
 
-# # distribution
-# p1 = Plots.scatter(srt[:], x,
-#     label = "t2mmax",
+# distribution
+f = Figure(size=(800,800));
+ax = Axis(f[1,1], 
+    xlabel = "ranked",
+    ylabel = "values",
+    )
+scatter!(ax,srtold.data[:], stold.data[1:length(srtold)],
+    label = "old",
+    color = :grey, 
+    marker = :circle, markersize = 2, alpha = 0.6, strokewidth = 0,
+    )
+scatter!(ax,srtnew.data[:], st.data[:],
+    label = "new",
+    color = :blue, 
+    marker = :circle, markersize = 2, alpha = 0.6, strokewidth = 0,
+    )
+axislegend(ax, framevisible = true)
+ax1 = Axis(f[2,1], 
+    xlabel = "ranked",
+    ylabel = "values",)
+ind = map(x -> x.<=0.01, srtold.data[:])
+scatter!(ax1,srtnew.data[1:length(srtold)][ind], st.data[1:length(srtold)][ind],
+    label = "new as old",
+    color = :red, 
+    marker = :circle, markersize = 2, alpha = 0.6, strokewidth = 0,
+    )
+indn = map(x -> x.<=0.01, srtnew.data[:])
+scatter!(ax1,srtold.data[indn[1:length(srtold)]], stold.data[1:length(srtold)][indn[1:length(srtold)]],
+    label = "old as new",
+    color = :orange, 
+    marker = :circle, markersize = 2, alpha = 0.6, strokewidth = 0,
+    )
+scatter!(ax1, srtold.data[ind], stold.data[1:length(srtold)][ind],
+    label = "old",
+    color = :grey, 
+    marker = :circle, markersize = 2, alpha = 0.6, strokewidth = 0,
+    )
+scatter!(ax1,srtnew.data[indn], st.data[indn],
+    label = "new",
+    color = :blue, 
+    marker = :circle, markersize = 2, alpha = 0.6, strokewidth = 0,
+    )
+axislegend(ax1, framevisible = true)
+f
+save("$(path2fig)/scatter_tmax_vs_ranked.png",f)
+
+# scatter old versus new
+f = Figure();
+ax = Axis(f[1,1], xlabel = "old", ylabel = "new")
+scatter!(ax, stold.data[:], st.data[:], markersize = 2)
+f
+save("$(path2fig)/scatter_tmax_old_vs_new.png",f)
+
+# do the same with PEIs...
+speinew = peinew[lon = At(Jenalon, atol=0.25), lat = At(Jenalat, atol=0.25)]
+speiold = peiold[lon = At(Jenalon, atol=0.25), lat = At(Jenalat, atol=0.25)]
+srpeinew = rpeinew[lon = At(Jenalon, atol=0.25), lat = At(Jenalat, atol=0.25)]
+srpeiold = rpeiold[lon = At(Jenalon, atol=0.25), lat = At(Jenalat, atol=0.25)]
+# scatter old versus new
+f = Figure();
+for (i,variable) in zip(1:3,lookup(speinew, :Variable,))
+    ax = Axis(f[1,i], title = variable, xlabel = "old", ylabel = "new")
+    scatter!(ax, speiold[Variable = At(variable)].data[:], speinew[Variable = At(variable)].data[:], markersize = 2)
+end
+f
+save("$(path2fig)/scatter_pei_old_vs_new.png",f)
+
+f = Figure(size=(800,600));
+for (i,variable) in zip(1:3,lookup(speinew, :Variable,))
+ax = Axis(f[1,i], 
+    xlabel = "ranked",
+    ylabel = "values",
+    )
+scatter!(ax,srpeiold[Variable = At(variable)].data[:], speiold[Variable = At(variable)].data[1:length(srpeiold)],
+    label = "old",
+    color = :grey, 
+    marker = :circle, markersize = 2, alpha = 0.6, strokewidth = 0,
+    )
+scatter!(ax,srpeinew[Variable = At(variable)].data[:], speinew[Variable = At(variable)].data[:],
+    label = "new",
+    color = :blue, 
+    marker = :circle, markersize = 2, alpha = 0.6, strokewidth = 0,
+    )
+axislegend(ax, framevisible = true)
+# ax1 = Axis(f[2,1], 
 #     xlabel = "ranked",
-#     ylabel = "values",
-#     color = :grey, markershape = :circle, markersize = 2, markeralpha = 0.6, markerstrokewidth = 0,
+#     ylabel = "values",)
+# ind = map(x -> x.<=0.01, srtold.data[:])
+# scatter!(ax1,srtnew.data[1:length(srtold)][ind], st.data[1:length(srtold)][ind],
+#     label = "new as old",
+#     color = :red, 
+#     marker = :circle, markersize = 2, alpha = 0.6, strokewidth = 0,
 #     )
-# savefig(p1, "$(path2fig)/scatter_tmax_vs_ranked.png")
+# indn = map(x -> x.<=0.01, srtnew.data[:])
+# scatter!(ax1,srtold.data[indn[1:length(srtold)]], stold.data[1:length(srtold)][indn[1:length(srtold)]],
+#     label = "old as new",
+#     color = :orange, 
+#     marker = :circle, markersize = 2, alpha = 0.6, strokewidth = 0,
+#     )
+# scatter!(ax1, srtold.data[ind], stold.data[1:length(srtold)][ind],
+#     label = "old",
+#     color = :grey, 
+#     marker = :circle, markersize = 2, alpha = 0.6, strokewidth = 0,
+#     )
+# scatter!(ax1,srtnew.data[indn], st.data[indn],
+#     label = "new",
+#     color = :blue, 
+#     marker = :circle, markersize = 2, alpha = 0.6, strokewidth = 0,
+#     )
+# axislegend(ax1, framevisible = true)
+end
+# f
+# save("$(path2fig)/scatter_pei_vs_ranked.png",f)
+###########
 
 # plot!(p1,[0.01,0.01], Statistics.quantile(x,[0,1]), color= Colors.colorant"#28828F", lw=1, label = "Threshold")
 # savefig(p,"$(path2fig)/tmax_ranked_tres.png")
