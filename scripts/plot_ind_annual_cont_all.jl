@@ -3,19 +3,25 @@
 import CSV
 using DataFrames
 
-path2v = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3"
+path2v3 = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3"
 # import preliminary back extension stats
-back = "$path2v/indicators_annual_wstats_continents_backext.csv"
+back = "$path2v3/indicators_annual_wstats_continents_backext.csv"
 dfb = CSV.read(back, DataFrame);
-dfb[!, "version"] .= "preliminary" ;
+dfb[!, "version"] .= "v2" ;
 
 # import current version (v3)
-currentv = "$path2v/indicators_annual_wstats_continents.csv"
+currentv = "$path2v3/indicators_annual_wstats_continents.csv"
 dfc = CSV.read(currentv, DataFrame);
-dfc[!, "version"] .=  "current" ;
+dfc[!, "version"] .=  "v3" ;
+
+# import new version (v4)
+path2v4 = "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4"
+newv = "$path2v3/indicators_annual_wstats_continents.csv"
+dfn = CSV.read(currentv, DataFrame);
+dfn[!, "version"] .=  "v4" ;
 
 # combine both data DataFrames
-df = DataFrames.vcat(dfb, dfc)
+df = DataFrames.vcat(dfb, dfc, dfn)
 
 # modify tp to get mm instead of M
 df[df.variable .== "tp", :value] .*= 1e3;
