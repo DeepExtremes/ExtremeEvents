@@ -315,6 +315,8 @@ function myfilter(img;Nh=(1, 1, 3), diamondindices = get_diamond_indices(1))
     # @show d
     return v==true && d && s >= length(diamondindices)
 end
+
+
 timewindow = function(img, Nh)
     d = false;
     for i in 0:(Nh[3]-1)
@@ -341,31 +343,6 @@ function mytimefilter(img)
         return d
     end
     return timewindow()
-end
-
-function masknfilter!(xout, (xin1,xin2), compound_events, filter_events, filter_land)
-    # xout is 1,1,time
-    # from time,lon,lat to lon,lat,time 
-    if compound_events
-        permutedims(
-        # ((broadcast(x->isodd(x),clastyears.data)) .& (clastyears.data .> 0x01))[:,:,:],
-        (broadcast(x -> isodd(x) && x > 0x01, view(clastyears.data, :,:,:))),
-        (2,3,1)
-        );
-
-        x = reshape(xin1 , 1,1,5)
-    else
-        permutedims(
-        # ((clastyears.data .> 0x00) .& (clastyears.data .< 0x10))[:,:,:],
-        (broadcast(x -> x > 0x00 && x > 0x01, view(clastyears.data,:,:,:))),
-        (2,3,1)
-        x = xin1
-    end
-    if filter_events
-        x1 = myfilter(x; Nh=(1, 1, 3), diamondindices = get_diamond_indices(1))
-    elseif 
-        x
-    end
 end
 
 ####### Towards anomalies
