@@ -21,7 +21,8 @@ end
 if occursin("/Users", pwd())
     path = "/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/"
 else
-    path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
+    # path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
+    path = "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/"
 end
 
 # Event Cube
