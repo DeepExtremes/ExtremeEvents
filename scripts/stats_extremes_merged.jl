@@ -1,14 +1,15 @@
 # Compute summary statistics on labelled extrene events
-using SlurmClusterManager, Distributed
+using SlurmClusterManager, Distributed, RetryManagers
 
 #Quick check if we are in a slurm job
 if haskey(ENV,"SLURM_CPUS_PER_TASK")
-    # addprocs(SlurmManager())
-    # delay addprocs
-    for iproc in 1:parse(Int,ENV["SLURM_NTASKS"])
-        addprocs(1)
-        sleep(0.001)
-    end
+    # # addprocs(SlurmManager())
+    # # delay addprocs
+    # for iproc in 1:parse(Int,ENV["SLURM_NTASKS"])
+    #     addprocs(1)
+    #     sleep(0.001)
+    # end
+    addprocs(RetryManager(SlurmManager()))
 end
 
 @everywhere begin
@@ -31,26 +32,22 @@ include("../src/stats.jl")
 
 end # begin
 
-if occursin("/Users", pwd())
-    path = "https://s3.bgc-jena.mpg.de:9000/deepextremes/v3/"
-    patho = "./"
-else
-    path = "/Net/Groups/BGI/work_1/scratch/s3/deepextremes/v3/"
-    patho = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
-end
+path = "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/"
+patho = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
+
 
 # Open all Data Cubes
-pei = open_dataset("$(path)PEICube.zarr")
+pei = open_dataset(joinpath(path,"PEICube.zarr"))
 
-zg = zopen("$(path)ERA5Cube.zarr",consolidated=true, fill_as_missing = false)
+zg = zopen(joinpath(path,"ERA5Cube.zarr"),consolidated=true, fill_as_missing = false)
 era = open_dataset(zg)
+pet = open_dataset(joinpath(patho,"ERA5Cube.zarr")).pet
 
-eventspath = "$(path)EventCube_ranked_pot0.01_ne0.1.zarr"
+eventspath = joinpath(path,"EventCube_ranked_pot0.01_ne0.1.zarr")
 eventcube = open_dataset(eventspath)
 
 # LandSeaMask
-lsmask = open_dataset("$(path)lsm.1440.721.static.nc")
-lsmask_notime = lsmask[time = At(DateTime("2019-01-01T13:00:00"))]
+lsmask_notime = Cube(open_dataset("/Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.721.static.nc"))[time = At(DateTime("2019-01-01T13:00:00"))]
 
 # # Fluxcom carbon fluxes (gC m^(-2) year^(-1))
 # # gross primary productivity
@@ -64,14 +61,15 @@ lsmask_notime = lsmask[time = At(DateTime("2019-01-01T13:00:00"))]
 # renameaxis!(ter, "Time" => "time")
 
 # ranks
-pei_ranks = open_dataset("$(path)pei_ranks.zarr")
-tmax_ranks = open_dataset("$(path)tmax_ranked.zarr")
+pei_ranks = open_dataset(joinpath(path,"pei_ranks.zarr"))
+tmax_ranks = open_dataset(joinpath(path,"tmax_ranked.zarr"))
 
-labelpath = "$(path)mergedlabels.zarr/"
+labelpath = joinpath(path, "mergedlabels_ranked_pot0.01_ne0.1_cmp_S1_T3_1950_2023.zarr/")
 labels = open_dataset(labelpath)
 
 ti = lookup( labels.labels, :Ti)
 period = ti[1] .. ti[end]
+# period = ti[end-364] .. ti[end]
 
 # create iterable table with data cube label
 # each chunk can be read in memory
@@ -84,12 +82,12 @@ tab = CubeTable(
     t2m      = era.t2m[time=period],
     t2mmin   = era.t2mmin[time=period],
     tp       = era.tp[time=period],
-    pet      = era.pet[time=period],
+    pet      = pet[time=period],
     event    = eventcube.layer[time=period],
     # gpp      = gpp[ time=period],
     # nee      = nee[ time=period],
     # ter      = ter[ time=period],
-    landmask = lsmask_notime.lsm,
+    landmask = lsmask_notime,
     # rank
     rt = tmax_ranks.layer[time=period, ],
     rd30 = pei_ranks.pei_30[time=period,],

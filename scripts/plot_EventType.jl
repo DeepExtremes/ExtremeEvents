@@ -5,19 +5,24 @@ using WeightedOnlineStats
 # using Plots
 # using StatsPlots
 using CairoMakie
+using Makie.Colors
 
 if occursin("/Users", pwd())
-    path2v = "/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/v3"
+    path2vo = "/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/v3"
+    path2v = "/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/Dheed_v4"
 else
-    path2v = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3"
+    path2v = "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4"
+    path2vo = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3"
 end
 # path2v = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3"
 pot = 0.01
 ne = 0.1
+startyear = 1950
+endyear   = 2023
 
 annualstats = load("$path2v/YearlyEventType_ranked_pot" * string(pot) * "_ne" * string(ne) * "_land.jld")
-allx = vec(["$i.$yr.$k" for i in 0:16, yr in 1950:2022, k in range(1,8)]);
-allres = vec([value(annualstats["$(yr).$k"]).y[i] for i in 1:17, yr in 1950:2022, k in range(1,8)]);
+allx = vec(["$i.$yr.$k" for i in 0:16, yr in startyear:endyear, k in range(1,8)]);
+allres = vec([value(annualstats["$(yr).$k"]).y[i] for i in 1:17, yr in startyear:endyear, k in range(1,8)]);
 
 
 # not sure about this one
@@ -42,7 +47,7 @@ outname = "$path2v/YearlyEventType_ranked_pot$(pot)_ne$(ne)_land.csv"
 # CSV.write(outname, df)
 df = CSV.read(outname, DataFrame)
 
-cadf = CSV.read("$path2v/land_wstats_continents.csv", DataFrame)
+cadf = CSV.read("$path2vo/land_wstats_continents.csv", DataFrame)
 sum(cadf.value)
 # 1.9e5 NOT e7!!! e7 comes from the time dimension: 365
 
@@ -69,7 +74,7 @@ end
 # data check: every year, the total (land area) x (days in the year) should be the same, except for leap years
 # Hence, all bars should have the same height!!!
 barplot(df.Year, df.Area)
-# this is not the case AND there are 2 outliers: 1959 and 1979?
+# this is not the case AND there are 2 outliers: 1959 and 1979? 
 sum(value(annualstats["1959.2"]).y)
 sum(value(annualstats["1960.2"]).y)
 sum(value(annualstats["1961.2"]).y)
@@ -183,7 +188,7 @@ cont_cols = [colorant"#77aadd", # light Blue
             ]
 
 
-function mygroupedbar(dfp, grouping; startyear = 1950, endyear = 2022, kwargs...) # for whatever reason I don't understand, I can't pass kwargs...
+function mygroupedbar(dfp, grouping; startyear = 1950, endyear = endyear, kwargs...) # for whatever reason I don't understand, I can't pass kwargs...
     f = Figure(size=(800,460));
     ax = Axis(f[1,1],
         xlabel = "Year", 
@@ -233,7 +238,7 @@ ecbar = Colorbar(p[2,1],
     ticksvisible = true,
     vertical = false,
         )
-    ecbar.ticks = (
+ecbar.ticks = (
         1:8, 
         [
             continents["1"],
@@ -246,18 +251,19 @@ ecbar = Colorbar(p[2,1],
             continents["8"],
         ],
     )
-save("$path2v/fig/landArea_by_Cont_1970_2022.png",p)
+p
+save("$path2v/fig/landArea_by_Cont_1970_$(endyear).png",p)
 
-# # relative area by continent
-# df22 = df |> 
-#     # (df -> stack(df, Not(:ev), variable_name = :Year, value_name = :Area)) |>
-#     (df -> DataFrames.groupby(df, [:Year, :Continent, :cont])) |> 
-#     # total extremes of 1 type =1% over 73 years, divided by n years (73) ~= 0.0137 %
-#     # but on average should be 1 % per year
-#     (df -> DataFrames.transform(df, :Area => (x -> x./sum(x) .*100) => :Area_pc)) |>
-#     (df -> subset(df, :Type => x-> x.>0 .&& x.<16)) |>
-#     (df -> DataFrames.groupby(df, [:Year, :Continent, :cont])) |>
-#     (df -> combine(df, :Area_pc => sum)) 
+# relative area by continent
+df22 = df |> 
+    # (df -> stack(df, Not(:ev), variable_name = :Year, value_name = :Area)) |>
+    (df -> DataFrames.groupby(df, [:Year, :Continent, :cont])) |> 
+    # total extremes of 1 type =1% over 73 years, divided by n years (73) ~= 0.0137 %
+    # but on average should be 1 % per year
+    (df -> DataFrames.transform(df, :Area => (x -> x./sum(x) .*100) => :Area_pc)) |>
+    (df -> subset(df, :Type => x-> x.>0 .&& x.<16)) |>
+    (df -> DataFrames.groupby(df, [:Year, :Continent, :cont])) |>
+    (df -> combine(df, :Area_pc => sum)) 
 # # p = mygroupedbar(df22 |> (df -> subset(df, :Year => x -> x .>= 1970)), :Continent, cont_cols', startyear = 1970, bar_position = :dodge)
 # p = mygroupedbar(df22|> (df -> subset(df, :Year => x -> x .>= 1970)), :cont; startyear = 1970, dodge = df.cont, colormap = cgrad(cont_cols, categorical = true), colorrange = (1,8))
 # ecbar = Colorbar(p[2,1],
@@ -300,7 +306,7 @@ ecbar = Colorbar(p[2,1],
             spinewidth = 0,
             vertical = false,
         )
-    ecbar.ticks = (
+ecbar.ticks = (
         [0,1,4],#0:4, 
         [
             "only hot",
@@ -308,7 +314,8 @@ ecbar = Colorbar(p[2,1],
             "dry and hot",
         ],
     )
-save("$path2v/fig/landArea_by_Int8_1970_2022.png",p)
+p
+save("$path2v/fig/landArea_by_Int8_1970_$(endyear).png",p)
 
 function macrotype(x; ot::Type = Int)
     if x == 1
@@ -349,7 +356,7 @@ ecbar = Colorbar(p[2,1],
             spinewidth = 0,
             vertical = false,
         )
-    ecbar.ticks = (
+ecbar.ticks = (
         1:3, 
         [
             "only hot",
@@ -357,7 +364,8 @@ ecbar = Colorbar(p[2,1],
             "dry and hot",
         ],
     )
-save("$path2v/fig/landArea_by_macroType_1970_2022.png", p)
+p
+save("$path2v/fig/landArea_by_macroType_1970_$(endyear).png", p)
 
 
 # p = @df dfp groupedbar(:Year, :Area_pc_sum, group = :MacroType, 
@@ -459,8 +467,8 @@ ax = Axis(f[1,1])
 p = barplot!(ax,dfpp.Year, dfpp.Area_pc_sum, color = colours[1], label = "Hot and dry")
 ax.xlabel = "Year"
 ax.ylabel = "Percentage of annual days and land area"
-xlims!(1970-1,2022+1)
-ax.xticks=(1970:5:(2022),string.(1970:5:2022))
+xlims!(1970-1,endyear+1)
+ax.xticks=(1970:5:(endyear),string.(1970:5:endyear))
 l = lines!(ax, dfpp.Year,  (slope .* dfpp.Year .+ intercept), color = :grey, label = "Theil-Sen estimator: $(round(slope; sigdigits = 2)) * Year + ($(round(intercept; sigdigits = 2))) \n Mann-Kendall test: p-value = $(round(p_value; sigdigits = 2))")
 Legend(f[2,1], ax, orientation = :horizontal, nbanks = 1, framevisible = false)
 f
@@ -704,7 +712,7 @@ dfpc = df |>
 d0 = dfpc |> 
     (df -> groupby(df, :Continent)) |> 
     (df -> combine(df, :Area_pc_sum => mean)) |>
-    (df -> rename(df, :Area_pc_sum_mean => :Years_1970_2022))
+    (df -> rename(df, :Area_pc_sum_mean => :Years_1970_2023))
 d1 = dfpc |> 
     (df -> filter(:Year => x -> x .< 2000, df)) |>
     (df -> groupby(df, :Continent)) |> 
@@ -714,7 +722,7 @@ d2 = dfpc |>
     (df -> filter(:Year => x -> x .>= 2000, df)) |>
     (df -> groupby(df, :Continent)) |> 
     (df -> combine(df, :Area_pc_sum => mean))|>
-    (df -> rename(df, :Area_pc_sum_mean => :Years_2000_2022))
+    (df -> rename(df, :Area_pc_sum_mean => :Years_2000_2023))
 d = leftjoin(d0,leftjoin(d1,d2, on = :Continent), on = :Continent)
 # # data check
 # d0 = dfpc |> 
@@ -736,7 +744,7 @@ d = leftjoin(d0,leftjoin(d1,d2, on = :Continent), on = :Continent)
 # global
 d0 = dfpp |> 
     (df -> combine(df, :Area_pc_sum => mean)) |>
-    (df -> rename(df, :Area_pc_sum_mean => :Years_1970_2022))
+    (df -> rename(df, :Area_pc_sum_mean => :Years_1970_2023))
 d1 = dfpp |> 
     (df -> filter(:Year => x -> x .< 2000, df)) |>
     (df -> combine(df, :Area_pc_sum => mean))|>
@@ -744,9 +752,11 @@ d1 = dfpp |>
 d2 = dfpp |> 
     (df -> filter(:Year => x -> x .>= 2000, df)) |>
     (df -> combine(df, :Area_pc_sum => mean))|>
-    (df -> rename(df, :Area_pc_sum_mean => :Years_2000_2022))
+    (df -> rename(df, :Area_pc_sum_mean => :Years_2000_2023))
 
-show(stdout, MIME("text/latex"),vcat(d, hcat(DataFrame(Continent = "Global"), d0, d1, d2)))
+show(stdout, MIME("text/latex"), vcat(d, hcat(DataFrame(Continent = "Global"), d0, d1, d2)),) # formatters = PrettyTables.ft_printf("%4.2f", 2:4))
+
+(d.Years_2000_2023 .- d.Years_1970_1999) ./ d.Years_1970_1999
 
 # l = @layout [a;b;c;d;e;f;g;h]
 # p = ();
@@ -758,7 +768,8 @@ show(stdout, MIME("text/latex"),vcat(d, hcat(DataFrame(Continent = "Global"), d0
 # png("$path2v/fig/landArea_hotndry_by_ContSubplot_1970.png")
 
 f = figcontsub(dfpc |> (df -> subset(df, :Year => x -> x.>= 1970) ))
-ylims!(-0.05, 1.0)
+ylims!(-0.05, 1.2)
+f
 save("$path2v/fig/landArea_hotndry_by_ContSubplot_1970.png",f)
 
 
