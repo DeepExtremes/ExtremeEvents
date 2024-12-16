@@ -11,9 +11,10 @@ import CSV
 using CairoMakie, GeoMakie
 
 if occursin("/Users", pwd())
-    path = "/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/v3"
+    pathpet = "/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/v3"
 else
-    path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
+    pathpet = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
+    path="/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/"
 end
 
 trial = "ranked_pot0.01_ne0.1"
@@ -288,3 +289,12 @@ f = plot_city(City("Niamey_83", "Niamey, Niger", Niameylon, Niameylat, Date(1983
 Jenalat = 50.92; Jenalon = 11.59
 f = plot_city(City("Jena", "Jena, Germany", Jenalon, Jenalat, Date(2018) .. Date(2022,12,31)))
 f = plot_city(City("Jena_20", "Jena, Germany", Jenalon, Jenalat, Date(2020) .. Date(2020,12,31)))
+
+Salmaitlat = 8.896620077205956; Salmaitlon =  48.53069202362685
+f = plot_city(City("Salmait", "Salmait, Somalia (8°54'N 48°30'E)", Salmaitlon, Salmaitlat, Date(2015) .. Date(2022, 12, 31)))
+f = plot_city(City("Salmait_2022", "Salmait, Somalia", Salmaitlon, Salmaitlat, Date(2022) .. Date(2022, 12, 31)))
+f = plot_city(City("Salmait_2021", "Salmait, Somalia", Salmaitlon, Salmaitlat, Date(2021) .. Date(2021, 12, 31)))
+f = plot_city(City("Salmait_2020", "Salmait, Somalia", Salmaitlon, Salmaitlat, Date(2020) .. Date(2020, 12, 31)))
+f = plot_city(City("Salmait_2019", "Salmait, Somalia", Salmaitlon, Salmaitlat, Date(2019) .. Date(2019, 12, 31)))
+f = plot_city(City("Salmait_2018", "Salmait, Somalia", Salmaitlon, Salmaitlat, Date(2018) .. Date(2018, 12, 31)))
+f = plot_city(City("Salmait_2017", "Salmait, Somalia", Salmaitlon, Salmaitlat, Date(2017) .. Date(2017, 12, 31)))
