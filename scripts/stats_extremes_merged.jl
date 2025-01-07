@@ -110,7 +110,7 @@ sort!(res, by=i->i[end].v, rev=true);
 # first convert tuple to named tuple
 df = toDF(res)
 # write DataFrame out to CSV file
-outname = "$(patho)MergedEventStats$(landonly)_int.csv"
+outname = joinpath(path,"MergedEventStats$(landonly)_int.csv")
 CSV.write(outname, df)
 println(outname)
 println("done!")
