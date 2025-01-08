@@ -16,10 +16,11 @@ lsm = Cube("/Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.721.static.nc")[
     # region = region,
     ]
 
-labelpath = "/Net/Groups/BGI/work_1/scratch/fgans/DeepExtremes/MergeLabelCubes/mergedlabels.zarr"
-labels = Cube(labelpath )# 
-largest = [42561  51252  24092  55983  55755  25632  18958  44770  36790  53015]
-longest = [31767  31866  49981  44843  18998  24109  42561  28223  50340  54071]
+path = "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/"
+labelpath = joinpath(path, "mergedlabels_ranked_pot0.01_ne0.1_cmp_S1_T3_1950_2023.zarr")
+labels = Cube(labelpath) # labels = open_dataset(labelpath )# 
+largest = [83007  104409  143161  116830  121895  109346  105411  89565  139883  127204]
+longest = [30070  50443  50825  51134  105411  139883  143103  50197  51283  100731]
 
 # test on small subset (42561 (Russian heatwave of 2010) + 18958)
 lon1 = 50 .. 51; lat1 = 54 .. 55;  
@@ -88,7 +89,7 @@ end
     outdims = OutDims(
         Dim{:Variable}(["largest", "longest"]),
         outtype = Int64,
-        path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/largest_longest_idx_labels.zarr",
+        path = joinpath(path, "largest_longest_idx_labels.zarr"),
         backend = :zarr,
         overwrite = true,
         chunksize=Dict("Variable"=>1),
