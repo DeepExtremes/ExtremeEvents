@@ -67,20 +67,20 @@ p=1950:16:2020
 
     path2v4 = "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4"
     # path2v3 = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3"
-    inpath = "$path2v4/EventCube_ranked_pot$(pot)_ne$(ne).zarr"
+    inpath = joinpath(path2v4, "EventCube_ranked_pot$(pot)_ne$(ne).zarr")
     # inpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/EventCube_smoothed_pot" * string(pot) * "_ne" * string(ne) * ".zarr"
     c = Cube(inpath)
 end
 
 @sync @distributed for period in p
-    # period=2014
+    # period=2023
     startyear=period;endyear=min(period+15, year(c.Ti[end]))
     @show aperiod = "$(startyear)_$(endyear)"
     outpath = "$path2v4/labelcube_ranked_pot$(pot)_ne$(ne)_$(cmp)_$(filtern)_$(aperiod)$(land)$(region).zarr"
 
 clastyears = c[time=DateTime(startyear-1, 12, 30) .. DateTime(endyear+1, 1,2)]
 # test:
-# clastyears = c[time=period, latitude=45 ..50, longitude=10 .. 15]
+# clastyears = c[time=DateTime(startyear-1, 12, 30) .. DateTime(endyear+1, 1,2), latitude=45 ..50, longitude=10 .. 15]
 # create binary array flagging all events (regardless of type of event) and load to memory
 # keep out non-extremes, i.e. where event is < tresne or > 1-tresne
 if compound_events
