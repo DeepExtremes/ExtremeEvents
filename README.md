@@ -175,3 +175,6 @@ Compare MergedEventStats_landonly with table of reported events compiled *a prio
 
 Extract timeseries at single locations with `plot_city.jl`
 
+### add figure with grid cell trends
+
+Plotting trend map based on indivdual grid cells and all years doesn't bring up significant trends, see `plot_trendmap.jl`. Decadal trend instead. Or, compare average number of extreme dry and hot days from two periods: 1970-1999 with 2000-2023 (`plot_comparemap.jl`).
