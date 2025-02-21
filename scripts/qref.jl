@@ -20,50 +20,60 @@ end
 # 
 @everywhere include("../src/detection.jl")
 
-path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
+path = "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/"#"/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
 
-zg = zopen("$(path)ERA5Cube.zarr",consolidated=true, fill_as_missing = false)
-era = Cube(open_dataset(zg))
+# era = Cube(open_dataset(joinpath(path, "ERA5Cube.zarr")))
 
 # @time qref(
 #     era, #[latitude = 40.0 .. 42.0, longitude = 10.0 .. 12.0], #tmax
-#     "$(path)qref_era_1971_2000.zarr/";
+#     joinpath(path, "qref_era_1971_2000.zarr/");
 #     ref = (1971,2000), 
-#     q = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975, 0.99],
+#     q = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.99],
 #     overwrite = true,
 #     backend = :zarr
 #     )
-# # 7694.231031 seconds (25.78 M allocations: 1.706 GiB, 0.01% gc time, 0.20% compilation time)
+# # 828.093435 seconds (24.81 M allocations: 1.635 GiB, 0.11% gc time, 1.73% compilation time)
+
+peis = Cube(open_dataset(joinpath(path, "PEICube.zarr")))
 
 @time qref(
-    era[Variable=At("tp")],
-    "$(path)qref_eratp_raindays_1971_2000.zarr/";
+    peis,
+    joinpath(path, "qref_pei_1971_2000.zarr/");
     ref = (1971,2000), 
     q = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.99],
-    rule = x -> x[map(xi -> xi > 0.0001, x)],
     overwrite = true,
     backend = :zarr
-)
+    )
 
-@time qref(
-    era[Variable=At("tp")],
-    "$(path)qref_eratp_raindays_1981_2010.zarr/";
-    ref = (1981,2010), 
-    q = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.99],
-    rule = x -> x[map(xi -> xi > 0.0001, x)],
-    overwrite = true,
-    backend = :zarr
-)
+# @time qref(
+#     era[Variable=At("tp")],
+#     "$(path)qref_eratp_raindays_1971_2000.zarr/";
+#     ref = (1971,2000), 
+#     q = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.99],
+#     rule = x -> x[map(xi -> xi > 0.0001, x)],
+#     overwrite = true,
+#     backend = :zarr
+# )
 
-@time qref(
-    era[Variable=At("tp")],
-    "$(path)qref_eratp_raindays_1991_2020.zarr/";
-    ref = (1991,2020), 
-    q = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.99],
-    rule = x -> x[map(xi -> xi > 0.0001, x)],
-    overwrite = true,
-    backend = :zarr
-)
+# @time qref(
+#     era[Variable=At("tp")],
+#     "$(path)qref_eratp_raindays_1981_2010.zarr/";
+#     ref = (1981,2010), 
+#     q = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.99],
+#     rule = x -> x[map(xi -> xi > 0.0001, x)],
+#     overwrite = true,
+#     backend = :zarr
+# )
+
+# @time qref(
+#     era[Variable=At("tp")],
+#     "$(path)qref_eratp_raindays_1991_2020.zarr/";
+#     ref = (1991,2020), 
+#     q = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.99],
+#     rule = x -> x[map(xi -> xi > 0.0001, x)],
+#     overwrite = true,
+#     backend = :zarr
+# )
 
 
 # pei = Cube(open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/PEICube.zarr/"))
