@@ -1,5 +1,5 @@
-## figure for DeepExtremesCubes paper (Ji et al. 2024)
-# time series for event obs_event=19. 7 days (25/07/2019 to 01/07/2019). 
+## figure for revised Dheed paper (Dheed_v4)
+# time series for specific event. Summer 2003 Europe heatwave.
 # first row: t2mmax + legend
 # second row: pei_30? + legend
 # third row: EventCube + legend
@@ -18,16 +18,17 @@ using CairoMakie, GeoMakie
 import Random
 
 obs_event = 33
+startyear = 1950; endyear = 2023
 trial = "ranked_pot0.01_ne0.1"
-etrial = "$(trial)_cmp_S1_T3"
-startyears = 1970:10:2010 
-intervals = map( y -> (y, y+12), startyears)
+etrial = "$(trial)_cmp_S1_T3_$(startyear)_$(endyear)"
+# intervals = map( y -> (y, y+12), startyears)
 landonly = "landonly"
 
 if haskey(ENV, "https_proxy") && occursin( "bgc-jena", ENV["https_proxy"])
-    path = "/Net/Groups/BGI/work_1/scratch/s3/deepextremes/v3/"
+    # path = "/Net/Groups/BGI/work_1/scratch/s3/deepextremes/Dheed_v4/"
+    path = "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/"
 else
-    path = "https://s3.bgc-jena.mpg.de:9000/deepextremes/v3/"
+    path = "https://s3.bgc-jena.mpg.de:9000/deepextremes/Dheed_v4/"
 end
 
 # labels = ()
@@ -43,34 +44,45 @@ end
 #     labelsi = open_dataset(labelpathi)
 #     labels = (labels..., labelsi)
 # end
-labels = open_dataset("$(path)mergedlabels.zarr")
-statevents = CSV.read("$(path)MergedEventStats_landonly.csv", DataFrame)
+labels = open_dataset(joinpath(path,"mergedlabels_$etrial.zarr"))
+statevents = CSV.read(joinpath(path,"MergedEventStats_landonly_int.csv"), DataFrame)
 
-zg = zopen("$(path)ERA5Cube.zarr",consolidated=true, fill_as_missing = false)
+zg = zopen(joinpath(path,"ERA5Cube.zarr"),consolidated=true, fill_as_missing = false)
 era = open_dataset(zg)
 tmax = era.t2mmax
-rt = Cube("$(path)tmax_ranked.zarr")
+rt = Cube(joinpath(path,"tmax_ranked.zarr"))
 
-peis = open_dataset(zopen("$(path)PEICube.zarr",consolidated=true, fill_as_missing = false))
-rp = open_dataset(zopen("$(path)pei_ranks.zarr",consolidated=true, fill_as_missing = false))
+peis = open_dataset(zopen(joinpath(path,"PEICube.zarr"),consolidated=true, fill_as_missing = false))
+rp = open_dataset(zopen(joinpath(path,"pei_ranks.zarr"),consolidated=true, fill_as_missing = false))
 
-eec = open_dataset(zopen("$(path)EventCube_$(trial).zarr",consolidated=true, fill_as_missing = false))
+eec = open_dataset(zopen(joinpath(path,"EventCube_$(trial).zarr"),consolidated=true, fill_as_missing = false))
 
 if haskey(ENV, "https_proxy") && occursin( "bgc-jena", ENV["https_proxy"])
-    df0 = CSV.read("$(path)SanityCheck_merged.csv", DataFrame, header=1)
+    df0 = CSV.read(joinpath(path,"SanityCheck_merged.csv"), DataFrame, header=1)
 else
-    df0_http = HTTP.get("$(path)SanityCheck_merged.csv")
+    df0_http = HTTP.get(joinpath(path,"SanityCheck_merged.csv"))
     df0 = CSV.read(df0_http.body, DataFrame, header=1)
 end 
-df = subset(df0, :obs_event => x -> x .== obs_event, :volume => x -> x .>= 70.0, :area => x -> x .>= 5.0)
+
+# set spatiotemporal window of interest
+lat = (41.0,53.5)#(43.0, 53);
+lon = (-5,17.5)#(-5,15);
+period = (Date("2003-08-02"), Date("2003-08-16"))
+# period = (Date("2003-07-31"), Date("2003-09-01"))
+# period = (Date("2003-07-02"), Date("2003-09-01"))
+
+df = subset(df0, 
+    :obs_event => x -> x .== obs_event, 
+    :volume => x -> x .>= 70.0, 
+    :area => x -> x .>= 5.0,
+    :start_time => x -> x .<= period[2],
+    :end_time => x -> x .>= period[1]
+    )
 
 # helper functions
 include("../src/stats.jl")
 include("../src/plots.jl")
 
-lat = (43.0, 53);
-lon = (-5,15);
-period = (Date("2003-08-02"), Date("2003-08-16"))
 # transform lon to match cube
 if lon[1] < 0 
     if lon[2] <= 0
@@ -89,20 +101,16 @@ end
 # number of days in obs_event
 nd = Dates.value(period[2]-period[1]) + 1
 
-# subset label cube with maximum intersecting bounding box of labelled events
+
 lato = (minimum(df[: ,:latitude_min]), maximum(df[: ,:latitude_max]))
 lono = (minimum(df[:, :longitude_min]), maximum(df[:, :longitude_max]))
 periodo = (minimum(df[:, :start_time]), maximum(df[:,:end_time])) #???
 
 n = (periodo[2] - periodo[1]).value + 1
-time_lapse = Day(3)
-
-# bbox obs
-xlims = typeof(lon) <: Vector ? expand(extrema(lon0)) : expand(extrema((lon..., lono...)))
-xlims = xlims[1] >= 180 ? xlims.-360 : xlims
-ylims = expand(extrema((lat...,lato...)))
+time_lapse = Day(3) # makes sense bc this is minimum label event duration
 
 # selected labels
+# only those that intersect with period!
 lbls = df.label
 ulbls = sort(unique(lbls))
 nlb = length(ulbls)
@@ -141,6 +149,11 @@ etcols = [colorant"#FFFFFF",
 tthcols = cgrad([colorant"#FFB86F", colorant"#BBBBBB", colorant"#FFFFFF",], [0.02,0.5], categorical = true)
 tthcols = cgrad([colorant"#000000", colorant"#666666", colorant"#bbbbbb",], [0.02,0.5], categorical = true)
 pthcols = cgrad([colorant"#A6C5E8", colorant"#BBBBBB", colorant"#FFFFFF",], [0.02,0.5], categorical = true)
+
+# bbox obs
+xlims = typeof(lon) <: Vector ? expand(extrema(lon0)) : expand(extrema((lon..., lono...)))
+xlims = xlims[1] >= 180 ? xlims.-360 : xlims
+ylims = expand(extrema((lat...,lato...)))
 
 # ratio = diff([xlims[1],xlims[2]]) ./ diff([ylims[1], ylims[2]])
 # fig = Figure(size = (round(1000 * ratio[1]), 50+250*F[end][1]));
@@ -334,7 +347,7 @@ fig = with_theme(fontsize_theme) do
 end
 
 if haskey(ENV, "https_proxy") && occursin( "bgc-jena", ENV["https_proxy"])
-    save("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/plot" * "_" * trial * "_Event_$obs_event" * "_GeoAxis.png", fig, dpi = 300) 
+    save(joinpath(path,"fig", "plot" * "_" * trial * "_Event_$obs_event" * "_GeoAxis.png"), fig, dpi = 300) 
 else
     save("plot" * "_" * trial * "_Event_$obs_event" * "_GeoAxis.png", fig, dpi = 300) 
 end
@@ -342,7 +355,10 @@ end
 #### without GeoAxis
 
 # bbox obs
-xlims = (-2.5,12.5)
+xlims = lon0#(-5.5,17.5)#(-2.5,12.5)
+# xlims = typeof(lon) <: Vector ? expand(extrema(lon0)) : expand(extrema((lon..., lono...)))
+# xlims = xlims[1] >= 180 ? xlims.-360 : xlims
+
 ylims = expand(extrema((lat...,lato...)))
 
 function myfig(;size = (2400, 1500), kwargs...)
@@ -538,12 +554,12 @@ end
 
 fontsize_theme = Theme(fontsize = 32)
 fig = with_theme(fontsize_theme) do
-    fig = myfig(size = (2500, 1500), font = "Helvetica")
+    fig = myfig(size = (2500, 1350), font = "Helvetica")
 end
 
 if haskey(ENV, "https_proxy") && occursin( "bgc-jena", ENV["https_proxy"])
-    save("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/plot" * "_" * trial * "_Event_$obs_event" * "_first.png", fig, dpi = 300) 
-    save("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/plot" * "_" * trial * "_Event_$obs_event" * "_first.pdf", fig, dpi = 300) 
+    save(joinpath(path,"fig", "plot" * "_" * trial * "_Event_$obs_event" * "_first.png"), fig, dpi = 300) 
+    save(joinpath(path,"fig", "plot" * "_" * trial * "_Event_$obs_event" * "_first.pdf"), fig, dpi = 300) 
 else
     save("plot" * "_" * trial * "_Event_$obs_event" * "_first.png", fig, dpi = 300) 
 end
@@ -746,8 +762,8 @@ fig = with_theme(fontsize_theme) do
 end
 
 if haskey(ENV, "https_proxy") && occursin( "bgc-jena", ENV["https_proxy"])
-    save("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/plot" * "_" * trial * "_Event_$obs_event" * "_fn.png", fig, dpi = 300) 
-    save("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/fig/plot" * "_" * trial * "_Event_$obs_event" * "_fn.pdf", fig, dpi = 300) 
+    save(joinpath(path,"fig", "plot" * "_" * trial * "_Event_$obs_event" * "_fn.png"), fig, dpi = 300) 
+    save(joinpath(path,"fig", "plot" * "_" * trial * "_Event_$obs_event" * "_fn.pdf"), fig, dpi = 300) 
 else
     save("plot" * "_" * trial * "_Event_$obs_event" * "_fn.png", fig, dpi = 300) 
 end
