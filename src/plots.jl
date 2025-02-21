@@ -356,7 +356,7 @@ function labelplot!(ax, labels::Dataset, period, lat, lon, lblt; kwargs...)
 end
 
 function getsublabels(labels::Dataset, period, lat, lon, lblt)
-    sublabels = labels.layer[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
+    sublabels = labels.labels[time=period[1]..period[2], latitude=lat[1]..lat[2], longitude=lon[1]..lon[2]]
         # load to memory and set all other values to 0 (so that they will be set to NaN by prephm)
         # small events have been discarded from the plot
         sublabels1 = map(x -> x in lblt ? x : 0, (sublabels.data)[:,:,:]);
