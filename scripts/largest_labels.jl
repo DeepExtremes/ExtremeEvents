@@ -43,9 +43,9 @@ lon1 = 50 .. 51; lat1 = 54 .. 55;
 # #  42561
 
 @everywhere function getllabelsfaster!(xout,lbls,ls,largest,longest)
-    if ls[1] < 0.5
-        return xout[:] .= 0
-    end
+    # if ls[1] < 0.5
+    #     return xout[:] .= 0
+    # end
     # more events in recent years, hence reverse lbls
     lbls1 = reverse(lbls)
     # i want the smallest events among the largest. Hence reverse as input
