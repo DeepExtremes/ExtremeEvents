@@ -295,7 +295,7 @@ df22 = df |>
 # aggregate area by Event type
 df3 = df1  |>
     (df -> DataFrames.groupby(df, [:Year, :Type])) |>
-    (df -> combine(df, :Area_pc => sum)) 
+    (df -> combine(df, :Area_pc => sum))
 # p = mygroupedbar(df3, :Type, cols[2:end]')
 p = mygroupedbar(df3|> (df -> subset(df, :Year => x -> x .>= 1970)), :Type; startyear = 1970, colormap = cgrad(cols[2:end-1], categorical = true), colorrange = (1,15))
 ecbar = Colorbar(p[2,1], 
@@ -316,6 +316,33 @@ ecbar.ticks = (
     )
 p
 save("$path2v/fig/landArea_by_Int8_1970_$(endyear).png",p)
+
+# add figure with dry and hot by colour
+df3 = df1  |>
+    (df -> DataFrames.groupby(df, [:Year, :Type])) |>
+    (df -> combine(df, :Area_pc => sum)) |>
+    (df -> DataFrames.subset(df, :Type => x -> (x .>1) .& (iseven.(x.+1))))
+# p = mygroupedbar(df3, :Type, cols[2:end]')
+p = mygroupedbar(df3|> (df -> subset(df, :Year => x -> x .>= 1970)), :Type; startyear = 1970, colormap = cgrad(cols[2:end-1], categorical = true), colorrange = (1,15));
+ecbar = Colorbar(p[2,1], 
+            colormap = cgrad(cols[[10,6,4]], categorical=true),
+            limits = (-0.5,2.5),
+            halign = :left,
+            ticksvisible = false,
+            spinewidth = 0,
+            vertical = false,
+        )
+ecbar.ticks = (
+        [0,1,2], 
+        [
+            "dry and hot, 180 days",
+            "dry and hot, 90 days",
+            "dry and hot, 30 days",
+        ],
+    )
+p
+save("$path2v/fig/landArea_by_dh_1970_$(endyear).png",p)
+
 
 function macrotype(x; ot::Type = Int)
     if x == 1
@@ -771,6 +798,7 @@ f = figcontsub(dfpc |> (df -> subset(df, :Year => x -> x.>= 1970) ))
 ylims!(-0.05, 1.2)
 f
 save("$path2v/fig/landArea_hotndry_by_ContSubplot_1970.png",f)
+print(subset(dfpc,:Area_pc_sum => x -> x.>1.2))
 
 
 
