@@ -188,7 +188,8 @@ longest = df.label'
 # longest_v4 = [30070  50443  50825  51134  105411  139883  143103  50197  51283  100731]
 
 # plot largest events
-llabels = open_dataset(joinpath(path,"largest_longest_idx_labels.zarr"))
+# landonly="";
+llabels = open_dataset(joinpath(path,"largest_longest_idx_labels$(landonly).zarr"))
 lla = convert(Array{Float64},llabels.largest);
 replace!(lla, 0 => NaN);
 lon = lookup(llabels.largest, :longitude);
