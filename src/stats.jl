@@ -131,13 +131,17 @@ mutable struct Intensity{F1<:Float64, F2<:Float64, F3<:Float64, F4<:Float64}
     d180::F4
 end
 Intensity() = Intensity(0.0, 0.0, 0.0, 0.0)
+function intensity(threshold, rank, lat)
+    (threshold - min(rank, threshold )) / threshold * cosd(lat)
+end
 # Define function computestat for objects of type Intensity:
 # Update Intensity by adding threshold - rank only when threshold is passed over weighted by grid cells' area (approximated by cosine of latitude)
 function computestat(in::Intensity, row)
-    in.h = in.h + 0.01 - min(row.rt, 0.01 ) * cosd(row.latitude)
-    in.d30 = in.d30 + 0.01 - min(row.rd30, 0.01 ) * cosd(row.latitude)
-    in.d90 = in.d90 + 0.01 - min(row.rd90, 0.01 ) * cosd(row.latitude)
-    in.d180 = in.d180 + 0.01 - min(row.rd180, 0.01 ) * cosd(row.latitude)
+    threshold = 0.01
+    in.h = in.h + intensity(threshold, row.rt, row.latitude)
+    in.d30 = in.d30 + intensity(threshold, row.rd30, row.latitude)
+    in.d90 = in.d90 + intensity(threshold, row.rd90, row.latitude)
+    in.d180 = in.d180 + intensity(threshold, row.rd180, row.latitude)
 end
 
 # Define function computestat for objects of type Pair 
@@ -622,7 +626,7 @@ function theilsen(x::AbstractVector, y::AbstractVector)
     # Calculate Theil-Sen intercept
     intercepts = y - (theil_sen_slope * x)
     si = sort(intercepts)
-    theil_sen_intercept = iseven(n) ? (si[n ÷ 2 + 2] + si[n ÷ 2])/2 : si[n ÷ 2]
+    theil_sen_intercept = iseven(n) ? (si[n ÷ 2 + 1] + si[n ÷ 2])/2 : si[n ÷ 2]
     return theil_sen_slope, theil_sen_intercept 
 end
 
