@@ -108,13 +108,31 @@ gdf = fev |>
 
 # Quantile Regression
 qrres = Dict()
-for q in [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]
+qvals = [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]
+for q in qvals
     qrres["q$(@sprintf("%0.2f",q))"] = 
         qreg(@formula(log10(volume)~yr), fev |> 
             (df -> transform(df, :start_time => (x -> year.(x)) => :yr)),
             q, IP())
 end
-DataPlot = reduce(vcat, [[coeftable(qrres["q$(@sprintf("%0.2f",q))"]).cols[2][2] coeftable(qrres["q$(@sprintf("%0.2f",q))"]).cols[2][1]] for q in [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]])
+DataPlot = reduce(vcat, [[coeftable(qrres["q$(@sprintf("%0.2f",q))"]).cols[2][2] coeftable(qrres["q$(@sprintf("%0.2f",q))"]).cols[2][1] coeftable(qrres["q$(@sprintf("%0.2f",q))"]).cols[3][2]] for q in [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]])
+
+f2,ax,l = lines(qvals, DataPlot[:,1])
+lines!(qvals, DataPlot[:,1] .- 1.96 .* DataPlot[:,3], linestyle = :dash)
+lines!(qvals, DataPlot[:,1] .+ 1.96 .* DataPlot[:,3], linestyle = :dash)
+f2
+
+# DataPlot
+# 9×3 Matrix{Float64}:
+#  0.00227783   -4.64682   0.000353279
+#  0.00246095   -4.77044   0.000208044
+#  0.00252367   -4.7555    0.000135703
+#  0.000691515  -0.93992   4.30235e-5
+#  0.00059828   -0.574038  0.000207175
+#  0.000647113  -0.203651  0.000318798
+#  0.000323353   1.04264   0.000560838
+#  0.000672841   0.775262  0.00069914
+#  0.00422328   -5.47117   0.00156554
 
 # # Bands
 # band!(ax2,  gdf.yr, DataPlot[1,1] .* gdf.yr .+ DataPlot[1,2], DataPlot[7,1] .* gdf.yr .+ DataPlot[7,2], color = (:grey85, 0.3), label = "[p1, p99]")
@@ -177,18 +195,18 @@ largest = df.label'
 # largest_v4 = [83007  104409  143161  116830  121895  109346  105411  89565  139883  127204]
 
 # longest duration
-df = fev |>
+dfl = fev |>
            (df -> sort(df, :d, rev = true)) |>
            (df -> first(df,10));
-df.start_date = Date.(df.start_time);
-df.end_date = Date.(df.end_time);
-show(stdout, MIME("text/latex"), select(df, [:label, :start_date, :end_date, :longitude_min,  :longitude_max,  :latitude_min,  :latitude_max, :duration, :area, :volume]))
-longest = df.label'
+dfl.start_date = Date.(df.start_time);
+dfl.end_date = Date.(df.end_time);
+show(stdout, MIME("text/latex"), select(dfl, [:label, :start_date, :end_date, :longitude_min,  :longitude_max,  :latitude_min,  :latitude_max, :duration, :area, :volume]))
+longest = dfl.label'
 # longest_v3 = [31767  31866  49981  44843  18998  24109  42561  28223  50340  54071]
 # longest_v4 = [30070  50443  50825  51134  105411  139883  143103  50197  51283  100731]
 
 # plot largest events
-# landonly="";
+landonly="";
 llabels = open_dataset(joinpath(path,"largest_longest_idx_labels$(landonly).zarr"))
 lla = convert(Array{Float64},llabels.largest);
 replace!(lla, 0 => NaN);
@@ -217,13 +235,14 @@ cbar = Colorbar(fig[2,1], h,
     vertical = false,)
 nlb = length(largest)
 cbar.limits = (1,nlb)
-cbar.ticks = ((1+(nlb-1)/nlb/2):((nlb-1)/nlb):(nlb), [string(largest[1,i]) for i in 1:10])
+startyear = year.(df.start_date)'
+cbar.ticks = ((1+(nlb-1)/nlb/2):((nlb-1)/nlb):(nlb), [string(largest[1,i]) * "\n($(startyear[i]))" for i in 1:10])
             
-# # remove gridlines
-# gax.xgridcolor[] = colorant"transparent";
-# gax.ygridcolor[] = colorant"transparent";
-# gax.xticklabelsvisible = false;
-# gax.yticklabelsvisible = false;
+# remove gridlines
+gax.xgridcolor[] = colorant"transparent";
+gax.ygridcolor[] = colorant"transparent";
+gax.xticklabelsvisible = false;
+gax.yticklabelsvisible = false;
 fig
 save(joinpath(path, "fig/largest_$trial$(landonly)_1970.png"), fig, size = (800, 494))
 
@@ -253,16 +272,44 @@ cbar = Colorbar(fig[2,1], h,
     vertical = false,)
 nlb = length(longest)
 cbar.limits = (1,nlb)
-cbar.ticks = ((1+(nlb-1)/nlb/2):((nlb-1)/nlb):(nlb), [string(longest[1,i]) for i in 1:10])
+startyear = year.(dfl.start_date)'
+cbar.ticks = ((1+(nlb-1)/nlb/2):((nlb-1)/nlb):(nlb), [string(longest[1,i])* "\n($(startyear[i]))" for i in 1:10])
 
-# # remove gridlines
-# gax.xgridcolor[] = colorant"transparent";
-# gax.ygridcolor[] = colorant"transparent";
-# gax.xticklabelsvisible = false;
-# gax.yticklabelsvisible = false;
+# remove gridlines
+gax.xgridcolor[] = colorant"transparent";
+gax.ygridcolor[] = colorant"transparent";
+gax.xticklabelsvisible = false;
+gax.yticklabelsvisible = false;
 fig
 save(path * "fig/longest_$trial$(landonly)_1970.png", fig, size = (800, 494))
 
+# duration: do events get longer? (or just wider?)
+qrdres = Dict()
+qvals = [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]
+for q in qvals
+    qrdres["q$(@sprintf("%0.2f",q))"] = 
+        qreg(@formula(Float64(d)~yr), fev |> 
+            (df -> transform(df, :start_time => (x -> year.(x)) => :yr)),
+            q, IP())
+end
+dDataPlot = reduce(vcat, [[coeftable(qrdres["q$(@sprintf("%0.2f",q))"]).cols[2][2] coeftable(qrdres["q$(@sprintf("%0.2f",q))"]).cols[2][1] coeftable(qrdres["q$(@sprintf("%0.2f",q))"]).cols[3][2]] for q in [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]])
+
+f2,ax,l = lines(qvals, dDataPlot[:,1])
+lines!(qvals, dDataPlot[:,1] .- 1.96 .* dDataPlot[:,3], linestyle = :dash)
+lines!(qvals, dDataPlot[:,1] .+ 1.96 .* dDataPlot[:,3], linestyle = :dash)
+f2
+
+# dDataPlot
+# 9×3 Matrix{Float64}:
+#  -1.40695e-17   0.477121  5.70066e-6
+#   1.33747e-17   0.477121  4.25287e-6
+#   1.10546e-16   0.477121  3.86792e-6
+#   1.07681e-18   0.477121  3.56839e-6
+#   6.38918e-16   0.477121  3.39738e-6
+#  -1.66885e-15   0.60206   7.21878e-6
+#   4.42118e-17   0.778151  2.12519e-5
+#   0.00134865   -1.81444   0.000123102
+#   0.00180128   -2.41702   0.000511767
 
 # # test hm
 # f,ax = hm(lsm.data[:,:], lsm.axes);
@@ -300,3 +347,11 @@ save(path * "fig/longest_$trial$(landonly)_1970.png", fig, size = (800, 494))
 # # reg_lat = EarthDataLab.known_regions[region][2] .. EarthDataLab.known_regions[region][4]
 
 # # DimensionalData.dim2key(subevents.layer.axes)
+
+# events with lots of dought_180
+ev |> 
+    (df -> filter(:drought180 => x -> x .> 90, df, )) |>
+    (df -> select(df, [:label, :start_time, :drought30, :drought90, :drought180])) |>
+    (df -> subset(df, :start_time => x -> x .>=Date(1970)))
+
+ev |> (df -> filter(:label => x -> x.== 136845, df))
