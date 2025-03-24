@@ -39,7 +39,7 @@ dnh = get_trend!(xout,xin,tempo)
 
 function trendmap(cube; title="", clabel="", kwargs...)
     f = Figure()
-    ax = Axis(f[1,1], title=title)
+    ax = GeoAxis(f[1,1], title=title)
     data = circshift(convert(Array{Float32},cube), (180/0.25, 0));
     # replace!(data, 0 => NaN);
     lon = circshift(map(x -> x >= 180 ? x-360 : x, lookup(cube, :longitude)), (180/0.25));
@@ -52,6 +52,11 @@ function trendmap(cube; title="", clabel="", kwargs...)
     translate!(cl, 0, 0, 1000)
 
     cb = Colorbar(f[2,1], h, vertical=false, label=clabel)
+    # remove gridlines
+    ax.xgridcolor[] = colorant"transparent";
+    ax.ygridcolor[] = colorant"transparent";
+    ax.xticklabelsvisible = false;
+    ax.yticklabelsvisible = false;
     f
 end
 
@@ -62,7 +67,7 @@ end
 # 190.135836 seconds (815.77 M allocations: 317.858 GiB, 12.77% gc time, 195.58% compilation time: <1% of which was recompilation)
 trend_dh=Cube(joinpath(path,"trendmap_dh_decade_1966_2023.zarr"))
 f = trendmap(trend_dh, clabel="Theil-Sen trend in decadal number of extremely dry and hot days (1966-2023)", colorrange=(-1,1), colormap=:vik)
-save(joinpath(path,"fig/trendmap_dh_decadal_1966_2023.png"), f)
+save(joinpath(path,"fig/trendmap_dh_decadal_1966_2023_geo.png"), f)
 
 # # @time trend_any = mapCube(get_trend!,deo,tempo,rule = x -> (x .> 0 .&& x .< 16), indims=InDims(:Ti), outdims=OutDims(outtype=Float32,path=joinpath(path,"trendmap_any_1971_2023.zarr"), chunksize=:max, overwrite=true, layername="any"))
 # # # 2195.409061 seconds (3.67 G allocations: 498.512 GiB, 2.60% gc time, 0.01% compilation time)

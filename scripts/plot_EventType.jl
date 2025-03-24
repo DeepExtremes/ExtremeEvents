@@ -295,23 +295,43 @@ df22 = df |>
 # aggregate area by Event type
 df3 = df1  |>
     (df -> DataFrames.groupby(df, [:Year, :Type])) |>
-    (df -> combine(df, :Area_pc => sum))
-# p = mygroupedbar(df3, :Type, cols[2:end]')
-p = mygroupedbar(df3|> (df -> subset(df, :Year => x -> x .>= 1970)), :Type; startyear = 1970, colormap = cgrad(cols[2:end-1], categorical = true), colorrange = (1,15))
+    (df -> combine(df, :Area_pc => sum)) |>
+    # bitshift to have heat on bit 4
+    (df -> transform(df, :Type => x -> .<<(x .& 0x1, 3) .| .>>(x,1)))
+# p = mygroupedbar(df3|> (df -> subset(df, :Year => x -> x .>= 1970)), :Type; startyear = 1970, colormap = cgrad(cols[2:end-1], categorical = true), colorrange = (1,15))
+colsnew = cols[[3,5,7,9,11,13,15,2,4,6,8,10,12,14,16]]
+p = mygroupedbar(df3|> (df -> subset(df, :Year => x -> x .>= 1970)), :Type_function; startyear = 1970, colormap = cgrad(colsnew, categorical = true), colorrange = (1,15))
 ecbar = Colorbar(p[2,1], 
-            colormap = cgrad(cols[[2,9,5,3,10,6,4]], categorical=true),
+            colormap = cgrad(cols[[2,3,5,9,4,6,10]], categorical=true),
+            # colormap = cgrad(cols[[2,9,5,3,10,6,4]], categorical=true),
             limits = (-0.5,6.5),
             halign = :left,
             ticksvisible = false,
             spinewidth = 0,
             vertical = false,
+            flipaxis = false
         )
+# ecbar.ticks = (
+#         [0,1,4],#0:4, 
+#         [
+#             "only hot",
+#             "only dry",
+#             "dry and hot",
+#         ],
+#     )
+bs = function(x)
+    bitstring(Int8(x))[5:end]
+end
 ecbar.ticks = (
-        [0,1,4],#0:4, 
+        0:6, 
         [
-            "only hot",
-            "only dry",
-            "dry and hot",
+            "only hot\n$(bs(1))",
+            "only dry\n$(bs(2))",
+            "\n$(bs(4))\n$(bs(6))",
+            "\n$(bs(8))\n$(bs(10))\n$(bs(12))\n$(bs(14))",
+            "dry and hot\n$(bs(3))",
+            "\n$(bs(5))\n$(bs(7))",
+            "\n$(bs(9))\n$(bs(11))\n$(bs(13))\n$(bs(15))"
         ],
     )
 p
@@ -466,6 +486,16 @@ reject_null_hypothesis, p_value, Tau, slope, intercept = mann_kendall(dfpp.Year,
 # # other implementation https://github.com/mmhs013/MannKendall.jl/
 # using MannKendall
 # mk_original_test(dfpp.Area_pc_sum)
+dfpp1 = dfpp|> 
+    (df -> subset(df, :Year => x -> x .<=1997)
+    ) ;
+_, p_value1, _, slope1, intercept1 = mann_kendall(dfpp1.Year, dfpp1.Area_pc_sum)
+
+dfpp2 = dfpp|> 
+    (df -> subset(df, :Year => x -> x .>=1998)
+    ) ;
+_, p_value2, _, slope2, intercept2 = mann_kendall(dfpp2.Year, dfpp2.Area_pc_sum)
+
 
 # p = @df dfpp scatter(:Year, :Area_pc_sum, 
 #     legend = :top, lw = 1,
@@ -489,18 +519,20 @@ reject_null_hypothesis, p_value, Tau, slope, intercept = mann_kendall(dfpp.Year,
 #     label = "Hot and dry",
 #     xrotation = 45.0, xtickfontsize = 6,
 #     xlims = (1970-1,2022+1),xticks=(1970.5:5:(2022+1),string.(1970:5:2022)));
-f = Figure(size = (800,460));
+f = Figure(size = (800,500));
 ax = Axis(f[1,1])
 p = barplot!(ax,dfpp.Year, dfpp.Area_pc_sum, color = colours[1], label = "Hot and dry")
 ax.xlabel = "Year"
 ax.ylabel = "Percentage of annual days and land area"
 xlims!(1970-1,endyear+1)
 ax.xticks=(1970:5:(endyear),string.(1970:5:endyear))
-l = lines!(ax, dfpp.Year,  (slope .* dfpp.Year .+ intercept), color = :grey, label = "Theil-Sen estimator: $(round(slope; sigdigits = 2)) * Year + ($(round(intercept; sigdigits = 2))) \n Mann-Kendall test: p-value = $(round(p_value; sigdigits = 2))")
-Legend(f[2,1], ax, orientation = :horizontal, nbanks = 1, framevisible = false)
+l = lines!(ax, dfpp.Year,  (slope .* dfpp.Year .+ intercept), color = :grey, linestyle = :dash, label = "(1970-2023)\nTheil-Sen estimator : $(round(slope; sigdigits = 2)) * Year + ($(round(intercept; sigdigits = 2))) \n Mann-Kendall test: p-value = $(round(p_value; sigdigits = 2))")
+l1 = lines!(ax, dfpp1.Year,  (slope1 .* dfpp1.Year .+ intercept1), color = :grey70, label = "(1970-1997)\nTheil-Sen estimator : $(round(slope1; sigdigits = 2)) * Year + ($(round(intercept1; sigdigits = 2))) \n Mann-Kendall test: p-value = $(round(p_value1; sigdigits = 2))")
+l2 = lines!(ax, dfpp2.Year,  (slope2 .* dfpp2.Year .+ intercept2), color = :grey20, label = "(1998-2023)\nTheil-Sen estimator : $(round(slope2; sigdigits = 2)) * Year + ($(round(intercept2; sigdigits = 2))) \n Mann-Kendall test: p-value = $(round(p_value2; sigdigits = 2))")
+Legend(f[2,1], ax, orientation = :horizontal, nbanks = 2, framevisible = false)
 f
 save("$path2v/fig/landArea_by_hotndry_1970.png",f)
-
+@show (slope2 .* [1998,2023] .+ intercept2)
 
 # group by indicator
 dfp1 = df |>
@@ -872,3 +904,5 @@ print(subset(dfpc,:Area_pc_sum => x -> x.>1.2))
 # hline!(p,[q1],labels=false)
 
 # #savefig(p,"n_extremes.png")
+
+# area_dh/(area_h * area_d)
