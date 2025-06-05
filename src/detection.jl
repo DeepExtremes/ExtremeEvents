@@ -8,7 +8,7 @@ using Distributed
 # spatial filter
 using SphericalConvolutions
 
-export rescale, compute_extremes, qdoy, qref
+# export rescale, compute_extremes, qdoy, qref
 
 """
     rescale(inputcube::YAXArray, outputpath::String; <keyword arguments>))
@@ -149,13 +149,16 @@ end
     tres::Float64,
     outputpath::AbstractString;
     tresne::Union{Float64,Nothing} = nothing,
+    tempo::String = "Ti",
+    fun::Function = <,
     backend::Symbol = :zarr,
     overwrite::Bool = true,
     max_cache::Float64 = 1e9)
 
-Compute extreme events as Peaks-over-Threshold (POT). If values have been scaled between 0 and 1, threshold is the quantile *UNDER* which an event is considered an extreme. For example, to detect high temperature extremes, the input should be (- T) or (1 - T_scaled) or argument `multiplier` must be provided as a 1x(number of Variables). The inputs will be processed as [input_1 ... input_n] .* multiplier. Values should be {-1, 1}.
+Compute extreme events as Peaks-over-Threshold (POT). If values have been scaled between 0 and 1, threshold is the quantile *UNDER* which an event is considered an extreme. Indeed the default function `fun` is `<`. It can be adjusted as a keyword parameter.
+For example, to detect high temperature extremes, the input should be (- T) or (1 - T_scaled) or argument `multiplier` must be provided as a 1x(number of Variables). The inputs will be processed as [input_1 ... input_n] .* multiplier. Values should be {-1, 1}.
 
-`input` can be a datacube of type YAXArray or a tuple of YAXArray Datasets. In case of a tuple, each Dataset must have the same dimensions. Dimension Time is mandatory. The maximum number of input layers is 7.
+`input` can be a datacube of type YAXArray or a tuple of YAXArray Datasets. In case of a tuple, each Dataset must have the same dimensions. Dimension Time is mandatory. The name can be adjusted with `tempo`. The maximum number of input layers is 7.
 
 The output is a single layer cube with UInt8 values computed as bitwise OR (|) of layers encoded each on one bit.
 E.G. if `input` has 3 layers, extreme events in each layer will be encoded respectively as 1, 2 and 4. A combined extreme event of all 3 variables will have a value of 7.
@@ -166,21 +169,23 @@ function compute_extremes(
     input::Any,
     tres::Float64,
     outputpath::String;
+    tempo::Symbol = :Ti,
+    fun::Function = <,
     tresne::Union{Float64,Nothing} = nothing,
     backend::Symbol = :zarr,
     overwrite::Bool = true,
     max_cache::Float64 = 1e9
 )   
-    indims = ntuple(_->InDims("Time"),length(input))
+    indims = ntuple(_->InDims(tempo),length(input))
     #@show indims
-    outdims = OutDims("Time",
+    outdims = OutDims(Dim{tempo}(lookup(inputs[1], tempo)), # somehow ERROR: LoadError: Multiple possible axis matches found for YAXArrays.ByName("Ti")
         outtype = UInt8,
         chunksize = :input, 
         path = outputpath,
         overwrite=overwrite,
         backend=backend,
     )
-    mapCube(getextremes!, input; indims=indims, outdims=outdims, max_cache=max_cache, tres = tres, tresne = tresne)
+    mapCube(getextremes!, input; indims=indims, outdims=outdims, max_cache=max_cache, tres = tres, tresne = tresne, fun = fun)
 end
 # method for YAXArray
 """
@@ -286,7 +291,7 @@ function get_diamond_indices(window)
     diamondindices = findall(diamond)
 end
 
-function myfilter(img)
+function myfilter(img;Nh=(1, 1, 3), diamondindices = get_diamond_indices(1))
     # img has size = window
     # window = size(img)
     # @show window
@@ -298,26 +303,28 @@ function myfilter(img)
     # t = length(diamondindices); # 0.6 * length(diamondindices);
     # # @show t
     # central value
-    v = img[Nh[1],Nh[2],Nh[3]]
+    v = img[Nh...]
     # @show v
     # apply diamond spatially on central slice
-    s = sum(diamondindices) do ind
+    s = sum(skipmissing(diamondindices)) do ind
         view(img,:,:,Nh[3])[ind]
     end
     # @show s
     # time (3rd) dimension
-    timewindow = function()
-        d = false;
-        for i in 0:(Nh[3]-1)
-            ind = (Nh[3]-i):((Nh[3]*2)-i-1)
-            d = d || all(view(img,Nh[1],Nh[2],ind))
-            d ? break : d
-        end
-        return d
-    end
-    d = timewindow()
+    d = timewindow(img,Nh)
     # @show d
-    return v && d && s >= t
+    return v && d && s >= length(diamondindices)
+end
+
+
+timewindow = function(img, Nh)
+    d = false;
+    for i in 0:(Nh[3]-1)
+        ind = (Nh[3]-i):((Nh[3]*2)-i-1)
+        d = all(view(img,Nh[1],Nh[2],ind))
+        d ? break : d
+    end
+    return d
 end
 
 function mytimefilter(img)
@@ -338,16 +345,19 @@ function mytimefilter(img)
     return timewindow()
 end
 
-####### Towards anomalies
+####### Get quantiles
 
 """
     qdoy(c::YAXArray, outputpath::String; ref::NTuple{Int,Int} = (1971,2000), w::Int = 15, 
-    q::Vector = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975, 0.99], 
-    overwrite = true, backend = :zarr)
+    q::Vector = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.99], 
+    overwrite = true, backend = :zarr, 
+    chunksizes = Dict("longitude" => 60, "latitude" => 60, "doy" => 366, "quantiles" => 10))
 
-Function to compute quantiles q over reference period ref for each day of the year using moving window 2*w+1 centered on day of the year.
+Function to compute quantiles `q` over reference period `ref` for each day of the year using moving window `2*w+1` centered on day of the year.
     Quantiles for Feb 29 are computed centered on Mar 01 for non leap years.
-    Days from the end (beginning) of the time series are added for dates <= (>) w.
+    Days from the end (beginning) of the time series are added for dates <= (>) `w`.
+    Output is a YAXArray written to disc at `outputpath` with dimensions longitude, latitude, doy (day of the year), quantiles.
+    Chunk size can be adapted according to applications.
 
 """
 #
@@ -356,7 +366,7 @@ function qdoy(
     outputpath::String;
     ref::Tuple{Int,Int} = (1971,2000), 
     w::Int = 15, 
-    q::Vector = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975, 0.99],
+    q::Vector = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.99],
     overwrite = true,
     backend = :zarr,
     chunksizes = Dict("longitude" => 60, "latitude" => 60, "doy" => 366, "quantiles" => 10),
@@ -364,8 +374,6 @@ function qdoy(
 
     # assert that c has a time axis with years ref
     s = try
-        # c[time = Date(ref[1])..Date(ref[2]+1) - Day(1), latitude = At(Lytton[2], atol=0.25), longitude = At(Lytton[1], atol=0.25)]
-        # c[time = Date(ref[1])..Date(ref[2]+1) - Day(1), latitude = 45.0 .. 46.0, longitude = 15.0 .. 16.0]
         c[time = Date(ref[1])..Date(ref[2]+1) - Day(1)]
     catch
         @error "Input YAXArray c should have a time axis containing reference years $ref"
@@ -443,7 +451,7 @@ function qdoy(
 end
 
 # compute quantiles from indices
-function getquantiles!(xout, xin, indices, q)
+function getquantiles!(xout, xin, indices, q::Vector)
     
     quantiles = map(indices) do idxi
         Statistics.quantile(skipmissing(xin[idxi]), q)
@@ -456,15 +464,21 @@ end
 #
 
 """
-    qref(c::YAXArray, outputpath::String; ref::NTuple{Int,Int} = (1971,2000), 
-    q::Vector = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975, 0.99], 
-    overwrite = true, backend = :zarr)
+    qref(c::YAXArray, outputpath::String; 
+        ref::NTuple{Int,Int} = (1971,2000), 
+        q::Vector = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.99], 
+        rule::Function = identity,
+        overwrite = true, 
+        backend = :zarr
+    )
 
-Function to compute quantiles q over reference period ref.
-    Output has no time dimension.
+Function to compute quantiles `q` of data cube `c` over reference period `ref`. 
+    Missing values are skipped unless all are missing then `missing` is returned. NaN are considered missing.
+    Output has no time dimension. 
+    Function `rule` is applied to `c` values before computing quantiles. 
+    Input argument should be a `Vector`. Output should be of type `Vector{Number}` or `Vector{Union{Missing,Number}}`. 
 
 """
-#
 function qref(
     c::YAXArray,
     outputpath::String;
@@ -481,7 +495,7 @@ function qref(
         # c[time = Date(ref[1])..Date(ref[2]+1) - Day(1), latitude = 45.0 .. 46.0, longitude = 15.0 .. 17.0]
         c[time = Date(ref[1]) .. Date(ref[2]+1) - Day(1)]
     catch
-        @error "Input YAXArray c should have a time axis containing reference years $ref"
+        @error "Input YAXArray `c` should have a time axis containing reference years $ref"
     end
 
     # map quantile computation over each grid cell
@@ -505,14 +519,24 @@ function qref(
     end
 end
 
-function getquantiles!(xout, xin, q)
-    xout[:] = Statistics.quantile(skipmissing(xin), q)
+function getquantiles!(xout, xin, q::Vector)
+    # replace NaN by missing
+    xin1 = broadcast(i-> ismissing(i) || isnan(i) ? missing : i, xin)
+    if all(ismissing.(xin1))
+        xout .= missing
+    else
+        xout[:] = Statistics.quantile(skipmissing(xin1), q)
+    end
     return xout
 end
 
-function getquantiles!(xout, xin, q, rule)
-    xout[:] = Statistics.quantile(skipmissing(rule(xin)), q)
+function getquantiles!(xout, xin, q::Vector, rule::Function)
+    # replace NaN by missing
+    xin1 = broadcast(i-> ismissing(i) || isnan(i) ? missing : i, xin)
+    if all(ismissing.(xin1))
+        xout .= missing
+    else
+        xout[:] = Statistics.quantile(skipmissing(rule(xin1)), q)
+    end
     return xout
 end
-
-# end

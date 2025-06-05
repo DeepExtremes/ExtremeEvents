@@ -3,7 +3,10 @@ using SlurmClusterManager, Distributed
 
 #Quick check if we are in a slurm job
 if haskey(ENV,"SLURM_CPUS_PER_TASK")
-    addprocs(SlurmManager())
+    for iproc in 1:parse(Int,ENV["SLURM_NTASKS"])
+        addprocs(1)
+        sleep(0.001)
+    end
 end
 
 @everywhere begin
@@ -21,12 +24,12 @@ sm = smoothed ? "smoothed_" : "ranked_"
 start_year = "" #"_2016"#
 
 @everywhere begin
-    using YAXArrays, EarthDataLab
+    using YAXArrays
     include("../src/detection.jl")
 end
 
-inpath_t = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/tmax_ranked.zarr"#tmax_smoothed_40"*start_year*".zarr"
-inpath_pei = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/pei_ranks.zarr"#"/Net/Groups/BGI/scratch/fgans/DeepExtremes/smoothed_pei_ranks.zarr"
+inpath_t = "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/tmax_ranked.zarr"#tmax_smoothed_40"*start_year*".zarr"
+inpath_pei = "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/pei_ranks.zarr"#"/Net/Groups/BGI/scratch/fgans/DeepExtremes/smoothed_pei_ranks.zarr"
 r_t = open_dataset(inpath_t)
 # r_t = r_t[Time = (2016,2022)]
 # r_t_old = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/tmax_smoothed.zarr")
@@ -42,7 +45,7 @@ inputs = (r_t.layer,
     r_pei.pei_90,
     r_pei.pei_180,)
 
-outpath = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/EventCube_" * sm * "pot" * string(pot) * "_ne" * string(ne) * start_year *".zarr"
+outpath = "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/EventCube_" * sm * "pot" * string(pot) * "_ne" * string(ne) * start_year *".zarr"
 tmp = compute_extremes(inputs, pot, outpath; tresne = ne);
 
 print("done.")

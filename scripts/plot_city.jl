@@ -11,16 +11,17 @@ import CSV
 using CairoMakie, GeoMakie
 
 if occursin("/Users", pwd())
-    path = "/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/v3"
+    pathpet = "/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/v3"
 else
-    path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
+    pathpet = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
+    path="/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/"
 end
 
 trial = "ranked_pot0.01_ne0.1"
 etrial = "$(trial)_cmp_S1_T3"
-startyears = 1970:10:2010 
-intervals = map( y -> (y, y+12), startyears)
-landonly = "landonly"
+# startyears = 1970:10:2010 
+# intervals = map( y -> (y, y+12), startyears)
+# landonly = "landonly"
 
 mutable struct City
     name::String
@@ -31,7 +32,7 @@ mutable struct City
 end
 
 # load also ERA5 and PEICube
-zg = zopen("$(path)ERA5Cube.zarr",consolidated=true, fill_as_missing = false)
+zg = zopen(joinpath(path,"ERA5Cube.zarr"),consolidated=true, fill_as_missing = false)
 era = open_dataset(zg)
 # For whatever reason, the time axis of pet is 
 # ↗ Time      Sampled{Int64} 1:26663 ForwardOrdered Regular Points
@@ -39,12 +40,15 @@ era = open_dataset(zg)
 # ↗ Ti        Sampled{DateTime} [1950-01-01T00:00:00, …, 2022-12-31T00:00:00] ForwardOrdered Irregular Points
 # solved manually by editing .zmetadata
 tmax = era.t2mmax
-rt = Cube("$(path)tmax_ranked.zarr")
+rt = Cube(joinpath(path,"tmax_ranked.zarr"))
 
-peis = open_dataset(zopen("$(path)PEICube.zarr",consolidated=true, fill_as_missing = false))
-rp = open_dataset(zopen("$(path)pei_ranks.zarr",consolidated=true, fill_as_missing = false))
+erao = open_dataset(joinpath(pathpet,"ERA5Cube.zarr"))
+pet=erao.pet
 
-eec = open_dataset(zopen("$(path)EventCube_$(trial).zarr",consolidated=true, fill_as_missing = false))
+peis = open_dataset(zopen(joinpath(path, "PEICube.zarr"),consolidated=true, fill_as_missing = false))
+rp = open_dataset(zopen(joinpath(path, "pei_ranks.zarr"),consolidated=true, fill_as_missing = false))
+
+eec = open_dataset(zopen(joinpath(path, "EventCube_$(trial).zarr"),consolidated=true, fill_as_missing = false))
 
 import Statistics
 function plot_city(city::City)
@@ -57,7 +61,7 @@ function plot_city(city::City)
     qpe180N = Statistics.quantile(skipmissing(peis.pei_180[lon = At(city.lon, atol=0.25), lat = At(city.lat, atol=0.25)][:]), [0.01, 0.1])
 
     stp = era.tp[time = city.period, latitude = At(city.lat, atol=0.25), longitude = At(city.lon, atol=0.25)]
-    spet = era.pet[time = city.period, latitude = At(city.lat, atol=0.25), longitude = At(city.lon, atol=0.25)]
+    spet = pet[time = city.period, latitude = At(city.lat, atol=0.25), longitude = At(city.lon, atol=0.25)]
     stmx = tmax[time = city.period, latitude = At(city.lat, atol=0.25), longitude = At(city.lon, atol=0.25)]
     spei = peis[time = city.period, latitude = At(city.lat, atol=0.25), longitude = At(city.lon, atol=0.25)]
     
@@ -283,8 +287,20 @@ f = plot_city(City("Beauraing_18", "Beauraing, Belgium", 4.9554, 50.1102, Date("
 
 Niameylon = 2.1254; Niameylat = 13.5116
 f = plot_city(City("Niamey_81_85", "Niamey, Niger", Niameylon, Niameylat, Date(1981) .. Date(1985,12,31)))
-f = plot_city(City("Niamey_83", "Niamey, Niger", Niameylon, Niameylat, Date(1983) .. Date(1983,12,31)))
+f = plot_city(City("Niamey_83", "Niamey, Niger", Niameylon, Niameylat, Date(1983,3,1) .. Date(1983,8,31)))
 
 Jenalat = 50.92; Jenalon = 11.59
-f = plot_city(City("Jena", "Jena, Germany", Jenalon, Jenalat, Date(2018) .. Date(2022,12,31)))
-f = plot_city(City("Jena_20", "Jena, Germany", Jenalon, Jenalat, Date(2020) .. Date(2020,12,31)))
+f = plot_city(City("Jena", "Jena, Germany", Jenalon, Jenalat, Date(2018) .. Date(2023,12,31)))
+f = plot_city(City("Jena_18", "Jena, Germany", Jenalon, Jenalat, Date(2018,5,1) .. Date(2018,10,31)))
+f = plot_city(City("Jena_19", "Jena, Germany", Jenalon, Jenalat, Date(2019,5,1) .. Date(2019,10,31)))
+f = plot_city(City("Jena_20", "Jena, Germany", Jenalon, Jenalat, Date(2020,5,1) .. Date(2020,10,31)))
+f = plot_city(City("Jena_22", "Jena, Germany", Jenalon, Jenalat, Date(2022,5,1) .. Date(2022,10,31)))
+
+Salmaitlat = 8.896620077205956; Salmaitlon =  48.53069202362685
+f = plot_city(City("Salmait", "Salmait, Somalia (8°54'N 48°30'E)", Salmaitlon, Salmaitlat, Date(2015) .. Date(2023, 12, 31)))
+f = plot_city(City("Salmait_2022", "Salmait, Somalia", Salmaitlon, Salmaitlat, Date(2022) .. Date(2022, 12, 31)))
+f = plot_city(City("Salmait_2021", "Salmait, Somalia", Salmaitlon, Salmaitlat, Date(2021) .. Date(2021, 12, 31)))
+f = plot_city(City("Salmait_2020", "Salmait, Somalia", Salmaitlon, Salmaitlat, Date(2020) .. Date(2020, 12, 31)))
+f = plot_city(City("Salmait_2019", "Salmait, Somalia", Salmaitlon, Salmaitlat, Date(2019) .. Date(2019, 12, 31)))
+f = plot_city(City("Salmait_2018", "Salmait, Somalia", Salmaitlon, Salmaitlat, Date(2018) .. Date(2018, 12, 31)))
+f = plot_city(City("Salmait_2017", "Salmait, Somalia", Salmaitlon, Salmaitlat, Date(2017) .. Date(2017, 12, 31)))

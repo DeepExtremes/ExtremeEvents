@@ -4,15 +4,20 @@ using ImageMorphology: DisjointMinSets
 using CSV
 
 
-select_decade(layer,decade) = if decade == 2010
-    layer[time=Date(2010,1,1)..Date(2022,12,31)]
+select_decade(labels,decade) = if decade == 2014
+    labels[time=Date(2014,1,1)..Date(2023,12,31)]
 else 
-    layer[time=Date(decade,1,1)..Date(decade+9,12,31)]
+    labels[time=Date(decade,1,1)..Date(decade+15,12,31)]
 end
 function open_decade(decade)
-    filename = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_$(decade)_$(decade+12).zarr"
+    # filename = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_$(decade)_$(decade+12).zarr"
+    if decade == 2014
+        filename = "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_2014_2023.zarr"
+    else
+        filename = "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_$(decade)_$(decade+15).zarr"
+    end
     arr = open_dataset(filename)
-    select_decade(arr.layer,decade)
+    select_decade(arr.labels,decade)
 end
 
 """
@@ -81,7 +86,7 @@ function compute_nlabels(decades,allars)
 end
 
 function create_outdataset(outpath,allars)
-    newtimes = YAXArrays.DD.Ti(Date(1950,1,1):Day(1):Date(2022,12,31))
+    newtimes = YAXArrays.DD.Ti(Date(1950,1,1):Day(1):Date(2023,12,31))
     outar = ConcatDiskArray(reshape(allars,1,1,length(allars)))
     mergedyax = YAXArray((allyax[1].longitude, allyax[1].latitude,newtimes),outar)
     mergedyax = setchunks(mergedyax,(120,120,90))
@@ -89,8 +94,8 @@ function create_outdataset(outpath,allars)
 end
 
 
-decades = 1950:10:2010
-outpath = "./mergedlabels.zarr"
+decades = 1950:16:2020 #1950:10:2010
+outpath = "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/mergedlabels_ranked_pot0.01_ne0.1_cmp_S1_T3_1950_2023.zarr"
 
 allyax = open_decade.(decades)
 allars = map(i->i.data,allyax)

@@ -17,19 +17,21 @@ include("../src/stats.jl")
 if occursin("/Users", pwd())
     path = "/Users/mweynants/BGI/DeepExtremes/DeepExtremesOutput/"
 else
-    path = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
+    path = "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/"
+    patho = "/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/"
 end
 
-trial = "ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022"
+trial = "ranked_pot0.01_ne0.1_cmp_S1_T3"
 landonly = "_landonly"
 # events = CSV.read(path * "EventStats_" * trial * landonly * ".csv", DataFrame);
-ev = CSV.read(path*"MergedEventStats"*landonly*".csv", DataFrame)
+ev = CSV.read(joinpath(path,"MergedEventStats"*landonly*"_int.csv"), DataFrame)
 # look for intersection between spatial and temporal range of events from the table or directly in the labelcube
 # labelpath = path * "labelcube_$trial.zarr"
-labelpath = "/Net/Groups/BGI/work_1/scratch/fgans/DeepExtremes/MergeLabelCubes/mergedlabels.zarr"
+# labelpath = "/Net/Groups/BGI/work_1/scratch/fgans/DeepExtremes/MergeLabelCubes/mergedlabels.zarr"
+labelpath = joinpath(path, "mergedlabels_ranked_pot0.01_ne0.1_cmp_S1_T3_1950_2023.zarr")
 labels = Cube(labelpath) # labels = open_dataset(labelpath )# 
 # labels_all = open_dataset(path * "labelcube_ranked_pot0.01_ne0.1_cmp_2016_2021.zarr")
-eventcube = Cube(path * "EventCube_ranked_pot0.01_ne0.1.zarr")
+eventcube = Cube(joinpath(path, "EventCube_ranked_pot0.01_ne0.1.zarr"))
 lsm = Cube("/Net/Groups/data_BGC/era5/e1/0d25_static/lsm.1440.721.static.nc")[
     time = At(DateTime("2019-01-01T13:00:00")),
     # region = region,
@@ -53,7 +55,7 @@ function myhexbin(ev::DataFrame)
     ax1 =  Axis(f[1,1],
         xlabel = "log10 (Area)",
         ylabel = "duration (days)",)
-    hb = hexbin!(ax1, log10.(ev.area), ev.d, cellsize = (0.1, 1.2),
+    hb = hexbin!(ax1, log10.(ev.area), ev.d, cellsize = (0.1, 3),
         colorscale=log10)
     Colorbar(f[2,1], hb,
         label = "Number of labelled events",
@@ -75,22 +77,25 @@ function myhexbin(ev::DataFrame)
     )
     return f, ax1, ax2
 end
-f = myhexbin(ev)
-save(path * "fig/events_stats_$trial$(landonly)_1950.png", f,)
+# f,ax1,ax2  = myhexbin(ev)
+# save(path * "fig/events_stats_$trial$(landonly)_1950.png", f,)
 
 # filter from 1970
 fev = ev |>
     (df -> transform(df, :duration => (x -> parse.(Int, replace.(x, r" day(s)?" => ""))) => :d)) |>
     (df -> filter([:start_time, :d] => (t, d) -> t .>= DateTime(1970,1,1) .&& d .> 2, df))
 f1,ax1,ax2 = myhexbin(fev)
-
+f1
 # extract stats
 print(quantile(fev.d, [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]))
-# [4.0, 4.0, 4.0, 4.0, 4.0, 5.0, 7.0, 9.0, 15.0]
+# v3: [4.0, 4.0, 4.0, 4.0, 4.0, 5.0, 7.0, 9.0, 15.0]
+# v4: [3.0, 3.0, 3.0, 3.0, 3.0, 4.0, 6.0, 8.0, 14.0]
 print(quantile(fev.area, [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]))
-# [0.22920039296150208, 0.4146932363510132, 0.5628049373626709, 0.8429072499275208, 0.9996573328971863, 2.985333263874054, 10.421100580692293, 24.471434984888276, 115.2952259035902]
+# v3: [0.22920039296150208, 0.4146932363510132, 0.5628049373626709, 0.8429072499275208, 0.9996573328971863, 2.985333263874054, 10.421100580692293, 24.471434984888276, 115.2952259035902]
+# v4: [0.2630312144756317, 0.45399048924446106, 0.6427876353263855, 0.8910065293312073, 0.9998477101325989, 2.9993931353092194, 10.34265430803809, 23.99999459274113, 113.00500658273575]
 print(quantile(fev.volume, [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]))
-# [0.9846131801605225, 1.7510369420051575, 2.4072601795196533, 3.587491035461426, 5.430251181125641, 15.98317289352417, 63.19659821987154, 164.24727816581685, 1082.8372119736412]
+# v3= [0.9846131801605225, 1.7510369420051575, 2.4072601795196533, 3.587491035461426, 5.430251181125641, 15.98317289352417, 63.19659821987154, 164.24727816581685, 1082.8372119736412]
+# v4= [0.8394870758056641, 1.4429663121700287, 2.0364022850990295, 2.805405557155609, 4.214771926403046, 12.363035768270493, 49.12029731869687, 133.30685550868512, 1016.9756002741416]
 
 # volume quantiles by year
 gdf = fev |>
@@ -101,17 +106,35 @@ gdf = fev |>
         DataFrame(yr = sdf.yr[1], q01 = q01, q05 = q05, q10 = q10, q25 = q25, q50 = q50, q75 = q75, q90 = q90, q95 = q95, q99 = q99)
     end)
 
-# Quantile Regression
-qrres = Dict()
-for q in [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]
-    qrres["q$(@sprintf("%0.2f",q))"] = 
-        qreg(@formula(log10(volume)~yr), fev |> 
-            (df -> transform(df, :start_time => (x -> year.(x)) => :yr)),
-            q, IP())
-end
-DataPlot = reduce(vcat, [[coeftable(qrres["q$(@sprintf("%0.2f",q))"]).cols[2][2] coeftable(qrres["q$(@sprintf("%0.2f",q))"]).cols[2][1]] for q in [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]])
+# # Quantile Regression
+# qrres = Dict()
+# qvals = [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]
+# for q in qvals
+#     qrres["q$(@sprintf("%0.2f",q))"] = 
+#         qreg(@formula(log10(volume)~yr), fev |> 
+#             (df -> transform(df, :start_time => (x -> year.(x)) => :yr)),
+#             q, IP())
+# end
+# DataPlot = reduce(vcat, [[coeftable(qrres["q$(@sprintf("%0.2f",q))"]).cols[2][2] coeftable(qrres["q$(@sprintf("%0.2f",q))"]).cols[2][1] coeftable(qrres["q$(@sprintf("%0.2f",q))"]).cols[3][2]] for q in [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]])
 
-# Bands
+# f2,ax,l = lines(qvals, DataPlot[:,1])
+# lines!(qvals, DataPlot[:,1] .- 1.96 .* DataPlot[:,3], linestyle = :dash)
+# lines!(qvals, DataPlot[:,1] .+ 1.96 .* DataPlot[:,3], linestyle = :dash)
+# f2
+
+# DataPlot
+# 9×3 Matrix{Float64}:
+#  0.00227783   -4.64682   0.000353279
+#  0.00246095   -4.77044   0.000208044
+#  0.00252367   -4.7555    0.000135703
+#  0.000691515  -0.93992   4.30235e-5
+#  0.00059828   -0.574038  0.000207175
+#  0.000647113  -0.203651  0.000318798
+#  0.000323353   1.04264   0.000560838
+#  0.000672841   0.775262  0.00069914
+#  0.00422328   -5.47117   0.00156554
+
+# # Bands
 # band!(ax2,  gdf.yr, DataPlot[1,1] .* gdf.yr .+ DataPlot[1,2], DataPlot[7,1] .* gdf.yr .+ DataPlot[7,2], color = (:grey85, 0.3), label = "[p1, p99]")
 # band!(ax2,  gdf.yr, DataPlot[2,1] .* gdf.yr .+ DataPlot[2,2], DataPlot[6,1] .* gdf.yr .+ DataPlot[6,2], color = (:grey90, 0.3), label = "[p5, p95]")
 # band!(ax2,  gdf.yr, DataPlot[3,1] .* gdf.yr .+ DataPlot[3,2], DataPlot[5,1] .* gdf.yr .+ DataPlot[5,2], color = (:grey95, 0.3), label = "[p25, p75]")
@@ -151,13 +174,13 @@ text!(ax1, log10.(levd.area), levd.d, text = " <-- " .* string.(levd.label),
     align = (:left, :center), 
     fontsize = 8, 
     color = colorant"#414487ff",
-    rotation = π/6,
+    rotation = π/7,
     label = "longest events")
 # Legend(f1[3,1], ax2, orientation = :horizontal)
-# plot point to increase limits
-scatter!(ax1, 3.6,63, color = :white)
+# plot point to increase limits (v3: (3.6,63))
+scatter!(ax1, 3.6,125, color = :white)
 f1
-save(path * "fig/events_stats_$trial$(landonly)_1970.png", f1,)
+save(joinpath(path, "fig/events_stats_$trial$(landonly)_1970.png"), f1,)
 
 # export table
 # largest volume
@@ -168,20 +191,23 @@ df.start_date = Date.(df.start_time);
 df.end_date = Date.(df.end_time);
 show(stdout, MIME("text/latex"), select(df, [:label, :start_date, :end_date, :longitude_min,  :longitude_max,  :latitude_min,  :latitude_max, :duration, :area, :volume]))
 largest = df.label'
-# largest = [42561  51252  24092  55983  55755  25632  18958  44770  36790  53015]
+# largest_v3 = [42561  51252  24092  55983  55755  25632  18958  44770  36790  53015]
+# largest_v4 = [83007  104409  143161  116830  121895  109346  105411  89565  139883  127204]
 
 # longest duration
-df = fev |>
+dfl = fev |>
            (df -> sort(df, :d, rev = true)) |>
            (df -> first(df,10));
-df.start_date = Date.(df.start_time);
-df.end_date = Date.(df.end_time);
-show(stdout, MIME("text/latex"), select(df, [:label, :start_date, :end_date, :longitude_min,  :longitude_max,  :latitude_min,  :latitude_max, :duration, :area, :volume]))
-longest = df.label'
-# longest = [31767  31866  49981  44843  18998  24109  42561  28223  50340  54071]
+dfl.start_date = Date.(df.start_time);
+dfl.end_date = Date.(df.end_time);
+show(stdout, MIME("text/latex"), select(dfl, [:label, :start_date, :end_date, :longitude_min,  :longitude_max,  :latitude_min,  :latitude_max, :duration, :area, :volume]))
+longest = dfl.label'
+# longest_v3 = [31767  31866  49981  44843  18998  24109  42561  28223  50340  54071]
+# longest_v4 = [30070  50443  50825  51134  105411  139883  143103  50197  51283  100731]
 
 # plot largest events
-# llabels = open_dataset("/Net/Groups/BGI/scratch/mweynants/DeepExtremes/v3/largest_longest_idx_labels.zarr")
+landonly="";
+llabels = open_dataset(joinpath(path,"largest_longest_idx_labels$(landonly).zarr"))
 lla = convert(Array{Float64},llabels.largest);
 replace!(lla, 0 => NaN);
 lon = lookup(llabels.largest, :longitude);
@@ -205,20 +231,20 @@ cl=lines!(gax,
 translate!(cl, 0, 0, 1000)
 
 cbar = Colorbar(fig[2,1], h, 
-    label = "Largest dry and hot events (1970 - 2022)",
+    label = "Largest dry and hot events (1970 - 2023)",
     vertical = false,)
 nlb = length(largest)
 cbar.limits = (1,nlb)
-cbar.ticks = ((1+(nlb-1)/nlb/2):((nlb-1)/nlb):(nlb), [string(largest[1,i]) for i in 1:10])
+startyear = year.(df.start_date)'
+cbar.ticks = ((1+(nlb-1)/nlb/2):((nlb-1)/nlb):(nlb), [string(largest[1,i]) * "\n($(startyear[i]))" for i in 1:10])
             
-
 # remove gridlines
 gax.xgridcolor[] = colorant"transparent";
 gax.ygridcolor[] = colorant"transparent";
 gax.xticklabelsvisible = false;
 gax.yticklabelsvisible = false;
 fig
-save(path * "fig/largest_$trial$(landonly)_1970.png", fig, size = (800, 494))
+save(joinpath(path, "fig/largest_$trial$(landonly)_1970.png"), fig, size = (800, 494))
 
 # plot longest events
 llo = convert(Array{Float64},llabels.longest);
@@ -242,11 +268,12 @@ cl=lines!(gax,
 translate!(cl, 0, 0, 1000)
 
 cbar = Colorbar(fig[2,1], h, 
-    label = "Longest dry and hot events (1970 - 2022)",
+    label = "Longest dry and hot events (1970 - 2023)",
     vertical = false,)
 nlb = length(longest)
 cbar.limits = (1,nlb)
-cbar.ticks = ((1+(nlb-1)/nlb/2):((nlb-1)/nlb):(nlb), [string(longest[1,i]) for i in 1:10])
+startyear = year.(dfl.start_date)'
+cbar.ticks = ((1+(nlb-1)/nlb/2):((nlb-1)/nlb):(nlb), [string(longest[1,i])* "\n($(startyear[i]))" for i in 1:10])
 
 # remove gridlines
 gax.xgridcolor[] = colorant"transparent";
@@ -256,6 +283,33 @@ gax.yticklabelsvisible = false;
 fig
 save(path * "fig/longest_$trial$(landonly)_1970.png", fig, size = (800, 494))
 
+# duration: do events get longer? (or just wider?)
+qrdres = Dict()
+qvals = [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]
+for q in qvals
+    qrdres["q$(@sprintf("%0.2f",q))"] = 
+        qreg(@formula(Float64(d)~yr), fev |> 
+            (df -> transform(df, :start_time => (x -> year.(x)) => :yr)),
+            q, IP())
+end
+dDataPlot = reduce(vcat, [[coeftable(qrdres["q$(@sprintf("%0.2f",q))"]).cols[2][2] coeftable(qrdres["q$(@sprintf("%0.2f",q))"]).cols[2][1] coeftable(qrdres["q$(@sprintf("%0.2f",q))"]).cols[3][2]] for q in [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]])
+
+f2,ax,l = lines(qvals, dDataPlot[:,1])
+lines!(qvals, dDataPlot[:,1] .- 1.96 .* dDataPlot[:,3], linestyle = :dash)
+lines!(qvals, dDataPlot[:,1] .+ 1.96 .* dDataPlot[:,3], linestyle = :dash)
+f2
+
+# dDataPlot
+# 9×3 Matrix{Float64}:
+#  -1.40695e-17   0.477121  5.70066e-6
+#   1.33747e-17   0.477121  4.25287e-6
+#   1.10546e-16   0.477121  3.86792e-6
+#   1.07681e-18   0.477121  3.56839e-6
+#   6.38918e-16   0.477121  3.39738e-6
+#  -1.66885e-15   0.60206   7.21878e-6
+#   4.42118e-17   0.778151  2.12519e-5
+#   0.00134865   -1.81444   0.000123102
+#   0.00180128   -2.41702   0.000511767
 
 # # test hm
 # f,ax = hm(lsm.data[:,:], lsm.axes);
@@ -293,3 +347,11 @@ save(path * "fig/longest_$trial$(landonly)_1970.png", fig, size = (800, 494))
 # # reg_lat = EarthDataLab.known_regions[region][2] .. EarthDataLab.known_regions[region][4]
 
 # # DimensionalData.dim2key(subevents.layer.axes)
+
+# events with lots of dought_180
+ev |> 
+    (df -> filter(:drought180 => x -> x .> 90, df, )) |>
+    (df -> select(df, [:label, :start_time, :drought30, :drought90, :drought180])) |>
+    (df -> subset(df, :start_time => x -> x .>=Date(1970)))
+
+ev |> (df -> filter(:label => x -> x.== 136845, df))
