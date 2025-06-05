@@ -1,13 +1,5 @@
-## TO DO for Dheed v4
-- [x] Rechunk_data -> new ERA5Cube with correct offset and scaling + consolidate : "/Net/Groups/BGI/work_2/scratch/mweynants/Dheed_v4/ERA5Cube.zarr" (:attention: pet still in old cube)
-- [x] compute and rechunk PET -> not necessary, no error here
-- [x] compute PEI
-- [x] detect extremes
-- [ ] label events
-- [ ] redo all analyses from there
-
-# Workflow for building and analysing Dheed v3
-Dheed v3 is an ERA5 based global database dry and hot extreme events from 1950 to 2022, developed in the context of ESA funded project [DeepExtremes](https://eo4society.esa.int/projects/deep-extremes/).
+# Workflow for building and analysing Dheed
+Dheed v4 is an ERA5 based global database dry and hot extreme events from 1950 to 2022, developed in the context of ESA funded project [DeepExtremes](https://eo4society.esa.int/projects/deep-extremes/).
 The workflow runs in Julia 1.10.0, except for the consolidation of the data cubes, which is run in python. 
 Most steps of the workflow were run on the [MPI BGC-jena](https://bgc-jena.mpg.de) cluster. The input data are hourly ERA5 data retrieved from the [Copernicus Climate Data Store](https://cds.climate.copernicus.eu/) and stored on a local server as netcdf files. Some derived variables were calculated prior to the processing presented here.
 
@@ -125,23 +117,23 @@ sbatch stats_extremes_merged.slurm
 
 ## Figures and Postprocessing
 
+Figures from the manuscript
+
 ### fig01_workflow.png
 
 Flowchart designed in ppt. 
 
-### fig02_workflow-plot-33.png
+### fig02_plot_ranked_pot0.01_ne0.1_Event_33_first.png
 
 Example of dry and hot extreme event detection workflow over the 2003 summer heatwave in Europe.
 
 See `scripts/fig4dheed.jl`
 
-### fig03: timeseries
+### fig03_City_Lytton.png
 
-Timeseries of indicators for 2 contrasted locations: Jena (timeseries_11.59_50.92_2012_2023.png) and Niamey (timeseries_2.1254_13.5116_2012_2023.png).
+Extract timeseries at single locations with `plot_city.jl`
 
-See `scripts/plot_t2mmax.jl`
-
-### fig04 - fig06: Trends -- Annual global/continental summary
+### fig04 - fig07: Trends -- Annual global/continental summary
 
 Trends in annual global/continental indicators.
 
@@ -158,23 +150,31 @@ Plot the results of the EventCube analysis.
 ```
 julia --project="ExtremeEvents.toml" plot_EventType.jl
 ```
+### fig08: trendmap_dh_decadal_1966_2023_geo.png
 
-### fig07: events_stats_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022_landonly_1970.png
+Plot global spatial overview of trends of dry and hot extremes occurrences with `scripts/plot_trendmap.jl`. Plotting trend map based on indivdual grid cells and all years doesn't bring up significant trends, see `plot_trendmap.jl`. Decadal trend instead. Or, compare average number of extreme dry and hot days from two periods: 1970-1999 with 2000-2023 (`plot_comparemap.jl`).
+
+### fig09: events_stats_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022_landonly_1970.png
 
 Extract largest and longest events from `MergedEventStats_landonly` with `largest_labels.jl` and plot statistics with `plot_stats.jl`.
 
-### fig08: largest_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022_landonly_1970.png
+### fig10: largest_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022_landonly_1970.png
 
 A map of the spatial footprint of the largest events is generated with `plot_stats.jl`.
 
-### fig09: Validation
+### fig11: plot_ranked_pot0.01_ne0.1_cmp_S1_T3_validation.png
 
 Compare MergedEventStats_landonly with table of reported events compiled *a priori* with `SanityCheck.jl`. 
 
-### fig10: Lytton.png
+### figA1_City_Jena.png, figA2_City_Niamey_81_85.png
 
-Extract timeseries at single locations with `plot_city.jl`
+Other locations with `plot_city.jl`.
 
-### add figure with grid cell trends
+## Release note for Dheed v4
+For v4, `Rechunk_data.jl` was modified so that a new `ERA5Cube.zarr` with correct offset and scaling was produced.  `pet.zarr` was correct in v3. All processing and postprocessing scripts have been modified to use the corrected data. New figures have been added.
 
-Plotting trend map based on indivdual grid cells and all years doesn't bring up significant trends, see `plot_trendmap.jl`. Decadal trend instead. Or, compare average number of extreme dry and hot days from two periods: 1970-1999 with 2000-2023 (`plot_comparemap.jl`).
+## Funding
+
+The DeepExtreme project was funded by the European Space Agency in the AI4Science initiative.
+
+The XAIDA project was funded by the Horizon Europe Framework Programme of the European Commission. 
