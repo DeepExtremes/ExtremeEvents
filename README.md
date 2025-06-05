@@ -1,5 +1,5 @@
 # Workflow for building and analysing Dheed
-Dheed v4 is an ERA5 based global database dry and hot extreme events from 1950 to 2022, developed in the context of ESA funded project [DeepExtremes](https://eo4society.esa.int/projects/deep-extremes/).
+Dheed v4 is an ERA5 based global database dry and hot extreme events from 1950 to 2023, developed in the context of ESA funded project [DeepExtremes](https://eo4society.esa.int/projects/deep-extremes/).
 The workflow runs in Julia 1.10.0, except for the consolidation of the data cubes, which is run in python. 
 Most steps of the workflow were run on the [MPI BGC-jena](https://bgc-jena.mpg.de) cluster. The input data are hourly ERA5 data retrieved from the [Copernicus Climate Data Store](https://cds.climate.copernicus.eu/) and stored on a local server as netcdf files. Some derived variables were calculated prior to the processing presented here.
 
