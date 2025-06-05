@@ -55,7 +55,7 @@ function myhexbin(ev::DataFrame)
     ax1 =  Axis(f[1,1],
         xlabel = "log10 (Area)",
         ylabel = "duration (days)",)
-    hb = hexbin!(ax1, log10.(ev.area), ev.d, cellsize = (0.1, 1.2),
+    hb = hexbin!(ax1, log10.(ev.area), ev.d, cellsize = (0.1, 3),
         colorscale=log10)
     Colorbar(f[2,1], hb,
         label = "Number of labelled events",
@@ -85,7 +85,7 @@ fev = ev |>
     (df -> transform(df, :duration => (x -> parse.(Int, replace.(x, r" day(s)?" => ""))) => :d)) |>
     (df -> filter([:start_time, :d] => (t, d) -> t .>= DateTime(1970,1,1) .&& d .> 2, df))
 f1,ax1,ax2 = myhexbin(fev)
-
+f1
 # extract stats
 print(quantile(fev.d, [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]))
 # v3: [4.0, 4.0, 4.0, 4.0, 4.0, 5.0, 7.0, 9.0, 15.0]
@@ -106,21 +106,21 @@ gdf = fev |>
         DataFrame(yr = sdf.yr[1], q01 = q01, q05 = q05, q10 = q10, q25 = q25, q50 = q50, q75 = q75, q90 = q90, q95 = q95, q99 = q99)
     end)
 
-# Quantile Regression
-qrres = Dict()
-qvals = [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]
-for q in qvals
-    qrres["q$(@sprintf("%0.2f",q))"] = 
-        qreg(@formula(log10(volume)~yr), fev |> 
-            (df -> transform(df, :start_time => (x -> year.(x)) => :yr)),
-            q, IP())
-end
-DataPlot = reduce(vcat, [[coeftable(qrres["q$(@sprintf("%0.2f",q))"]).cols[2][2] coeftable(qrres["q$(@sprintf("%0.2f",q))"]).cols[2][1] coeftable(qrres["q$(@sprintf("%0.2f",q))"]).cols[3][2]] for q in [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]])
+# # Quantile Regression
+# qrres = Dict()
+# qvals = [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]
+# for q in qvals
+#     qrres["q$(@sprintf("%0.2f",q))"] = 
+#         qreg(@formula(log10(volume)~yr), fev |> 
+#             (df -> transform(df, :start_time => (x -> year.(x)) => :yr)),
+#             q, IP())
+# end
+# DataPlot = reduce(vcat, [[coeftable(qrres["q$(@sprintf("%0.2f",q))"]).cols[2][2] coeftable(qrres["q$(@sprintf("%0.2f",q))"]).cols[2][1] coeftable(qrres["q$(@sprintf("%0.2f",q))"]).cols[3][2]] for q in [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]])
 
-f2,ax,l = lines(qvals, DataPlot[:,1])
-lines!(qvals, DataPlot[:,1] .- 1.96 .* DataPlot[:,3], linestyle = :dash)
-lines!(qvals, DataPlot[:,1] .+ 1.96 .* DataPlot[:,3], linestyle = :dash)
-f2
+# f2,ax,l = lines(qvals, DataPlot[:,1])
+# lines!(qvals, DataPlot[:,1] .- 1.96 .* DataPlot[:,3], linestyle = :dash)
+# lines!(qvals, DataPlot[:,1] .+ 1.96 .* DataPlot[:,3], linestyle = :dash)
+# f2
 
 # DataPlot
 # 9×3 Matrix{Float64}:
