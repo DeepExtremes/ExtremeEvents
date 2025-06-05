@@ -471,10 +471,10 @@ dfpp = dfp|>
     ) ;
 # data check
 dfpp |>
-    (df -> combine(df, :Area_pc_sum => mean))
+    (df -> combine(df, :Area_pc_sum => median))
 dfpp |>
     (df -> filter(:Year => x -> x .> 2000, df)) |>
-    (df -> combine(df, :Area_pc_sum => mean))
+    (df -> combine(df, :Area_pc_sum => median))
 
 # Theil-Sen
 include("../src/stats.jl")
@@ -770,52 +770,55 @@ dfpc = df |>
 # data check
 d0 = dfpc |> 
     (df -> groupby(df, :Continent)) |> 
-    (df -> combine(df, :Area_pc_sum => mean)) |>
-    (df -> rename(df, :Area_pc_sum_mean => :Years_1970_2023))
+    (df -> combine(df, :Area_pc_sum => median)) |>
+    (df -> rename(df, :Area_pc_sum_median => :Years_1970_2023))
 d1 = dfpc |> 
-    (df -> filter(:Year => x -> x .< 2000, df)) |>
+    (df -> filter(:Year => x -> x .<= 1997, df)) |>
     (df -> groupby(df, :Continent)) |> 
-    (df -> combine(df, :Area_pc_sum => mean))|>
-    (df -> rename(df, :Area_pc_sum_mean => :Years_1970_1999))
+    (df -> combine(df, :Area_pc_sum => median))|>
+    (df -> rename(df, :Area_pc_sum_median => :Years_1970_1997))
 d2 = dfpc |> 
-    (df -> filter(:Year => x -> x .>= 2000, df)) |>
+    (df -> filter(:Year => x -> x .>= 1998, df)) |>
     (df -> groupby(df, :Continent)) |> 
-    (df -> combine(df, :Area_pc_sum => mean))|>
-    (df -> rename(df, :Area_pc_sum_mean => :Years_2000_2023))
+    (df -> combine(df, :Area_pc_sum => median))|>
+    (df -> rename(df, :Area_pc_sum_median => :Years_1998_2023))
 d = leftjoin(d0,leftjoin(d1,d2, on = :Continent), on = :Continent)
 # # data check
 # d0 = dfpc |> 
 #     (df -> groupby(df, :Continent)) |> 
-#     (df -> combine(df, :Area_pc_sum => mean)) |>
+#     (df -> combine(df, :Area_pc_sum => median)) |>
 #     (df -> rename(df, :Area_pc_sum_mean => :Years_1970_2022))
 # d1 = dfpc |> 
 #     (df -> filter(:Year => x -> x .< 1996, df)) |>
 #     (df -> groupby(df, :Continent)) |> 
-#     (df -> combine(df, :Area_pc_sum => mean))|>
+#     (df -> combine(df, :Area_pc_sum => median))|>
 #     (df -> rename(df, :Area_pc_sum_mean => :Years_1970_1995))
 # d2 = dfpc |> 
 #     (df -> filter(:Year => x -> x .>= 1996, df)) |>
 #     (df -> groupby(df, :Continent)) |> 
-#     (df -> combine(df, :Area_pc_sum => mean))|>
+#     (df -> combine(df, :Area_pc_sum => median))|>
 #     (df -> rename(df, :Area_pc_sum_mean => :Years_1996_2022))
 # d = leftjoin(d0,leftjoin(d1,d2, on = :Continent), on = :Continent)
 
 # global
 d0 = dfpp |> 
-    (df -> combine(df, :Area_pc_sum => mean)) |>
-    (df -> rename(df, :Area_pc_sum_mean => :Years_1970_2023))
+    (df -> combine(df, :Area_pc_sum => median)) |>
+    (df -> rename(df, :Area_pc_sum_median => :Years_1970_2023))
 d1 = dfpp |> 
-    (df -> filter(:Year => x -> x .< 2000, df)) |>
-    (df -> combine(df, :Area_pc_sum => mean))|>
-    (df -> rename(df, :Area_pc_sum_mean => :Years_1970_1999))
+    (df -> filter(:Year => x -> x .<= 1997, df)) |>
+    (df -> combine(df, :Area_pc_sum => median))|>
+    (df -> rename(df, :Area_pc_sum_median => :Years_1970_1997))
 d2 = dfpp |> 
-    (df -> filter(:Year => x -> x .>= 2000, df)) |>
-    (df -> combine(df, :Area_pc_sum => mean))|>
-    (df -> rename(df, :Area_pc_sum_mean => :Years_2000_2023))
+    (df -> filter(:Year => x -> x .>= 1998, df)) |>
+    (df -> combine(df, :Area_pc_sum => median))|>
+    (df -> rename(df, :Area_pc_sum_median => :Years_1998_2023))
 
-show(stdout, MIME("text/latex"), vcat(d, hcat(DataFrame(Continent = "Global"), d0, d1, d2)),) # formatters = PrettyTables.ft_printf("%4.2f", 2:4))
+# using PrettyTables
+show(stdout, MIME("text/latex"), vcat(d, hcat(DataFrame(Continent = "Global"), d0, d1, d2)),) # formatters = PrettyTables.ft_printf("%4.2f"))
 
-(d.Years_2000_2023 .- d.Years_1970_1999) ./ d.Years_1970_1999
+(d.Years_1998_2023 .- d.Years_1970_1997) ./ d.Years_1970_1997
+
+# anova - test whether
 
 # l = @layout [a;b;c;d;e;f;g;h]
 # p = ();
