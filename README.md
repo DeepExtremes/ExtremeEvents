@@ -166,15 +166,22 @@ A map of the spatial footprint of the largest events is generated with `plot_sta
 
 Compare MergedEventStats_landonly with table of reported events compiled *a priori* with `SanityCheck.jl`. 
 
-### figA1_City_Jena.png, figA2_City_Niamey_81_85.png
+### Appendix A: SPEI versus PEI
 
-Other locations with `plot_city.jl`.
+Compare distributions and thresholds obtained from SPEI and PEI with `compare_spei_pei.jl` and visualize results with `plot_spei_versus_pei.jl`.
+
+### Appendix C: Dheed time series
+
+Plot Dheed time series at various locations with `plot_city.jl`.
+
+### Appendix D: Validation of PEI against daily SPEI
+
+Compare Dheed detected dry extremes with Pohl et al. 2023 and Liu et al. 2024 with `compare_phl.jl`.
 
 ## Release note for Dheed v4
-For v4, `Rechunk_data.jl` was modified so that a new `ERA5Cube.zarr` with correct offset and scaling was produced.  `pet.zarr` was correct in v3. All processing and postprocessing scripts have been modified to use the corrected data. New figures have been added.
+For v4, `Rechunk_data.jl` was modified so that a new `ERA5Cube.zarr` with correct offset and scaling was produced.  `pet.zarr` was already correct in v3. All processing and postprocessing scripts have been modified to use the corrected data. New figures have been added during the review process.
 
 ## Funding
 
-The DeepExtreme project was funded by the European Space Agency in the AI4Science initiative.
-
-The XAIDA project was funded by the Horizon Europe Framework Programme of the European Commission. 
+This work was funded by the European Space Agency (ESA) AI4Science projects "Multi-Hazards, Compounds and Cascade events: Deep Extremes," 2022--2024, and "Climate Adaptation, Extremes, Multi-Hazards and Geo-Hazards Science: ARCEME", 2024--2026, and the European Union's Horizon 2020 research and innovation program within the project "XAIDA: Extreme Events -- Artificial Intelligence for Detection and Attribution", (grant agreement 101003469). 
+Recent developments in the Julia package \textsf{YAXArrays.jl} were funded by ESA AI4Science project "The DeepESDL AI-Ready Earth System Data Lab".
