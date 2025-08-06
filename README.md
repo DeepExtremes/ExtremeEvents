@@ -83,7 +83,7 @@ Unique labels are assigned to blobs of co-occurrent hot and dry extremes, i.e. w
 
 *Note*: this will reduce the total number of tmax extremes in the cube...
 
-Because the connected component analysis requires to load the full cube into memory and the algorithm is greedy, the analysis was split into seven tasks, covering each 13 years, with three years overlap between two successive periods.
+Because the connected component analysis requires to load the full cube into memory and the algorithm is greedy, the analysis was split into seven tasks, covering each 16 years.
 
 ```
 cd SlurmScripts
@@ -91,13 +91,11 @@ sbatch label_events.slurm
 ```
 
 *Output*: 
-- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_1950_1962.zarr
-- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_1960_1972.zarr
-- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_1970_1982.zarr
-- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_1980_1992.zarr
-- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_1990_2002.zarr
-- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_2000_2012.zarr
-- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022.zarr
+- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_1950_1965.zarr
+- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_1966_1981.zarr
+- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_1982_1997.zarr
+- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_1998_2013.zarr
+- labelcube_ranked_pot0.01_ne0.1_cmp_S1_T3_2014_2023.zarr
 
 The labels are then merged into a single mergedlabels cube with `scripts/merge_labels.jl`.
 
@@ -152,36 +150,36 @@ julia --project="ExtremeEvents.toml" plot_EventType.jl
 ```
 ### fig08: trendmap_dh_decadal_1966_2023_geo.png
 
-Plot global spatial overview of trends of dry and hot extremes occurrences with `scripts/plot_trendmap.jl`. Plotting trend map based on indivdual grid cells and all years doesn't bring up significant trends, see `plot_trendmap.jl`. Decadal trend instead. Or, compare average number of extreme dry and hot days from two periods: 1970-1999 with 2000-2023 (`plot_comparemap.jl`).
+Plot global spatial overview of trends of dry and hot extremes occurrences with `scripts/plot_trendmap.jl`. Plotting trend map based on indivdual grid cells and all years doesn't bring up significant trends, see `plot_trendmap.jl`. Decadal trend instead. Or, compare average number of extreme dry and hot days from two periods: 1970-1999 with 2000-2023 (`scripts/plot_comparemap.jl`).
 
 ### fig09: events_stats_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022_landonly_1970.png
 
-Extract largest and longest events from `MergedEventStats_landonly` with `largest_labels.jl` and plot statistics with `plot_stats.jl`.
+Extract largest and longest events from `scripts/MergedEventStats_landonly` with `scripts/largest_labels.jl` and plot statistics with `scripts/plot_stats.jl`.
 
 ### fig10: largest_ranked_pot0.01_ne0.1_cmp_S1_T3_2010_2022_landonly_1970.png
 
-A map of the spatial footprint of the largest events is generated with `plot_stats.jl`.
+A map of the spatial footprint of the largest events is generated with `scripts/plot_stats.jl`.
 
 ### fig11: plot_ranked_pot0.01_ne0.1_cmp_S1_T3_validation.png
 
-Compare MergedEventStats_landonly with table of reported events compiled *a priori* with `SanityCheck.jl`. 
+Compare MergedEventStats_landonly with table of reported events compiled *a priori* with `scripts/SanityCheck.jl`. 
 
 ### Appendix A: SPEI versus PEI
 
-Compare distributions and thresholds obtained from SPEI and PEI with `compare_spei_pei.jl` and visualize results with `plot_spei_versus_pei.jl`.
+Compare distributions and thresholds obtained from SPEI and PEI with `scripts/compare_spei_pei.jl` and visualize results with `scripts/plot_spei_versus_pei.jl`.
 
 ### Appendix C: Dheed time series
 
-Plot Dheed time series at various locations with `plot_city.jl`.
+Plot Dheed time series at various locations with `scripts/plot_city.jl`.
 
 ### Appendix D: Validation of PEI against daily SPEI
 
-Compare Dheed detected dry extremes with Pohl et al. 2023 and Liu et al. 2024 with `compare_phl.jl`.
+Compare Dheed detected dry extremes with Pohl et al. 2023 and Liu et al. 2024 with `scripts/compare_phl.jl`.
 
 ## Release note for Dheed v4
-For v4, `Rechunk_data.jl` was modified so that a new `ERA5Cube.zarr` with correct offset and scaling was produced.  `pet.zarr` was already correct in v3. All processing and postprocessing scripts have been modified to use the corrected data. New figures have been added during the review process.
+For v4, `scripts/Rechunk_data.jl` was modified so that a new `ERA5Cube.zarr` with correct offset and scaling was produced.  `pet.zarr` was already correct in v3. All processing and postprocessing scripts have been modified to use the corrected data. New figures have been added during the review process.
 
 ## Funding
 
 This work was funded by the European Space Agency (ESA) AI4Science projects "Multi-Hazards, Compounds and Cascade events: Deep Extremes," 2022--2024, and "Climate Adaptation, Extremes, Multi-Hazards and Geo-Hazards Science: ARCEME", 2024--2026, and the European Union's Horizon 2020 research and innovation program within the project "XAIDA: Extreme Events -- Artificial Intelligence for Detection and Attribution", (grant agreement 101003469). 
-Recent developments in the Julia package \textsf{YAXArrays.jl} were funded by ESA AI4Science project "The DeepESDL AI-Ready Earth System Data Lab".
+Recent developments in the Julia package [YAXArrays.jl](https://github.com/JuliaDataCubes/YAXArrays.jl) were funded by ESA AI4Science project "The DeepESDL AI-Ready Earth System Data Lab".
